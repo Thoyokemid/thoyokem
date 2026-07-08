@@ -74,7 +74,7 @@ export default function AttendancePage() {
     >
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
             Attendance Management
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

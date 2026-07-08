@@ -14,13 +14,13 @@ export default function Card({ children, className = '', title, onClick }: CardP
       onClick={onClick}
     >
       {title && (
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-3 py-2.5 md:px-4 md:py-3 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
             {title}
           </h3>
         </div>
       )}
-      <div className={title ? 'p-4' : 'p-4'}>{children}</div>
+      <div className="p-3 md:p-4">{children}</div>
     </div>
   );
 }

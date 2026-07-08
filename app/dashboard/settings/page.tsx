@@ -123,9 +123,9 @@ export default function SettingsPage() {
       }}
     >
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Manage user permissions and access control
             </p>

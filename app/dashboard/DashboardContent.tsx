@@ -69,6 +69,10 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   const [chartMode, setChartMode] = useState<'overtime' | 'keterlambatan'>('overtime');
   // Sub-view: daily or per user
   const [chartView, setChartView] = useState<'daily' | 'users'>('daily');
+  // Date range for top chart: 3, 7, 30 days, or custom (default 30)
+  const [chartRange, setChartRange] = useState<'3' | '7' | '30' | 'custom'>('30');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   const [birthdayPage, setBirthdayPage] = useState(1);
   const [quotaPage, setQuotaPage] = useState(1);
@@ -102,10 +106,30 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   const processed = attendanceData.length ? processAttendanceData(attendanceData) : [];
   const recap = processed.length ? calculateRecap(processed) : [];
 
+  // --- Date range for top chart ---
+  const { rangeFrom, rangeTo } = (() => {
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    if (chartRange === 'custom') {
+      return { rangeFrom: customFrom, rangeTo: customTo };
+    }
+    const days = parseInt(chartRange, 10);
+    const from = new Date(today);
+    from.setDate(from.getDate() - (days - 1));
+    return { rangeFrom: fmt(from), rangeTo: fmt(today) };
+  })();
+
+  const rangeFilteredProcessed = processed.filter((r) => {
+    if (rangeFrom && r.tanggal_absensi < rangeFrom) return false;
+    if (rangeTo && r.tanggal_absensi > rangeTo) return false;
+    return true;
+  });
+  const rangeRecap = rangeFilteredProcessed.length ? calculateRecap(rangeFilteredProcessed) : [];
+
   // --- Overtime data ---
   const overtimeDailyData = (() => {
     const dayMap = new Map<string, number>();
-    processed.forEach((r) => {
+    rangeFilteredProcessed.forEach((r) => {
       if (r.overtime_menit > 0) {
         dayMap.set(r.tanggal_absensi, (dayMap.get(r.tanggal_absensi) ?? 0) + r.overtime_menit);
       }
@@ -115,7 +139,7 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
       .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
   })();
 
-  const overtimeUsersData = recap
+  const overtimeUsersData = rangeRecap
     .filter((r) => r.total_overtime_menit > 0)
     .map((r) => ({ name: toTitleCase(r.nama_karyawan), total: r.total_overtime_menit }))
     .sort((a, b) => b.total - a.total);
@@ -123,7 +147,7 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   // --- Keterlambatan data ---
   const keterlambatanDailyData = (() => {
     const dayMap = new Map<string, number>();
-    processed.forEach((r) => {
+    rangeFilteredProcessed.forEach((r) => {
       if (r.keterlambatan_menit > 0) {
         dayMap.set(r.tanggal_absensi, (dayMap.get(r.tanggal_absensi) ?? 0) + r.keterlambatan_menit);
       }
@@ -133,7 +157,7 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
       .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
   })();
 
-  const keterlambatanUsersData = recap
+  const keterlambatanUsersData = rangeRecap
     .filter((r) => r.total_keterlambatan_menit > 0)
     .map((r) => ({ name: toTitleCase(r.nama_karyawan), total: r.total_keterlambatan_menit }))
     .sort((a, b) => b.total - a.total);
@@ -220,56 +244,104 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
 
       {/* TOP: Chart */}
       <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {chartTitle}
-          </h3>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              {chartTitle}
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
+                <button
+                  onClick={() => setChartMode('overtime')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    chartMode === 'overtime'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Overtime
+                </button>
+                <button
+                  onClick={() => setChartMode('keterlambatan')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    chartMode === 'keterlambatan'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Keterlambatan
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
+                <button
+                  onClick={() => setChartView('daily')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    chartView === 'daily'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Daily
+                </button>
+                <button
+                  onClick={() => setChartView('users')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    chartView === 'users'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Users
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
+              {(['3', '7', '30'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setChartRange(d)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    chartRange === d
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {d} Hari
+                </button>
+              ))}
               <button
-                onClick={() => setChartMode('overtime')}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  chartMode === 'overtime'
+                onClick={() => setChartRange('custom')}
+                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                  chartRange === 'custom'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                Overtime
-              </button>
-              <button
-                onClick={() => setChartMode('keterlambatan')}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  chartMode === 'keterlambatan'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                Keterlambatan
+                Custom
               </button>
             </div>
 
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
-              <button
-                onClick={() => setChartView('daily')}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  chartView === 'daily'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                Daily
-              </button>
-              <button
-                onClick={() => setChartView('users')}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  chartView === 'users'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                Users
-              </button>
-            </div>
+            {chartRange === 'custom' && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="input-field !py-1 !px-2 text-xs w-[9.5rem]"
+                />
+                <span className="text-xs text-gray-400">—</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="input-field !py-1 !px-2 text-xs w-[9.5rem]"
+                />
+              </div>
+            )}
           </div>
         </div>
 

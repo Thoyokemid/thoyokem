@@ -133,7 +133,7 @@ export default function RegistrationPage() {
     >
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
             Registration Requests
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -169,7 +169,7 @@ export default function RegistrationPage() {
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
                           {tab.label}
                         </p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-1">
                           {tab.count}
                         </p>
                       </div>
