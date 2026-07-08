@@ -37,6 +37,7 @@ export default function LeavePage() {
     date_end: "",
     category: "sick",
     link_url: "",
+    keterangan: "",
   });
 
   useEffect(() => {
@@ -139,6 +140,7 @@ export default function LeavePage() {
             date_end: formData.date_end,
             category: formData.category,
             link_url: fileUrl,
+            keterangan: formData.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -159,6 +161,7 @@ export default function LeavePage() {
             date_end: formData.date_end,
             category: formData.category,
             link_url: fileUrl,
+            keterangan: formData.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -170,7 +173,7 @@ export default function LeavePage() {
 
   const handleEdit = (leave: LeaveAttendance) => {
     setEditingLeave(leave);
-    setFormData({ staff_id: "", date_from: leave.date_from, date_end: leave.date_end, category: leave.category, link_url: leave.link_url });
+    setFormData({ staff_id: "", date_from: leave.date_from, date_end: leave.date_end, category: leave.category, link_url: leave.link_url, keterangan: leave.keterangan || "" });
     setIsModalOpen(true);
   };
 
@@ -188,7 +191,7 @@ export default function LeavePage() {
     setIsModalOpen(false);
     setEditingLeave(null);
     setUploadedFile(null);
-    setFormData({ staff_id: "", date_from: "", date_end: "", category: "sick", link_url: "" });
+    setFormData({ staff_id: "", date_from: "", date_end: "", category: "sick", link_url: "", keterangan: "" });
   };
 
   const clearFilters = () => {
@@ -336,6 +339,7 @@ export default function LeavePage() {
                     <ThBtn field="date_end">Date To</ThBtn>
                     <ThBtn field="category">Category</ThBtn>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Document</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keterangan</th>
                     <ThBtn field="created_at">Created</ThBtn>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -343,7 +347,7 @@ export default function LeavePage() {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredLeaves.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</td>
+                      <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</td>
                     </tr>
                   ) : (
                     filteredLeaves.map((row) => (
@@ -365,6 +369,9 @@ export default function LeavePage() {
                           ) : (
                             <span className="text-gray-400 text-xs">-</span>
                           )}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100 max-w-[200px] truncate" title={row.keterangan}>
+                          {row.keterangan || <span className="text-gray-400">-</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">
                           {new Date(row.created_at).toLocaleDateString()}
@@ -450,6 +457,17 @@ export default function LeavePage() {
                   required
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="label-field">Keterangan</label>
+              <textarea
+                value={formData.keterangan}
+                onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
+                className="input-field"
+                rows={2}
+                placeholder="Add a note or reason for this leave (optional)"
+              />
             </div>
 
             <div>

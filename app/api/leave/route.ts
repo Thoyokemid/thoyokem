@@ -36,6 +36,7 @@ export async function GET() {
       date_end: row[4] || '',
       category: row[5] || '',
       link_url: row[6] || '',
+      keterangan: row[9] || '',
       created_at: row[7] || '',
       update_at: row[8] || '',
     }));
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       data.link_url || '',
       now,
       now,
+      data.keterangan || '',
     ];
 
     await appendSheet('leave_attendance', [newLeave]);
@@ -117,8 +119,9 @@ export async function PUT(request: NextRequest) {
     rows[rowIndex][5] = updates.category || rows[rowIndex][5];
     rows[rowIndex][6] = updates.link_url || rows[rowIndex][6];
     rows[rowIndex][8] = now;
+    rows[rowIndex][9] = updates.keterangan ?? rows[rowIndex][9] ?? '';
 
-    await writeSheet('leave_attendance', `A${rowIndex + 1}:I${rowIndex + 1}`, [rows[rowIndex]]);
+    await writeSheet('leave_attendance', `A${rowIndex + 1}:J${rowIndex + 1}`, [rows[rowIndex]]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -75,6 +75,7 @@ export interface LeaveAttendance {
   date_end: string;
   category: string;
   link_url: string;
+  keterangan: string; // NEW — kolom J di sheet
   created_at: string;
   update_at: string;
 }
