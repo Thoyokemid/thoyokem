@@ -10,7 +10,9 @@ import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ChevronsUpDown, ShieldOff } from "lucide-react";
+import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
+import { generateLeaveLetterPDF } from "@/utils/leaveLetter";
+import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ChevronsUpDown, ShieldOff, Download, X } from "lucide-react";
 
 type SortField = 'name' | 'date_from' | 'date_end' | 'category' | 'created_at';
 type SortDir = 'asc' | 'desc';
@@ -46,6 +48,7 @@ export default function LeavePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLeave, setEditingLeave] = useState<LeaveAttendance | null>(null);
+  const [detailLeave, setDetailLeave] = useState<LeaveAttendance | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
@@ -376,7 +379,11 @@ export default function LeavePage() {
                     </tr>
                   ) : (
                     filteredLeaves.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <tr
+                        key={row.id}
+                        onClick={() => setDetailLeave(row)}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      >
                         <td className="px-3 py-2 text-xs">
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
@@ -392,7 +399,7 @@ export default function LeavePage() {
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {row.link_url ? (
-                            <a href={row.link_url} target="_blank" rel="noopener noreferrer"
+                            <a href={row.link_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                               className="text-primary hover:underline text-xs inline-flex items-center gap-1">
                               <FileText size={12} /> View
                             </a>
@@ -407,7 +414,7 @@ export default function LeavePage() {
                           {new Date(row.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-3 py-2 text-xs">
-                          <div className="flex gap-2">
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
                               <Edit size={14} />
                             </button>
@@ -527,6 +534,82 @@ export default function LeavePage() {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Detail Modal */}
+        <Modal isOpen={!!detailLeave} onClose={() => setDetailLeave(null)} title="Detail Cuti" size="md">
+          {detailLeave && (() => {
+            const relatedStaff = staff.find((s) => s.registration_id === detailLeave.registration_id);
+            const quota = relatedStaff?.leave_quota ?? 12;
+            const usedDays = countUsedLeaveDays(leaves, detailLeave.registration_id);
+            const remaining = Math.max(0, quota - usedDays);
+            const totalDays = countLeaveDays(detailLeave);
+
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
+                    {getInitials(detailLeave.name)}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailLeave.name}</p>
+                    <CategoryBadge category={detailLeave.category} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Tanggal Mulai</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.date_from}</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Tanggal Selesai</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.date_end}</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Jumlah Hari</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{totalDays} hari</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Sisa Kuota Cuti</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{remaining} / {quota} hari</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Keterangan</p>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 rounded-md p-2.5 min-h-[2.5rem]">
+                    {detailLeave.keterangan || <span className="text-gray-400">Tidak ada keterangan</span>}
+                  </p>
+                </div>
+
+                {detailLeave.link_url && (
+                  <a
+                    href={detailLeave.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <FileText size={13} /> Lihat dokumen pendukung
+                  </a>
+                )}
+
+                <div className="flex gap-2 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <Button variant="secondary" onClick={() => setDetailLeave(null)}>
+                    <X size={14} className="mr-1.5" />
+                    Tutup
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => generateLeaveLetterPDF(detailLeave, { quota, usedDays })}
+                  >
+                    <Download size={14} className="mr-1.5" />
+                    Download Surat Cuti
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </Modal>
       </div>
     </DashboardLayout>
