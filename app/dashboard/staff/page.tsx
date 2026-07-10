@@ -8,16 +8,33 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
-import { StaffList } from "@/types";
+import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog } from "lucide-react";
+import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
+import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, X, CalendarDays } from "lucide-react";
+
+const CATEGORY_STYLES: Record<string, string> = {
+  sick: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  annual: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  personal: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  emergency: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  sick: 'Sick Leave',
+  annual: 'Annual Leave',
+  personal: 'Personal Leave',
+  emergency: 'Emergency Leave',
+};
 
 export default function StaffPage() {
   const { data: session, status } = useSession();
   const [staff, setStaff] = useState<StaffList[]>([]);
+  const [leaves, setLeaves] = useState<LeaveAttendance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffList | null>(null);
+  const [detailStaff, setDetailStaff] = useState<StaffList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchName, setSearchName] = useState('');
 
@@ -34,8 +51,12 @@ export default function StaffPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/staff");
-      if (res.ok) setStaff(await res.json());
+      const [staffRes, leavesRes] = await Promise.all([
+        fetch("/api/staff"),
+        fetch("/api/leave"),
+      ]);
+      if (staffRes.ok) setStaff(await staffRes.json());
+      if (leavesRes.ok) setLeaves(await leavesRes.json());
     } catch (error) {
       console.error("Error fetching staff:", error);
     } finally {
@@ -203,7 +224,11 @@ export default function StaffPage() {
                     </tr>
                   ) : (
                     filteredStaff.map((s) => (
-                      <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <tr
+                        key={s.id}
+                        onClick={() => setDetailStaff(s)}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      >
                         <td className="px-3 py-2 text-xs">
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
@@ -225,7 +250,7 @@ export default function StaffPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-xs">
-                          <div className="flex gap-2">
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
                               <Edit size={14} />
                             </button>
@@ -299,6 +324,102 @@ export default function StaffPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Detail Modal */}
+        <Modal isOpen={!!detailStaff} onClose={() => setDetailStaff(null)} title="Detail Karyawan" size="lg">
+          {detailStaff && (() => {
+            const staffLeaves = leaves
+              .filter((l) => l.registration_id === detailStaff.registration_id)
+              .sort((a, b) => b.date_from.localeCompare(a.date_from));
+            const quota = detailStaff.leave_quota ?? 12;
+            const used = countUsedLeaveDays(leaves, detailStaff.registration_id);
+            const remaining = Math.max(0, quota - used);
+
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
+                    {getInitials(detailStaff.name)}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailStaff.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detailStaff.registration_id || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Tanggal Lahir</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailStaff.birth_date || '-'}</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Kuota Cuti</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{quota} hari/tahun</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
+                    <p className="text-gray-500 dark:text-gray-400">Sisa Kuota</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{remaining} / {quota} hari</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <CalendarDays size={14} className="text-gray-500" />
+                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Riwayat Cuti ({staffLeaves.length})
+                    </p>
+                  </div>
+
+                  {staffLeaves.length === 0 ? (
+                    <p className="text-xs text-gray-500 text-center py-6 bg-gray-50 dark:bg-gray-700 rounded-md">
+                      Belum ada riwayat cuti
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto border border-gray-100 dark:border-gray-700 rounded-md">
+                      <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-900">
+                          <tr>
+                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dari</th>
+                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sampai</th>
+                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hari</th>
+                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kategori</th>
+                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keterangan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                          {staffLeaves.map((l) => (
+                            <tr key={l.id}>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.date_from}</td>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.date_end}</td>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{countLeaveDays(l)}</td>
+                              <td className="px-2.5 py-1.5 text-xs">
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                                  CATEGORY_STYLES[l.category] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                }`}>
+                                  {CATEGORY_LABELS[l.category] || l.category}
+                                </span>
+                              </td>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[160px] truncate" title={l.keterangan}>
+                                {l.keterangan || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <Button variant="secondary" onClick={() => setDetailStaff(null)}>
+                    <X size={14} className="mr-1.5" />
+                    Tutup
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </Modal>
       </div>
     </DashboardLayout>
