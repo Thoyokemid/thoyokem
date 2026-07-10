@@ -8,7 +8,10 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
 import { Registration } from "@/types";
+import { getInitials } from "@/utils/format";
 import { AlertCircle, CheckCircle, XCircle, Clock } from "lucide-react";
+import { motion } from "framer-motion";
+import clsx from "clsx";
 
 export default function RegistrationPage() {
   const { data: session, status } = useSession();
@@ -103,6 +106,7 @@ export default function RegistrationPage() {
       label: "Pending",
       icon: Clock,
       color: "text-orange-500",
+      bg: "bg-orange-50 dark:bg-orange-900/20",
       count: registrations.filter((r) => r.status === "pending").length,
     },
     {
@@ -110,6 +114,7 @@ export default function RegistrationPage() {
       label: "Approved",
       icon: CheckCircle,
       color: "text-green-500",
+      bg: "bg-green-50 dark:bg-green-900/20",
       count: registrations.filter((r) => r.status === "approved").length,
     },
     {
@@ -117,6 +122,7 @@ export default function RegistrationPage() {
       label: "Rejected",
       icon: XCircle,
       color: "text-red-500",
+      bg: "bg-red-50 dark:bg-red-900/20",
       count: registrations.filter((r) => r.status === "rejected").length,
     },
   ];
@@ -159,9 +165,10 @@ export default function RegistrationPage() {
                 return (
                   <Card
                     key={tab.id}
-                    className={`cursor-pointer transition-all ${
-                      activeTab === tab.id ? "ring-2 ring-primary" : "hover:shadow-lg"
-                    }`}
+                    className={clsx(
+                      "cursor-pointer transition-all",
+                      activeTab === tab.id ? "ring-2 ring-primary" : "hover:shadow-md"
+                    )}
                     onClick={() => setActiveTab(tab.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -173,7 +180,9 @@ export default function RegistrationPage() {
                           {tab.count}
                         </p>
                       </div>
-                      <Icon className={tab.color} size={28} />
+                      <div className={clsx("p-2 rounded-lg", tab.bg)}>
+                        <Icon className={tab.color} size={22} />
+                      </div>
                     </div>
                   </Card>
                 );
@@ -191,24 +200,35 @@ export default function RegistrationPage() {
                   </div>
                 </Card>
               ) : (
-                filteredRegistrations.map((registration) => (
-                  <Card key={registration.id}>
+                filteredRegistrations.map((registration, i) => (
+                  <motion.div
+                    key={registration.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15, delay: Math.min(i * 0.03, 0.3) }}
+                  >
+                  <Card>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                          {registration.name}
-                        </h3>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Username: {registration.username}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-                          Requested: {new Date(registration.created_at).toLocaleString()}
-                        </p>
-                        {registration.update_at !== registration.created_at && (
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
-                            Updated: {new Date(registration.update_at).toLocaleString()}
+                      <div className="flex-1 flex items-start gap-3">
+                        <span className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {getInitials(registration.name)}
+                        </span>
+                        <div>
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                            {registration.name}
+                          </h3>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            Username: {registration.username}
                           </p>
-                        )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                            Requested: {new Date(registration.created_at).toLocaleString()}
+                          </p>
+                          {registration.update_at !== registration.created_at && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              Updated: {new Date(registration.update_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {activeTab === "pending" && (
@@ -245,6 +265,7 @@ export default function RegistrationPage() {
                       )}
                     </div>
                   </Card>
+                  </motion.div>
                 ))
               )}
             </div>

@@ -7,7 +7,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
-import { Save, Clock } from "lucide-react";
+import { Save, Clock, Timer } from "lucide-react";
 
 interface UserPermission {
   id: string;
@@ -54,9 +54,56 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  const [workHours, setWorkHours] = useState({ jam_masuk: "08:00", jam_pulang: "17:00", toleransi_menit: "0" });
+  const [isSavingHours, setIsSavingHours] = useState(false);
+  const [hoursMessage, setHoursMessage] = useState("");
+
   useEffect(() => {
-    if (session) fetchUsers();
+    if (session) {
+      fetchUsers();
+      fetchSettings();
+    }
   }, [session]);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkHours({
+          jam_masuk: data.jam_masuk || "08:00",
+          jam_pulang: data.jam_pulang || "17:00",
+          toleransi_menit: data.toleransi_menit || "0",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    }
+  };
+
+  const handleSaveWorkHours = async () => {
+    setIsSavingHours(true);
+    setHoursMessage("");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(workHours),
+      });
+      if (res.ok) {
+        setHoursMessage("Jam kerja berhasil disimpan!");
+      } else {
+        const err = await res.json();
+        setHoursMessage(err.error || "Gagal menyimpan jam kerja.");
+      }
+      setTimeout(() => setHoursMessage(""), 4000);
+    } catch (error) {
+      console.error("Error saving work hours:", error);
+      setHoursMessage("Gagal menyimpan jam kerja.");
+    } finally {
+      setIsSavingHours(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -145,6 +192,59 @@ export default function SettingsPage() {
             {saveMessage}
           </div>
         )}
+
+        <Card title="Jam Kerja">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-1.5 rounded-md bg-primary-50 dark:bg-primary-900/20 mt-0.5">
+              <Timer className="text-primary" size={16} />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Jam kerja default ini dipakai saat mesin absensi tidak mengirim "Jam Set" untuk suatu record.
+              Berlaku global untuk semua karyawan.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="label-field">Jam Masuk</label>
+              <input
+                type="time"
+                value={workHours.jam_masuk}
+                onChange={(e) => setWorkHours({ ...workHours, jam_masuk: e.target.value })}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label-field">Jam Pulang</label>
+              <input
+                type="time"
+                value={workHours.jam_pulang}
+                onChange={(e) => setWorkHours({ ...workHours, jam_pulang: e.target.value })}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label-field">Toleransi Keterlambatan (menit)</label>
+              <input
+                type="number"
+                min={0}
+                value={workHours.toleransi_menit}
+                onChange={(e) => setWorkHours({ ...workHours, toleransi_menit: e.target.value })}
+                className="input-field"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Button onClick={handleSaveWorkHours} isLoading={isSavingHours}>
+              <Save size={14} className="mr-1.5" />
+              Simpan Jam Kerja
+            </Button>
+            {hoursMessage && (
+              <span className={`text-xs ${hoursMessage.includes("berhasil") ? "text-green-600" : "text-red-600"}`}>
+                {hoursMessage}
+              </span>
+            )}
+          </div>
+        </Card>
 
         {isLoading ? (
           <Card>

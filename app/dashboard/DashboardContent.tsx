@@ -5,10 +5,11 @@ import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
 import { AttendanceImport, StaffList, LeaveAttendance } from '@/types';
 import { processAttendanceData, calculateRecap, countUsedLeaveDays } from '@/utils/attendance';
+import { useWorkHours } from '@/hooks/useWorkHours';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Cake, FileText, Clock, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cake, FileText, Clock, Users, UserCheck, CalendarClock, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface DashboardContentProps {
   userName: string;
@@ -103,20 +104,30 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
     }
   };
 
-  const processed = attendanceData.length ? processAttendanceData(attendanceData) : [];
+  const workHours = useWorkHours();
+  const processed = attendanceData.length ? processAttendanceData(attendanceData, workHours) : [];
   const recap = processed.length ? calculateRecap(processed) : [];
 
   // --- Date range for top chart ---
+  // Anchor "N hari" pada tanggal terbaru yang ADA di data, bukan tanggal hari ini,
+  // supaya data yang ditampilkan tetap 30 hari terakhir yang tersedia meski data belum di-import untuk hari ini.
+  const latestDataDate = processed.reduce(
+    (max, r) => (r.tanggal_absensi > max ? r.tanggal_absensi : max),
+    ''
+  );
+
   const { rangeFrom, rangeTo } = (() => {
-    const today = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
     if (chartRange === 'custom') {
       return { rangeFrom: customFrom, rangeTo: customTo };
     }
+    if (!latestDataDate) return { rangeFrom: '', rangeTo: '' };
+
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
     const days = parseInt(chartRange, 10);
-    const from = new Date(today);
+    const anchor = new Date(latestDataDate);
+    const from = new Date(anchor);
     from.setDate(from.getDate() - (days - 1));
-    return { rangeFrom: fmt(from), rangeTo: fmt(today) };
+    return { rangeFrom: fmt(from), rangeTo: latestDataDate };
   })();
 
   const rangeFilteredProcessed = processed.filter((r) => {
@@ -217,6 +228,64 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
     .sort((a, b) => a.avg - b.avg)
     .slice(0, 10);
 
+  // --- KPI stats (BI-style) ---
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const monthPrefix = todayStr.slice(0, 7);
+
+  const hadirHariIni = new Set(
+    processed.filter((r) => r.tanggal_absensi === todayStr && r.jam_masuk_actual).map((r) => r.nama)
+  ).size;
+
+  const cutiAktifHariIni = leaveData.filter(
+    (l) => l.date_from <= todayStr && l.date_end >= todayStr
+  ).length;
+
+  const overtimeBulanIni = processed
+    .filter((r) => r.tanggal_absensi.startsWith(monthPrefix))
+    .reduce((sum, r) => sum + r.overtime_menit, 0);
+
+  const keterlambatanBulanIni = processed
+    .filter((r) => r.tanggal_absensi.startsWith(monthPrefix))
+    .reduce((sum, r) => sum + r.keterlambatan_menit, 0);
+
+  const kpis = [
+    {
+      label: 'Total Karyawan',
+      value: staffList.length,
+      icon: Users,
+      color: 'text-indigo-500',
+      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+    },
+    {
+      label: 'Hadir Hari Ini',
+      value: hadirHariIni,
+      icon: UserCheck,
+      color: 'text-green-500',
+      bg: 'bg-green-50 dark:bg-green-900/20',
+    },
+    {
+      label: 'Cuti Aktif Hari Ini',
+      value: cutiAktifHariIni,
+      icon: CalendarClock,
+      color: 'text-blue-500',
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
+    },
+    {
+      label: 'Overtime Bulan Ini',
+      value: `${overtimeBulanIni} min`,
+      icon: TrendingUp,
+      color: 'text-purple-500',
+      bg: 'bg-purple-50 dark:bg-purple-900/20',
+    },
+    {
+      label: 'Keterlambatan Bulan Ini',
+      value: `${keterlambatanBulanIni} min`,
+      icon: TrendingDown,
+      color: 'text-red-500',
+      bg: 'bg-red-50 dark:bg-red-900/20',
+    },
+  ];
+
   // Jumlah absen per orang
   const absenPerOrangData = recap
     .map((r) => ({
@@ -240,6 +309,26 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           Welcome back, {userName}!
         </p>
+      </div>
+
+      {/* KPI Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <Card key={kpi.label}>
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{kpi.label}</p>
+                  <p className="text-lg md:text-xl font-bold text-gray-900 dark:text-white mt-0.5">{kpi.value}</p>
+                </div>
+                <div className={`p-2 rounded-lg flex-shrink-0 ${kpi.bg}`}>
+                  <Icon className={kpi.color} size={18} />
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* TOP: Chart */}

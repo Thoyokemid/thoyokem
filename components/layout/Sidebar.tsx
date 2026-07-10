@@ -96,18 +96,31 @@ export default function Sidebar({ permissions }: SidebarProps) {
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <h1 className="text-base font-bold text-primary">Thoyokem</h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                T
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-gray-900 dark:text-white leading-tight truncate">Thoyokem</h1>
+                <p className="text-[10px] text-gray-400 leading-tight">Workspace</p>
+              </div>
+            </div>
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden md:block p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="hidden md:block p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
           >
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
       </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        {!isCollapsed && (
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Menu
+          </p>
+        )}
         {menuItems.map((item) => {
           if (!item.enabled) return null;
 
@@ -119,14 +132,14 @@ export default function Sidebar({ permissions }: SidebarProps) {
               key={item.href}
               href={item.href}
               onClick={() => setIsMobileOpen(false)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
                 isActive
-                  ? 'bg-primary text-white'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-primary-50 text-primary dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              <Icon size={16} />
-              {!isCollapsed && <span className="font-medium">{item.name}</span>}
+              <Icon size={16} className={isActive ? 'text-primary' : ''} />
+              {!isCollapsed && <span>{item.name}</span>}
             </Link>
           );
         })}

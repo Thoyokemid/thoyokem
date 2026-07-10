@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import { AttendanceImport, AttendanceRecord } from '@/types';
 import { processAttendanceData, exportToXLSX } from '@/utils/attendance';
+import { useWorkHours } from '@/hooks/useWorkHours';
 import { Search, Download, Calendar } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -20,16 +21,17 @@ export default function ReportTab() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  const workHours = useWorkHours();
 
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
     if (rawData.length > 0) {
-      const processed = processAttendanceData(rawData);
+      const processed = processAttendanceData(rawData, workHours);
       setReportData(processed);
       setFilteredData(processed);
     }
-  }, [rawData]);
+  }, [rawData, workHours]);
 
   useEffect(() => {
     filterData();

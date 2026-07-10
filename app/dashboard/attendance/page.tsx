@@ -8,11 +8,15 @@ import ImportTab from "./components/ImportTab";
 import DataTab from "./components/DataTab";
 import ReportTab from "./components/ReportTab";
 import RecapTab from "./components/RecapTab";
-import { AlertCircle } from "lucide-react";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import { AlertCircle, Upload } from "lucide-react";
 
 export default function AttendancePage() {
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState("data");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
 
   // Redirect if not authenticated
   if (status !== "loading" && !session) {
@@ -56,7 +60,6 @@ export default function AttendancePage() {
   }
 
   const tabs = [
-    { id: "import", label: "Import" },
     { id: "data", label: "Data" },
     { id: "report", label: "Report" },
     { id: "recap", label: "Recap" },
@@ -73,13 +76,19 @@ export default function AttendancePage() {
       }}
     >
       <div className="space-y-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-            Attendance Management
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage employee attendance records
-          </p>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+              Attendance Management
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Manage employee attendance records
+            </p>
+          </div>
+          <Button onClick={() => setIsImportModalOpen(true)} variant="outline" size="sm">
+            <Upload size={14} className="mr-1.5" />
+            Import
+          </Button>
         </div>
 
         <div className="border-b border-gray-200 dark:border-gray-700">
@@ -101,12 +110,25 @@ export default function AttendancePage() {
         </div>
 
         <div className="mt-4">
-          {activeTab === "import" && <ImportTab />}
-          {activeTab === "data" && <DataTab />}
+          {activeTab === "data" && <DataTab key={dataRefreshKey} />}
           {activeTab === "report" && <ReportTab />}
           {activeTab === "recap" && <RecapTab />}
         </div>
       </div>
+
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Attendance Data"
+        size="xl"
+      >
+        <ImportTab
+          onImported={() => {
+            setDataRefreshKey((k) => k + 1);
+            setIsImportModalOpen(false);
+          }}
+        />
+      </Modal>
     </DashboardLayout>
   );
 }

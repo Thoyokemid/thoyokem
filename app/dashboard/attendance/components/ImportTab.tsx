@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Upload, FileText, CheckCircle, AlertCircle, Info, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -12,7 +11,11 @@ interface ParsedResult {
   dates: string[];
 }
 
-export default function ImportTab() {
+interface ImportTabProps {
+  onImported?: () => void;
+}
+
+export default function ImportTab({ onImported }: ImportTabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -72,6 +75,7 @@ export default function ImportTab() {
       setFile(null);
       setParsed(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      onImported?.();
     } catch {
       setUploadStatus({ type: 'error', message: 'Failed to import data. Please try again.' });
     } finally {
@@ -123,10 +127,7 @@ export default function ImportTab() {
 
   return (
     <div className="space-y-4">
-      <Card title="Import Attendance Data">
-        <div className="space-y-4">
-
-          {/* Info banner */}
+      {/* Info banner */}
           <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
             <Info className="text-blue-500 flex-shrink-0 mt-0.5" size={16} />
             <p className="text-xs text-blue-700 dark:text-blue-300">
@@ -237,9 +238,7 @@ export default function ImportTab() {
                 )}
               </div>
             </div>
-          )}
-        </div>
-      </Card>
+      )}
     </div>
   );
 }

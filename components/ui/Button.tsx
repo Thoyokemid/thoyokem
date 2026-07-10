@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'success';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   children: React.ReactNode;
@@ -16,13 +16,15 @@ export default function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseClasses = 'rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center';
+  const baseClasses = 'rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center';
 
   const variantClasses = {
-    primary: 'bg-primary hover:bg-primary-600 text-white focus:ring-primary',
-    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 focus:ring-gray-400',
-    danger: 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-500',
-    success: 'bg-green-500 hover:bg-green-600 text-white focus:ring-green-500',
+    primary: 'bg-primary hover:bg-primary-600 text-white shadow-sm focus:ring-primary',
+    secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 dark:border-gray-600 focus:ring-gray-400',
+    outline: 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600 focus:ring-gray-400',
+    ghost: 'bg-transparent hover:bg-gray-100 text-gray-600 dark:hover:bg-gray-700 dark:text-gray-300 focus:ring-gray-400',
+    danger: 'bg-red-500 hover:bg-red-600 text-white shadow-sm focus:ring-red-500',
+    success: 'bg-green-500 hover:bg-green-600 text-white shadow-sm focus:ring-green-500',
   };
 
   const sizeClasses = {

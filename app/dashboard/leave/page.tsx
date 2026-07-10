@@ -9,10 +9,35 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
 import { LeaveAttendance, StaffList } from "@/types";
+import { getInitials } from "@/utils/format";
 import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ChevronsUpDown, ShieldOff } from "lucide-react";
 
 type SortField = 'name' | 'date_from' | 'date_end' | 'category' | 'created_at';
 type SortDir = 'asc' | 'desc';
+
+const CATEGORY_STYLES: Record<string, string> = {
+  sick: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  annual: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  personal: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  emergency: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  sick: 'Sick Leave',
+  annual: 'Annual Leave',
+  personal: 'Personal Leave',
+  emergency: 'Emergency Leave',
+};
+
+function CategoryBadge({ category }: { category: string }) {
+  return (
+    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+      CATEGORY_STYLES[category] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+    }`}>
+      {CATEGORY_LABELS[category] || category}
+    </span>
+  );
+}
 
 export default function LeavePage() {
   const { data: session, status } = useSession();
@@ -352,13 +377,18 @@ export default function LeavePage() {
                   ) : (
                     filteredLeaves.map((row) => (
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100 font-medium">{row.name}</td>
+                        <td className="px-3 py-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                              {getInitials(row.name)}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{row.name}</span>
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.date_from}</td>
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.date_end}</td>
                         <td className="px-3 py-2 text-xs">
-                          <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                            {row.category}
-                          </span>
+                          <CategoryBadge category={row.category} />
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {row.link_url ? (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import { UserPlus } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -74,10 +75,15 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8"
+      >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-            <UserPlus className="text-white" size={32} />
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-xl mb-4">
+            <UserPlus className="text-white" size={26} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Create Account
@@ -189,7 +195,7 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

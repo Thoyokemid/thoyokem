@@ -8,6 +8,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import { AttendanceImport, AttendanceRecord, AttendanceRecap } from '@/types';
 import { processAttendanceData, calculateRecap, exportRecapToXLSX } from '@/utils/attendance';
+import { useWorkHours } from '@/hooks/useWorkHours';
 import { Download, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -18,6 +19,7 @@ export default function RecapTab() {
   const [recapData, setRecapData] = useState<AttendanceRecap[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const workHours = useWorkHours();
 
   // Export modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -28,11 +30,11 @@ export default function RecapTab() {
 
   useEffect(() => {
     if (rawData.length > 0) {
-      const processed = processAttendanceData(rawData);
+      const processed = processAttendanceData(rawData, workHours);
       setProcessedRecords(processed);
       setRecapData(calculateRecap(processed));
     }
-  }, [rawData]);
+  }, [rawData, workHours]);
 
   const fetchData = async () => {
     try {

@@ -33,7 +33,17 @@ interface ProcessedDay {
   keterangan?: string;
 }
 
-export function processAttendanceData(rawData: AttendanceImport[]): AttendanceRecord[] {
+export interface WorkHourDefaults {
+  jamMasuk: string;
+  jamPulang: string;
+  toleransiMenit?: number;
+}
+
+export function processAttendanceData(
+  rawData: AttendanceImport[],
+  defaults: WorkHourDefaults = { jamMasuk: '08:00', jamPulang: '17:00', toleransiMenit: 0 }
+): AttendanceRecord[] {
+  const toleransi = defaults.toleransiMenit ?? 0;
   const grouped = new Map<string, Map<string, ProcessedDay>>();
 
   rawData.forEach((record) => {
@@ -79,8 +89,8 @@ export function processAttendanceData(rawData: AttendanceImport[]): AttendanceRe
 
     if (existingRecord) return;
 
-    const jamMasukTarget = dayRecord.masukTarget || '08:00';
-    const jamPulangTarget = dayRecord.pulangTarget || '17:00';
+    const jamMasukTarget = dayRecord.masukTarget || defaults.jamMasuk;
+    const jamPulangTarget = dayRecord.pulangTarget || defaults.jamPulang;
 
     let jamMasukActual = '';
     let keterlambatanMenit = 0;
@@ -95,7 +105,7 @@ export function processAttendanceData(rawData: AttendanceImport[]): AttendanceRe
       const targetMinutes = timeToMinutes(jamMasukTarget);
       const actualMinutes = timeToMinutes(jamMasukActual);
 
-      if (actualMinutes > targetMinutes) {
+      if (actualMinutes > targetMinutes + toleransi) {
         keterlambatanMenit = actualMinutes - targetMinutes;
         keteranganMasuk = 'Terlambat';
       } else {
