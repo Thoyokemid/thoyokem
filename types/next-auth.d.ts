@@ -10,6 +10,7 @@ declare module 'next-auth' {
       leave: boolean;
       registration_request: boolean;
       setting: boolean;
+      staff: boolean;
     };
   }
 
@@ -26,6 +27,7 @@ declare module 'next-auth' {
         leave: boolean;
         registration_request: boolean;
         setting: boolean;
+        staff: boolean;
       };
     };
   }
@@ -41,6 +43,7 @@ declare module 'next-auth/jwt' {
       leave: boolean;
       registration_request: boolean;
       setting: boolean;
+      staff: boolean;
     };
   }
 }

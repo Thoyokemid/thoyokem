@@ -8,6 +8,7 @@ import {
   Clock,
   FileText,
   UserPlus,
+  Users,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +27,7 @@ interface SidebarProps {
     leave: boolean;
     registration_request: boolean;
     setting: boolean;
+    staff: boolean;
   };
 }
 
@@ -72,6 +74,12 @@ export default function Sidebar({ permissions }: SidebarProps) {
       icon: FileText,
       href: '/dashboard/leave',
       enabled: permissions.leave, // ← now uses permission
+    },
+    {
+      name: 'Staff',
+      icon: Users,
+      href: '/dashboard/staff',
+      enabled: permissions.staff,
     },
     {
       name: 'Registration',

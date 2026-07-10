@@ -16,6 +16,7 @@ import { readSheet, writeSheet } from '@/lib/sheets';
  * I[8]  = registration_request (TRUE/FALSE)
  * J[9]  = setting (TRUE/FALSE)
  * K[10] = last_active (ISO string)  ← NEW
+ * L[11] = staff (TRUE/FALSE)        ← NEW
  */
 
 interface UserPermission {
@@ -28,6 +29,7 @@ interface UserPermission {
   leave: boolean;
   registration_request: boolean;
   setting: boolean;
+  staff: boolean;
   last_active?: string;
 }
 
@@ -56,6 +58,7 @@ export async function GET() {
       registration_request: row[8] === 'TRUE' || row[8] === true,
       setting: row[9] === 'TRUE' || row[9] === true,
       last_active: row[10] || '',
+      staff: row[11] === 'TRUE' || row[11] === true,
     }));
 
     return NextResponse.json(usersData);
@@ -91,11 +94,12 @@ export async function PUT(request: NextRequest) {
         rows[i][8] = user.registration_request ? 'TRUE' : 'FALSE';
         rows[i][9] = user.setting ? 'TRUE' : 'FALSE';
         // col 10 (last_active) is NOT touched here — it's updated on login/activity
+        rows[i][11] = user.staff ? 'TRUE' : 'FALSE';
       }
     }
 
-    // Write columns A–J (not K/last_active)
-    await writeSheet('users', `A2:J${rows.length}`, rows.slice(1).map(r => r.slice(0, 10)));
+    // Write columns A–L, preserving col K (last_active) as-is
+    await writeSheet('users', `A2:L${rows.length}`, rows.slice(1).map(r => r.slice(0, 12)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

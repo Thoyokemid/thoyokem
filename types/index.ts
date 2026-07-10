@@ -10,6 +10,7 @@ export interface User {
   leave: boolean;
   registration_request: boolean;
   setting: boolean;
+  staff: boolean;
   last_active?: string;
 }
 
@@ -101,5 +102,6 @@ export interface SessionUser {
     leave: boolean;
     registration_request: boolean;
     setting: boolean;
+    staff: boolean;
   };
 }

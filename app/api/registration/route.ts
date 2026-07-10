@@ -110,8 +110,11 @@ export async function PATCH(request: NextRequest) {
         'staff', // role
         'TRUE', // dashboard
         'FALSE', // attendance
+        'FALSE', // leave
         'FALSE', // registration_request
         'FALSE', // setting
+        '', // last_active
+        'FALSE', // staff (staff management permission)
       ];
 
       await appendSheet('users', [newUser]);

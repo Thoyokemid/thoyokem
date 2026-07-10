@@ -70,6 +70,7 @@ export const authOptions: NextAuthOptions = {
               leave: user[7] === 'TRUE' || user[7] === true,          // NEW col G (index 7)
               registration_request: user[8] === 'TRUE' || user[8] === true, // was 7, now 8
               setting: user[9] === 'TRUE' || user[9] === true,         // was 8, now 9 — BUT see note below
+              staff: user[11] === 'TRUE' || user[11] === true,        // NEW col L (index 11)
             },
           };
         } catch (error) {

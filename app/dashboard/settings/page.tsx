@@ -19,6 +19,7 @@ interface UserPermission {
   leave: boolean;
   registration_request: boolean;
   setting: boolean;
+  staff: boolean;
   last_active?: string;
 }
 
@@ -155,6 +156,7 @@ export default function SettingsPage() {
     { key: "dashboard", label: "Dashboard" },
     { key: "attendance", label: "Attendance" },
     { key: "leave", label: "Leave" },
+    { key: "staff", label: "Staff" },
     { key: "registration_request", label: "Registration" },
     { key: "setting", label: "Settings" },
   ];
