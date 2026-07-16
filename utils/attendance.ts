@@ -15,13 +15,14 @@ export function countLeaveDays(leave: LeaveAttendance): number {
 
 /**
  * Hitung total hari cuti yang sudah dipakai oleh seorang karyawan.
+ * Sick leave tidak dihitung karena tidak memotong kuota cuti.
  */
 export function countUsedLeaveDays(
   leaveData: LeaveAttendance[],
   registrationId: string
 ): number {
   return leaveData
-    .filter((l) => l.registration_id === registrationId)
+    .filter((l) => l.registration_id === registrationId && l.category !== 'sick')
     .reduce((sum, l) => sum + countLeaveDays(l), 0);
 }
 

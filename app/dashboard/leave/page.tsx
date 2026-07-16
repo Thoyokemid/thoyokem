@@ -58,6 +58,8 @@ export default function LeavePage() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const [formData, setFormData] = useState({
     staff_id: "",
@@ -110,6 +112,16 @@ export default function LeavePage() {
 
     return result;
   }, [leaves, searchName, filterCategory, filterDateFrom, filterDateTo, sortField, sortDir]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchName, filterCategory, filterDateFrom, filterDateTo, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeaves.length / pageSize));
+  const paginatedLeaves = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLeaves.slice(start, start + pageSize);
+  }, [filteredLeaves, currentPage]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
@@ -373,12 +385,12 @@ export default function LeavePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredLeaves.length === 0 ? (
+                  {paginatedLeaves.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</td>
                     </tr>
                   ) : (
-                    filteredLeaves.map((row) => (
+                    paginatedLeaves.map((row) => (
                       <tr
                         key={row.id}
                         onClick={() => setDetailLeave(row)}
@@ -429,6 +441,30 @@ export default function LeavePage() {
                 </tbody>
               </table>
             </div>
+
+            {filteredLeaves.length > 0 && (
+              <div className="flex items-center justify-between px-1 pt-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
 
