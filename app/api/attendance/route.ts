@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, clearAndWriteSheet } from '@/lib/sheets';
+import { clearAndWriteSheet, readSheetAsObjects, objectToRow } from '@/lib/sheets';
 import { AttendanceImport } from '@/types';
+
+const SHEET = 'attendance_import';
 
 export async function GET() {
   try {
@@ -17,24 +19,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const rows = await readSheet('attendance_import');
+    const { records } = await readSheetAsObjects<any>(SHEET);
 
-    if (!rows || rows.length < 2) {
-      return NextResponse.json([]);
-    }
-
-    const attendance: AttendanceImport[] = rows.slice(1).map((row) => ({
-      cloud_id: row[0] || '',
-      id: row[1] || '',
-      nama: row[2] || '',
-      tanggal_absensi: row[3] || '',
-      jam_set: row[4] || '',
-      jam_absensi: row[5] || '',
-      verifikasi: row[6] || '',
-      tipe_absensi: row[7] || '',
-      jabatan: row[8] || '',
-      kantor: row[9] || '',
-      keterangan: row[10] || '',
+    const attendance: AttendanceImport[] = records.map((r) => ({
+      cloud_id: r.cloud_id || '',
+      id: r.id || '',
+      employee_name: r.employee_name || '',
+      attendance_date: r.attendance_date || '',
+      jam_set: r.jam_set || '',
+      jam_absensi: r.jam_absensi || '',
+      verifikasi: r.verifikasi || '',
+      tipe_absensi: r.tipe_absensi || '',
+      designation: r.designation || '',
+      branch: r.branch || '',
+      remarks: r.remarks || '',
     }));
 
     return NextResponse.json(attendance);
@@ -60,56 +58,29 @@ export async function POST(request: NextRequest) {
 
     // Dates in the new import
     const incomingDates = new Set<string>(
-      data.map((item: AttendanceImport) => item.tanggal_absensi).filter(Boolean)
+      data.map((item: AttendanceImport) => item.attendance_date).filter(Boolean)
     );
 
     // Read existing data
-    const rows = await readSheet('attendance_import');
-    const existingData: AttendanceImport[] = rows && rows.length > 1
-      ? rows.slice(1).map((row) => ({
-          cloud_id: row[0] || '',
-          id: row[1] || '',
-          nama: row[2] || '',
-          tanggal_absensi: row[3] || '',
-          jam_set: row[4] || '',
-          jam_absensi: row[5] || '',
-          verifikasi: row[6] || '',
-          tipe_absensi: row[7] || '',
-          jabatan: row[8] || '',
-          kantor: row[9] || '',
-          keterangan: row[10] || '',
-        }))
-      : [];
+    const { headers, records: existingData } = await readSheetAsObjects<AttendanceImport>(SHEET);
 
     // Keep existing rows whose dates are NOT in the incoming data
-    const preserved = existingData.filter(
-      (item) => !incomingDates.has(item.tanggal_absensi)
+    const preserved = (existingData as any[]).filter(
+      (item) => !incomingDates.has(item.attendance_date)
     );
 
     // Merge: preserved old data + new data
     const merged = [...preserved, ...data];
 
-    // Sort by tanggal_absensi then nama for cleanliness
+    // Sort by attendance_date then employee_name for cleanliness
     merged.sort((a, b) => {
-      const dateCmp = a.tanggal_absensi.localeCompare(b.tanggal_absensi);
-      return dateCmp !== 0 ? dateCmp : a.nama.localeCompare(b.nama);
+      const dateCmp = a.attendance_date.localeCompare(b.attendance_date);
+      return dateCmp !== 0 ? dateCmp : a.employee_name.localeCompare(b.employee_name);
     });
 
-    const values = merged.map((item: AttendanceImport) => [
-      item.cloud_id,
-      item.id,
-      item.nama,
-      item.tanggal_absensi,
-      item.jam_set,
-      item.jam_absensi,
-      item.verifikasi,
-      item.tipe_absensi,
-      item.jabatan,
-      item.kantor,
-      item.keterangan || '',
-    ]);
+    const values = merged.map((item: AttendanceImport) => objectToRow(headers, item));
 
-    await clearAndWriteSheet('attendance_import', values);
+    await clearAndWriteSheet(SHEET, values);
 
     return NextResponse.json({
       success: true,

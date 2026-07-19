@@ -51,12 +51,12 @@ export function generateLeaveLetterPDF(
   y += 14;
 
   const rows: [string, string][] = [
-    ['Nama Karyawan', leave.name],
-    ['Jenis Cuti', CATEGORY_LABELS[leave.category] || leave.category],
-    ['Tanggal Mulai', formatDate(leave.date_from)],
-    ['Tanggal Selesai', formatDate(leave.date_end)],
+    ['Nama Karyawan', leave.employee_name],
+    ['Jenis Cuti', CATEGORY_LABELS[leave.leave_type] || leave.leave_type],
+    ['Tanggal Mulai', formatDate(leave.from_date)],
+    ['Tanggal Selesai', formatDate(leave.to_date)],
     ['Jumlah Hari', `${days} hari`],
-    ['Keterangan', leave.keterangan || '-'],
+    ['Keterangan', leave.description || '-'],
     ['Sisa Kuota Cuti Tahun Ini', `${remainingAfter} dari ${opts.quota} hari`],
   ];
 
@@ -83,5 +83,5 @@ export function generateLeaveLetterPDF(
   y += 25;
   doc.text('HRD Thoyokem Indonesia', pageWidth - marginX, y, { align: 'right' });
 
-  doc.save(`Surat_Cuti_${leave.name.replace(/\s+/g, '_')}_${leave.date_from}.pdf`);
+  doc.save(`Surat_Cuti_${leave.employee_name.replace(/\s+/g, '_')}_${leave.from_date}.pdf`);
 }

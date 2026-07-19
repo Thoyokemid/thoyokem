@@ -112,7 +112,7 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   // Anchor "N hari" pada tanggal terbaru yang ADA di data, bukan tanggal hari ini,
   // supaya data yang ditampilkan tetap 30 hari terakhir yang tersedia meski data belum di-import untuk hari ini.
   const latestDataDate = processed.reduce(
-    (max, r) => (r.tanggal_absensi > max ? r.tanggal_absensi : max),
+    (max, r) => (r.attendance_date > max ? r.attendance_date : max),
     ''
   );
 
@@ -131,8 +131,8 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   })();
 
   const rangeFilteredProcessed = processed.filter((r) => {
-    if (rangeFrom && r.tanggal_absensi < rangeFrom) return false;
-    if (rangeTo && r.tanggal_absensi > rangeTo) return false;
+    if (rangeFrom && r.attendance_date < rangeFrom) return false;
+    if (rangeTo && r.attendance_date > rangeTo) return false;
     return true;
   });
   const rangeRecap = rangeFilteredProcessed.length ? calculateRecap(rangeFilteredProcessed) : [];
@@ -141,8 +141,8 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   const overtimeDailyData = (() => {
     const dayMap = new Map<string, number>();
     rangeFilteredProcessed.forEach((r) => {
-      if (r.overtime_menit > 0) {
-        dayMap.set(r.tanggal_absensi, (dayMap.get(r.tanggal_absensi) ?? 0) + r.overtime_menit);
+      if (r.overtime_minutes > 0) {
+        dayMap.set(r.attendance_date, (dayMap.get(r.attendance_date) ?? 0) + r.overtime_minutes);
       }
     });
     return Array.from(dayMap.entries())
@@ -159,8 +159,8 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   const keterlambatanDailyData = (() => {
     const dayMap = new Map<string, number>();
     rangeFilteredProcessed.forEach((r) => {
-      if (r.keterlambatan_menit > 0) {
-        dayMap.set(r.tanggal_absensi, (dayMap.get(r.tanggal_absensi) ?? 0) + r.keterlambatan_menit);
+      if (r.late_entry_minutes > 0) {
+        dayMap.set(r.attendance_date, (dayMap.get(r.attendance_date) ?? 0) + r.late_entry_minutes);
       }
     });
     return Array.from(dayMap.entries())
@@ -191,9 +191,9 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return staffList
-      .filter((s) => s.birth_date)
+      .filter((s) => s.date_of_birth)
       .map((s) => {
-        const bd = new Date(s.birth_date!);
+        const bd = new Date(s.date_of_birth!);
         const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
         const nextBirthday =
           thisYear < today
@@ -211,8 +211,8 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   // Leave quota data
   const leaveQuotaData = staffList
     .map((s) => {
-      const used = countUsedLeaveDays(leaveData, s.registration_id);
-      const quota = s.leave_quota ?? 12;
+      const used = countUsedLeaveDays(leaveData, s.user_id);
+      const quota = s.leave_allocation ?? 12;
       const remaining = Math.max(0, quota - used);
       return { ...s, used, quota, remaining };
     })
@@ -233,20 +233,20 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
   const monthPrefix = todayStr.slice(0, 7);
 
   const hadirHariIni = new Set(
-    processed.filter((r) => r.tanggal_absensi === todayStr && r.jam_masuk_actual).map((r) => r.nama)
+    processed.filter((r) => r.attendance_date === todayStr && r.in_time).map((r) => r.employee_name)
   ).size;
 
   const cutiAktifHariIni = leaveData.filter(
-    (l) => l.date_from <= todayStr && l.date_end >= todayStr
+    (l) => l.from_date <= todayStr && l.to_date >= todayStr
   ).length;
 
   const overtimeBulanIni = processed
-    .filter((r) => r.tanggal_absensi.startsWith(monthPrefix))
-    .reduce((sum, r) => sum + r.overtime_menit, 0);
+    .filter((r) => r.attendance_date.startsWith(monthPrefix))
+    .reduce((sum, r) => sum + r.overtime_minutes, 0);
 
   const keterlambatanBulanIni = processed
-    .filter((r) => r.tanggal_absensi.startsWith(monthPrefix))
-    .reduce((sum, r) => sum + r.keterlambatan_menit, 0);
+    .filter((r) => r.attendance_date.startsWith(monthPrefix))
+    .reduce((sum, r) => sum + r.late_entry_minutes, 0);
 
   const kpis = [
     {
@@ -554,12 +554,12 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
               <div className="space-y-2">
                 {paginate(birthdayData, birthdayPage).map((s) => (
                   <div
-                    key={s.id}
+                    key={s.employee_id}
                     className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-gray-700 last:border-0"
                   >
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
-                        {toTitleCase(s.name)}
+                        {toTitleCase(s.employee_name)}
                       </p>
                       <p className="text-xs text-gray-500">
                         {s.nextBirthday.toLocaleDateString('id-ID', {
@@ -612,12 +612,12 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
                   const pct = Math.round((s.remaining / s.quota) * 100);
                   return (
                     <div
-                      key={s.id}
+                      key={s.employee_id}
                       className="py-1.5 border-b border-gray-50 dark:border-gray-700 last:border-0"
                     >
                       <div className="flex justify-between items-center mb-1">
                         <p className="text-xs font-medium text-gray-900 dark:text-white truncate max-w-[130px]">
-                          {toTitleCase(s.name)}
+                          {toTitleCase(s.employee_name)}
                         </p>
                         <span
                           className={`text-xs font-bold ${

@@ -1,22 +1,57 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { readSheet, writeSheet } from '@/lib/sheets';
+import { readSheetAsObjects, readSheet, writeSheet, findRowIndexByField } from '@/lib/sheets';
 
-// ── Utility: update last_active column (col index 9 = J) ──
+function toBool(v: any) {
+  return v === 'TRUE' || v === true;
+}
+
+// ── Utility: update last_active column ──
 export async function updateLastActive(userId: string) {
   try {
     const rows = await readSheet('users');
-    const rowIndex = rows.findIndex((row, i) => i > 0 && row[0] === userId);
-    if (rowIndex === -1) return;
+    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
+    const dataRowIndex = findRowIndexByField(headers, rows, 'id', userId);
+    if (dataRowIndex === -1) return;
+
+    const colIndex = headers.indexOf('last_active');
+    if (colIndex === -1) return;
 
     const now = new Date().toISOString();
-    rows[rowIndex][10] = now;
-    await writeSheet('users', `K${rowIndex + 1}`, [[now]]);
+    const colLetter = String.fromCharCode(65 + colIndex);
+    await writeSheet('users', `${colLetter}${dataRowIndex + 2}`, [[now]]);
   } catch (error) {
     // Non-blocking: log but don't throw
     console.error('Failed to update last_active:', error);
   }
+}
+
+// ── Utility: look up a role's permission set by role_id ──
+export async function getRolePermissions(roleId: string) {
+  const { records } = await readSheetAsObjects<any>('roles');
+  const role = records.find((r) => String(r.role_id) === String(roleId));
+
+  if (!role) {
+    // Fallback: no access if role can't be resolved
+    return {
+      dashboard: false,
+      attendance: false,
+      leave: false,
+      registration_request: false,
+      setting: false,
+      staff: false,
+    };
+  }
+
+  return {
+    dashboard: toBool(role.dashboard),
+    attendance: toBool(role.attendance),
+    leave: toBool(role.leave),
+    registration_request: toBool(role.registration_request),
+    setting: toBool(role.setting),
+    staff: toBool(role.staff),
+  };
 }
 
 export const authOptions: NextAuthOptions = {
@@ -33,45 +68,30 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const rows = await readSheet('users');
-
-          if (!rows || rows.length < 2) {
-            throw new Error('No users found');
-          }
-
-          const users = rows.slice(1);
-          const user = users.find((row) => row[2] === credentials.username);
+          const { records: users } = await readSheetAsObjects<any>('users');
+          const user = users.find((u) => u.username === credentials.username);
 
           if (!user) {
             throw new Error('Invalid username or password');
           }
 
-          const isPasswordValid = await bcrypt.compare(credentials.password, user[3]);
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
 
           if (!isPasswordValid) {
             throw new Error('Invalid username or password');
           }
 
-          // Update last_active on login
-          const rowIndex = rows.findIndex((row, i) => i > 0 && row[0] === user[0]);
-          if (rowIndex !== -1) {
-            const now = new Date().toISOString();
-            await writeSheet('users', `K${rowIndex + 1}`, [[now]]);
-          }
+          updateLastActive(user.id);
+
+          const permissions = await getRolePermissions(user.role_id);
 
           return {
-            id: user[0],
-            name: user[1],
-            email: user[2],
-            role: user[4],
-            permissions: {
-              dashboard: user[5] === 'TRUE' || user[5] === true,
-              attendance: user[6] === 'TRUE' || user[6] === true,
-              leave: user[7] === 'TRUE' || user[7] === true,          // NEW col G (index 7)
-              registration_request: user[8] === 'TRUE' || user[8] === true, // was 7, now 8
-              setting: user[9] === 'TRUE' || user[9] === true,         // was 8, now 9 — BUT see note below
-              staff: user[11] === 'TRUE' || user[11] === true,        // NEW col L (index 11)
-            },
+            id: user.id,
+            name: user.name,
+            email: user.username,
+            role: user.role,
+            role_id: user.role_id,
+            permissions,
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -85,6 +105,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.role_id = (user as any).role_id;
         token.permissions = user.permissions;
       }
       return token;
@@ -93,6 +114,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.role_id = token.role_id as string;
         session.user.permissions = token.permissions as any;
       }
       return session;
@@ -104,7 +126,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 60, // ← 30 MINUTES (was 30 days)
+    maxAge: 30 * 60, // 30 minutes
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',

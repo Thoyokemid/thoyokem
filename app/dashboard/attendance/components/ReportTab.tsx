@@ -54,12 +54,12 @@ export default function ReportTab() {
     if (searchTerm) {
       filtered = filtered.filter(
         (item) =>
-          item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.jabatan.toLowerCase().includes(searchTerm.toLowerCase())
+          item.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.designation.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    if (dateFrom) filtered = filtered.filter((item) => item.tanggal_absensi >= dateFrom);
-    if (dateTo) filtered = filtered.filter((item) => item.tanggal_absensi <= dateTo);
+    if (dateFrom) filtered = filtered.filter((item) => item.attendance_date >= dateFrom);
+    if (dateTo) filtered = filtered.filter((item) => item.attendance_date <= dateTo);
     setFilteredData(filtered);
   };
 
@@ -122,29 +122,29 @@ export default function ReportTab() {
               ) : (
                 paginatedData.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.nama}</td>
-                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.jabatan}</td>
-                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.tanggal_absensi}</td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.employee_name}</td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.designation}</td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.attendance_date}</td>
                     <td className="px-3 py-2 text-xs">
-                      <div className="text-xs text-gray-500">Target: {row.jam_masuk_target}</div>
-                      <div className={row.keterlambatan_menit > 0 ? 'text-red-600 font-medium text-xs' : 'text-xs'}>
-                        Actual: {row.jam_masuk_actual || '-'}
+                      <div className="text-xs text-gray-500">Target: {row.shift_start}</div>
+                      <div className={row.late_entry_minutes > 0 ? 'text-red-600 font-medium text-xs' : 'text-xs'}>
+                        Actual: {row.in_time || '-'}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs text-center">
-                      <div className="font-medium text-xs">{row.keterlambatan_menit} min</div>
+                      <div className="font-medium text-xs">{row.late_entry_minutes} min</div>
                       <div className={`text-xs ${row.keterangan_masuk === 'Terlambat' ? 'text-red-600' : 'text-green-600'}`}>
                         {row.keterangan_masuk}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      <div className="text-xs text-gray-500">Target: {row.jam_pulang_target}</div>
-                      <div className={row.overtime_menit > 0 ? 'text-blue-600 font-medium text-xs' : 'text-xs'}>
-                        Actual: {row.jam_pulang_actual || '-'}
+                      <div className="text-xs text-gray-500">Target: {row.shift_end}</div>
+                      <div className={row.overtime_minutes > 0 ? 'text-blue-600 font-medium text-xs' : 'text-xs'}>
+                        Actual: {row.out_time || '-'}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs text-center">
-                      <div className="font-medium text-xs">{row.overtime_menit} min</div>
+                      <div className="font-medium text-xs">{row.overtime_minutes} min</div>
                       <div className={`text-xs ${row.keterangan_pulang === 'Overtime' ? 'text-blue-600' : 'text-green-600'}`}>
                         {row.keterangan_pulang}
                       </div>

@@ -8,6 +8,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
+import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/components/ui/ListView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
@@ -37,6 +38,7 @@ export default function StaffPage() {
   const [detailStaff, setDetailStaff] = useState<StaffList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchName, setSearchName] = useState('');
+  const [birthdayFilter, setBirthdayFilter] = useState<'all' | 'has' | 'missing'>('all');
 
   const [formData, setFormData] = useState({
     name: "",
@@ -65,27 +67,32 @@ export default function StaffPage() {
   };
 
   const filteredStaff = useMemo(() => {
-    if (!searchName.trim()) return staff;
-    const q = searchName.toLowerCase();
-    return staff.filter((s) => s.name.toLowerCase().includes(q));
-  }, [staff, searchName]);
+    let result = staff;
+    if (searchName.trim()) {
+      const q = searchName.toLowerCase();
+      result = result.filter((s) => s.employee_name.toLowerCase().includes(q));
+    }
+    if (birthdayFilter === 'has') result = result.filter((s) => !!s.date_of_birth);
+    if (birthdayFilter === 'missing') result = result.filter((s) => !s.date_of_birth);
+    return result;
+  }, [staff, searchName, birthdayFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
       const payload = {
-        name: formData.name,
-        registration_id: formData.registration_id,
-        birth_date: formData.birth_date,
-        leave_quota: parseInt(formData.leave_quota, 10) || 12,
+        employee_name: formData.name,
+        user_id: formData.registration_id,
+        date_of_birth: formData.birth_date,
+        leave_allocation: parseInt(formData.leave_quota, 10) || 12,
       };
 
       const response = editingStaff
         ? await fetch("/api/staff", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: editingStaff.id, ...payload }),
+            body: JSON.stringify({ employee_id: editingStaff.employee_id, ...payload }),
           })
         : await fetch("/api/staff", {
             method: "POST",
@@ -107,10 +114,10 @@ export default function StaffPage() {
   const handleEdit = (s: StaffList) => {
     setEditingStaff(s);
     setFormData({
-      name: s.name,
-      registration_id: s.registration_id,
-      birth_date: s.birth_date || "",
-      leave_quota: String(s.leave_quota ?? 12),
+      name: s.employee_name,
+      registration_id: s.user_id,
+      birth_date: s.date_of_birth || "",
+      leave_quota: String(s.leave_allocation ?? 12),
     });
     setIsModalOpen(true);
   };
@@ -168,21 +175,29 @@ export default function StaffPage() {
         permissions: session.user.permissions,
       }}
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Staff Management</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Kelola data karyawan</p>
-          </div>
+      <>
+      <ListViewLayout
+        title="Staff Management"
+        subtitle="Kelola data karyawan"
+        primaryAction={
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={14} className="mr-1.5" />
             Add Staff
           </Button>
-        </div>
-
-        <Card>
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1 relative">
+        }
+        filterGroups={[
+          {
+            title: 'Tanggal Lahir',
+            filters: [
+              { label: 'Semua', value: 'all', active: birthdayFilter === 'all', onClick: () => setBirthdayFilter('all'), count: staff.length },
+              { label: 'Sudah diisi', value: 'has', active: birthdayFilter === 'has', onClick: () => setBirthdayFilter('has'), count: staff.filter((s) => !!s.date_of_birth).length },
+              { label: 'Belum diisi', value: 'missing', active: birthdayFilter === 'missing', onClick: () => setBirthdayFilter('missing'), count: staff.filter((s) => !s.date_of_birth).length },
+            ],
+          },
+        ]}
+        toolbar={
+          <div className="flex flex-col md:flex-row gap-3 items-center">
+            <div className="flex-1 relative w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
               <input
                 type="text"
@@ -192,81 +207,47 @@ export default function StaffPage() {
                 className="input-field pl-9"
               />
             </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {filteredStaff.length} of {staff.length} staff
+            </div>
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Showing {filteredStaff.length} of {staff.length} staff
-          </div>
-        </Card>
-
+        }
+      >
         {isLoading ? (
-          <Card>
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loading size="lg" />
-            </div>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loading size="lg" />
+          </div>
+        ) : filteredStaff.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-gray-500">No staff found</p>
         ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Registration ID</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Birth Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Leave Quota</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredStaff.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500">No staff found</td>
-                    </tr>
-                  ) : (
-                    filteredStaff.map((s) => (
-                      <tr
-                        key={s.id}
-                        onClick={() => setDetailStaff(s)}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <td className="px-3 py-2 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                              {getInitials(s.name)}
-                            </span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">{s.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 font-mono">{s.registration_id || '-'}</td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">
-                          <div className="flex items-center gap-1.5">
-                            {s.birth_date && <Cake size={12} className="text-pink-400" />}
-                            {s.birth_date || '-'}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                            {s.leave_quota ?? 12} hari/tahun
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
-                              <Edit size={14} />
-                            </button>
-                            <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          filteredStaff.map((s) => (
+            <ListRow
+              key={s.employee_id}
+              onClick={() => setDetailStaff(s)}
+              avatar={<ListRowAvatar initials={getInitials(s.employee_name)} />}
+              title={s.employee_name}
+              subtitle={s.user_id || '-'}
+              meta={
+                <div className="flex items-center gap-1.5">
+                  {s.date_of_birth && <Cake size={12} className="text-pink-400" />}
+                  {s.date_of_birth || 'No birth date'}
+                </div>
+              }
+              badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}
+              actions={
+                <>
+                  <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              }
+            />
+          ))
         )}
+      </ListViewLayout>
 
         <Modal isOpen={isModalOpen} onClose={resetForm} title={editingStaff ? "Edit Staff" : "Add Staff"} size="sm">
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -330,28 +311,28 @@ export default function StaffPage() {
         <Modal isOpen={!!detailStaff} onClose={() => setDetailStaff(null)} title="Detail Karyawan" size="lg">
           {detailStaff && (() => {
             const staffLeaves = leaves
-              .filter((l) => l.registration_id === detailStaff.registration_id)
-              .sort((a, b) => b.date_from.localeCompare(a.date_from));
-            const quota = detailStaff.leave_quota ?? 12;
-            const used = countUsedLeaveDays(leaves, detailStaff.registration_id);
+              .filter((l) => l.employee === detailStaff.user_id)
+              .sort((a, b) => b.from_date.localeCompare(a.from_date));
+            const quota = detailStaff.leave_allocation ?? 12;
+            const used = countUsedLeaveDays(leaves, detailStaff.user_id);
             const remaining = Math.max(0, quota - used);
 
             return (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
-                    {getInitials(detailStaff.name)}
+                    {getInitials(detailStaff.employee_name)}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailStaff.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detailStaff.registration_id || '-'}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailStaff.employee_name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detailStaff.user_id || '-'}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
                     <p className="text-gray-500 dark:text-gray-400">Tanggal Lahir</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailStaff.birth_date || '-'}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailStaff.date_of_birth || '-'}</p>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
                     <p className="text-gray-500 dark:text-gray-400">Kuota Cuti</p>
@@ -390,18 +371,18 @@ export default function StaffPage() {
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                           {staffLeaves.map((l) => (
                             <tr key={l.id}>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.date_from}</td>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.date_end}</td>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.from_date}</td>
+                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.to_date}</td>
                               <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{countLeaveDays(l)}</td>
                               <td className="px-2.5 py-1.5 text-xs">
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                  CATEGORY_STYLES[l.category] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                  CATEGORY_STYLES[l.leave_type] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                                 }`}>
-                                  {CATEGORY_LABELS[l.category] || l.category}
+                                  {CATEGORY_LABELS[l.leave_type] || l.leave_type}
                                 </span>
                               </td>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[160px] truncate" title={l.keterangan}>
-                                {l.keterangan || '-'}
+                              <td className="px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[160px] truncate" title={l.description}>
+                                {l.description || '-'}
                               </td>
                             </tr>
                           ))}
@@ -421,7 +402,7 @@ export default function StaffPage() {
             );
           })()}
         </Modal>
-      </div>
+      </>
     </DashboardLayout>
   );
 }

@@ -1,3 +1,15 @@
+// Role Types
+export interface Role {
+  role_id: string;
+  role_name: string;
+  dashboard: boolean;
+  attendance: boolean;
+  leave: boolean;
+  registration_request: boolean;
+  setting: boolean;
+  staff: boolean;
+}
+
 // User Types
 export interface User {
   id: string;
@@ -5,20 +17,37 @@ export interface User {
   username: string;
   password: string;
   role: string;
-  dashboard: boolean;
-  attendance: boolean;
-  leave: boolean;
-  registration_request: boolean;
-  setting: boolean;
-  staff: boolean;
+  role_id: string;
   last_active?: string;
+  // Profile fields — editable by the user themselves
+  photo_url?: string;
+  phone?: string;
+  date_of_birth?: string;
+  address?: string;
+  gender?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  bio?: string;
+}
+
+// Profile — subset of User that a user can self-edit
+export interface UserProfile {
+  name: string;
+  photo_url?: string;
+  phone?: string;
+  date_of_birth?: string;
+  address?: string;
+  gender?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  bio?: string;
 }
 
 // Registration Types
 export interface Registration {
   id: string;
   name: string;
-  username: string;
+  email: string;
   password: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
@@ -29,31 +58,31 @@ export interface Registration {
 export interface AttendanceImport {
   cloud_id: string;
   id: string;
-  nama: string;
-  tanggal_absensi: string;
+  employee_name: string;
+  attendance_date: string;
   jam_set: string;
   jam_absensi: string;
   verifikasi: string;
   tipe_absensi: string;
-  jabatan: string;
-  kantor: string;
-  keterangan: string; // NEW — kolom L di sheet
+  designation: string;
+  branch: string;
+  remarks: string; // NEW — kolom L di sheet
 }
 
 export interface AttendanceRecord {
   id: string;
-  nama: string;
-  jabatan: string;
-  tanggal_absensi: string;
-  jam_masuk_target: string;
-  jam_masuk_actual: string;
-  keterlambatan_menit: number;
+  employee_name: string;
+  designation: string;
+  attendance_date: string;
+  shift_start: string;
+  in_time: string;
+  late_entry_minutes: number;
   keterangan_masuk: string;
-  jam_pulang_target: string;
-  jam_pulang_actual: string;
-  overtime_menit: number;
+  shift_end: string;
+  out_time: string;
+  overtime_minutes: number;
   keterangan_pulang: string;
-  keterangan: string; // NEW — dari kolom keterangan import
+  remarks: string; // NEW — dari kolom keterangan import
 }
 
 export interface AttendanceRecap {
@@ -70,24 +99,24 @@ export interface AttendanceRecap {
 // Leave Types
 export interface LeaveAttendance {
   id: string;
-  registration_id: string;
-  name: string;
-  date_from: string;
-  date_end: string;
-  category: string;
-  link_url: string;
-  keterangan: string; // NEW — kolom J di sheet
+  employee: string;
+  employee_name: string;
+  from_date: string;
+  to_date: string;
+  leave_type: string;
+  attachment: string;
+  description: string; // NEW — kolom J di sheet
   created_at: string;
   update_at: string;
 }
 
 // Staff Types
 export interface StaffList {
-  id: string;
-  registration_id: string;
-  name: string;
-  birth_date?: string;
-  leave_quota?: number;
+  employee_id: string;
+  user_id: string;
+  employee_name: string;
+  date_of_birth?: string;
+  leave_allocation?: number;
 }
 
 // Session Types
@@ -96,6 +125,7 @@ export interface SessionUser {
   name: string;
   username: string;
   role: string;
+  role_id?: string;
   permissions: {
     dashboard: boolean;
     attendance: boolean;

@@ -1,35 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet } from '@/lib/sheets';
+import { readSheet, writeSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
 
-/**
- * Sheet column layout (0-indexed):
- * A[0]  = id
- * B[1]  = name
- * C[2]  = username
- * D[3]  = password (hashed)
- * E[4]  = role
- * F[5]  = dashboard (TRUE/FALSE)
- * G[6]  = attendance (TRUE/FALSE)
- * H[7]  = leave (TRUE/FALSE)        ← NEW
- * I[8]  = registration_request (TRUE/FALSE)
- * J[9]  = setting (TRUE/FALSE)
- * K[10] = last_active (ISO string)  ← NEW
- * L[11] = staff (TRUE/FALSE)        ← NEW
- */
+const SHEET = 'users';
 
-interface UserPermission {
+interface UserWithRole {
   id: string;
   name: string;
   username: string;
   role: string;
-  dashboard: boolean;
-  attendance: boolean;
-  leave: boolean;
-  registration_request: boolean;
-  setting: boolean;
-  staff: boolean;
+  role_id: string;
   last_active?: string;
 }
 
@@ -41,24 +22,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rows = await readSheet('users');
+    const { records } = await readSheetAsObjects<any>(SHEET);
 
-    if (!rows || rows.length < 2) {
-      return NextResponse.json([]);
-    }
-
-    const usersData: UserPermission[] = rows.slice(1).map((row) => ({
-      id: row[0] || '',
-      name: row[1] || '',
-      username: row[2] || '',
-      role: row[4] || '',
-      dashboard: row[5] === 'TRUE' || row[5] === true,
-      attendance: row[6] === 'TRUE' || row[6] === true,
-      leave: row[7] === 'TRUE' || row[7] === true,
-      registration_request: row[8] === 'TRUE' || row[8] === true,
-      setting: row[9] === 'TRUE' || row[9] === true,
-      last_active: row[10] || '',
-      staff: row[11] === 'TRUE' || row[11] === true,
+    const usersData: UserWithRole[] = records.map((r) => ({
+      id: r.id || '',
+      name: r.name || '',
+      username: r.username || '',
+      role: r.role || '',
+      role_id: r.role_id || '',
+      last_active: r.last_active || '',
     }));
 
     return NextResponse.json(usersData);
@@ -68,6 +40,7 @@ export async function GET() {
   }
 }
 
+// Assign a role_id to a single user. Admin-only (setting permission).
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -76,34 +49,33 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { users } = await request.json();
-    const rows = await readSheet('users');
+    const { id, role_id } = await request.json();
 
-    if (!rows || rows.length < 2) {
-      return NextResponse.json({ error: 'No users found' }, { status: 404 });
+    if (!id || !role_id) {
+      return NextResponse.json({ error: 'id and role_id are required' }, { status: 400 });
     }
 
-    for (let i = 1; i < rows.length; i++) {
-      const userId = rows[i][0];
-      const user = users.find((u: UserPermission) => u.id === userId);
+    const rows = await readSheet(SHEET);
+    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
+    const dataRowIndex = findRowIndexByField(headers, rows, 'id', id);
 
-      if (user) {
-        rows[i][5] = user.dashboard ? 'TRUE' : 'FALSE';
-        rows[i][6] = user.attendance ? 'TRUE' : 'FALSE';
-        rows[i][7] = user.leave ? 'TRUE' : 'FALSE';
-        rows[i][8] = user.registration_request ? 'TRUE' : 'FALSE';
-        rows[i][9] = user.setting ? 'TRUE' : 'FALSE';
-        // col 10 (last_active) is NOT touched here — it's updated on login/activity
-        rows[i][11] = user.staff ? 'TRUE' : 'FALSE';
-      }
+    if (dataRowIndex === -1) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Write columns A–L, preserving col K (last_active) as-is
-    await writeSheet('users', `A2:L${rows.length}`, rows.slice(1).map(r => r.slice(0, 12)));
+    const sheetRowIndex = dataRowIndex + 1;
+    const currentRow = rows[sheetRowIndex] || [];
+    const currentObj: Record<string, any> = {};
+    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
+
+    const merged = { ...currentObj, role_id: String(role_id) };
+    const newRow = objectToRow(headers, merged);
+    const lastCol = String.fromCharCode(65 + headers.length - 1);
+    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating users:', error);
-    return NextResponse.json({ error: 'Failed to update users' }, { status: 500 });
+    console.error('Error updating user role:', error);
+    return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
   }
 }

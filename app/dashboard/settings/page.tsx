@@ -6,22 +6,28 @@ import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
-import { Save, Clock, Timer } from "lucide-react";
+import { Role } from "@/types";
+import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck } from "lucide-react";
 
-interface UserPermission {
+interface UserWithRole {
   id: string;
   name: string;
   username: string;
   role: string;
-  dashboard: boolean;
-  attendance: boolean;
-  leave: boolean;
-  registration_request: boolean;
-  setting: boolean;
-  staff: boolean;
+  role_id: string;
   last_active?: string;
 }
+
+const PERMISSION_COLS: { key: keyof Omit<Role, "role_id" | "role_name">; label: string }[] = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "attendance", label: "Attendance" },
+  { key: "leave", label: "Leave" },
+  { key: "staff", label: "Staff" },
+  { key: "registration_request", label: "Registration" },
+  { key: "setting", label: "Settings" },
+];
 
 function formatLastActive(iso: string | undefined): string {
   if (!iso) return "Never";
@@ -50,18 +56,34 @@ function formatLastActive(iso: string | undefined): string {
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
-  const [users, setUsers] = useState<UserPermission[]>([]);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   const [workHours, setWorkHours] = useState({ jam_masuk: "08:00", jam_pulang: "17:00", toleransi_menit: "0" });
   const [isSavingHours, setIsSavingHours] = useState(false);
   const [hoursMessage, setHoursMessage] = useState("");
 
+  // Role modal state
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [roleForm, setRoleForm] = useState<Omit<Role, "role_id">>({
+    role_name: "",
+    dashboard: false,
+    attendance: false,
+    leave: false,
+    registration_request: false,
+    setting: false,
+    staff: false,
+  });
+  const [isSavingRole, setIsSavingRole] = useState(false);
+  const [roleError, setRoleError] = useState("");
+
   useEffect(() => {
     if (session) {
       fetchUsers();
+      fetchRoles();
       fetchSettings();
     }
   }, [session]);
@@ -117,49 +139,114 @@ export default function SettingsPage() {
     }
   };
 
-  const handlePermissionChange = (
-    userId: string,
-    permission: keyof Omit<UserPermission, "id" | "name" | "username" | "role" | "last_active">,
-    value: boolean
-  ) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, [permission]: value } : u))
-    );
+  const fetchRoles = async () => {
+    try {
+      const res = await fetch("/api/roles");
+      if (res.ok) setRoles(await res.json());
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+    }
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setSaveMessage("");
+  const handleRoleAssign = async (userId: string, roleId: string) => {
+    setSavingUserId(userId);
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role_id: roleId } : u)));
     try {
-      const res = await fetch("/api/users", {
+      await fetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ users }),
+        body: JSON.stringify({ id: userId, role_id: roleId }),
       });
+    } catch (error) {
+      console.error("Error assigning role:", error);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const openNewRole = () => {
+    setEditingRole(null);
+    setRoleForm({
+      role_name: "",
+      dashboard: false,
+      attendance: false,
+      leave: false,
+      registration_request: false,
+      setting: false,
+      staff: false,
+    });
+    setRoleError("");
+    setIsRoleModalOpen(true);
+  };
+
+  const openEditRole = (role: Role) => {
+    setEditingRole(role);
+    setRoleForm({
+      role_name: role.role_name,
+      dashboard: role.dashboard,
+      attendance: role.attendance,
+      leave: role.leave,
+      registration_request: role.registration_request,
+      setting: role.setting,
+      staff: role.staff,
+    });
+    setRoleError("");
+    setIsRoleModalOpen(true);
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleForm.role_name.trim()) {
+      setRoleError("Nama role wajib diisi");
+      return;
+    }
+    setIsSavingRole(true);
+    setRoleError("");
+    try {
+      const res = editingRole
+        ? await fetch("/api/roles", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role_id: editingRole.role_id, ...roleForm }),
+          })
+        : await fetch("/api/roles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(roleForm),
+          });
+
       if (res.ok) {
-        setSaveMessage("Permissions saved successfully!");
-        setTimeout(() => setSaveMessage(""), 3000);
+        setIsRoleModalOpen(false);
+        fetchRoles();
+      } else {
+        const err = await res.json();
+        setRoleError(err.error || "Gagal menyimpan role");
       }
     } catch (error) {
-      console.error("Error saving permissions:", error);
-      setSaveMessage("Failed to save. Please try again.");
+      console.error("Error saving role:", error);
+      setRoleError("Gagal menyimpan role");
     } finally {
-      setIsSaving(false);
+      setIsSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string) => {
+    if (!confirm("Hapus role ini?")) return;
+    try {
+      const res = await fetch(`/api/roles?role_id=${roleId}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchRoles();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Gagal menghapus role");
+      }
+    } catch (error) {
+      console.error("Error deleting role:", error);
     }
   };
 
   if (status !== "loading" && !session) redirect("/login");
   if (status === "loading") return <div className="flex items-center justify-center min-h-screen"><Loading size="lg" /></div>;
   if (!session) return null;
-
-  const permissionCols: { key: keyof UserPermission; label: string }[] = [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "attendance", label: "Attendance" },
-    { key: "leave", label: "Leave" },
-    { key: "staff", label: "Staff" },
-    { key: "registration_request", label: "Registration" },
-    { key: "setting", label: "Settings" },
-  ];
 
   return (
     <DashboardLayout
@@ -172,28 +259,12 @@ export default function SettingsPage() {
       }}
     >
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Manage user permissions and access control
-            </p>
-          </div>
-          <Button onClick={handleSave} isLoading={isSaving}>
-            <Save size={14} className="mr-1.5" />
-            Save Changes
-          </Button>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Manage roles, user access, and work hours
+          </p>
         </div>
-
-        {saveMessage && (
-          <div className={`px-4 py-2 rounded-md text-sm ${
-            saveMessage.includes("success")
-              ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-              : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-          }`}>
-            {saveMessage}
-          </div>
-        )}
 
         <Card title="Jam Kerja">
           <div className="flex items-start gap-3 mb-4">
@@ -248,6 +319,67 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* Roles management */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20">
+                <ShieldCheck className="text-indigo-500" size={16} />
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Roles</h3>
+            </div>
+            <Button onClick={openNewRole}>
+              <Plus size={14} className="mr-1.5" />
+              Add Role
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="py-2 pr-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
+                  {PERMISSION_COLS.map((col) => (
+                    <th key={col.key} className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      {col.label}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {roles.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-6 text-center text-sm text-gray-500">No roles found</td>
+                  </tr>
+                ) : (
+                  roles.map((role) => (
+                    <tr key={role.role_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <td className="py-2.5 pr-4 text-xs font-semibold text-gray-900 dark:text-gray-100">{role.role_name}</td>
+                      {PERMISSION_COLS.map((col) => (
+                        <td key={col.key} className="px-3 py-2.5 text-center">
+                          <span className={`inline-block w-2 h-2 rounded-full ${role[col.key] ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+                        </td>
+                      ))}
+                      <td className="px-3 py-2.5">
+                        <div className="flex gap-2">
+                          <button onClick={() => openEditRole(role)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                            <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleDeleteRole(role.role_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* User → Role assignment */}
         {isLoading ? (
           <Card>
             <div className="flex flex-col items-center justify-center py-12">
@@ -255,19 +387,13 @@ export default function SettingsPage() {
             </div>
           </Card>
         ) : (
-          <Card title="User Permissions">
+          <Card title="User Access">
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
-                      User
-                    </th>
-                    {permissionCols.map((col) => (
-                      <th key={col.key} className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        {col.label}
-                      </th>
-                    ))}
+                    <th className="py-2 pr-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">User</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       <span className="flex items-center gap-1"><Clock size={11} /> Last Active</span>
                     </th>
@@ -276,36 +402,28 @@ export default function SettingsPage() {
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-6 text-center text-sm text-gray-500">No users found</td>
+                      <td colSpan={3} className="py-6 text-center text-sm text-gray-500">No users found</td>
                     </tr>
                   ) : (
                     users.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         <td className="py-2.5 pr-4">
-                          <div>
-                            <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{user.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</p>
-                            <span className="inline-block mt-0.5 px-1.5 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                              {user.role}
-                            </span>
-                          </div>
+                          <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{user.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</p>
                         </td>
-                        {permissionCols.map((col) => (
-                          <td key={col.key} className="px-3 py-2.5 text-center">
-                            <input
-                              type="checkbox"
-                              checked={!!user[col.key]}
-                              onChange={(e) =>
-                                handlePermissionChange(
-                                  user.id,
-                                  col.key as keyof Omit<UserPermission, "id" | "name" | "username" | "role" | "last_active">,
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                            />
-                          </td>
-                        ))}
+                        <td className="px-3 py-2.5">
+                          <select
+                            value={user.role_id}
+                            onChange={(e) => handleRoleAssign(user.id, e.target.value)}
+                            disabled={savingUserId === user.id}
+                            className="input-field text-xs py-1"
+                          >
+                            <option value="">— No role —</option>
+                            {roles.map((r) => (
+                              <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="px-3 py-2.5">
                           <span className={`text-xs ${
                             user.last_active
@@ -314,19 +432,6 @@ export default function SettingsPage() {
                           }`}>
                             {formatLastActive(user.last_active)}
                           </span>
-                          {user.last_active && (
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                              {new Date(user.last_active).toLocaleTimeString("id-ID", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                              {" "}·{" "}
-                              {new Date(user.last_active).toLocaleDateString("id-ID", {
-                                day: "2-digit",
-                                month: "short",
-                              })}
-                            </p>
-                          )}
                         </td>
                       </tr>
                     ))
@@ -350,6 +455,49 @@ export default function SettingsPage() {
             </div>
           </div>
         </Card>
+
+        {/* Role Add/Edit Modal */}
+        <Modal isOpen={isRoleModalOpen} onClose={() => setIsRoleModalOpen(false)} title={editingRole ? "Edit Role" : "Add Role"} size="sm">
+          <div className="space-y-3">
+            <div>
+              <label className="label-field">Role Name</label>
+              <input
+                type="text"
+                value={roleForm.role_name}
+                onChange={(e) => setRoleForm({ ...roleForm, role_name: e.target.value })}
+                className="input-field"
+                placeholder="cth. HR Manager"
+              />
+            </div>
+
+            <div>
+              <label className="label-field">Permissions</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                {PERMISSION_COLS.map((col) => (
+                  <label key={col.key} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={roleForm[col.key]}
+                      onChange={(e) => setRoleForm({ ...roleForm, [col.key]: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {roleError && <p className="text-xs text-red-600">{roleError}</p>}
+
+            <div className="flex gap-2 justify-end pt-3">
+              <Button variant="secondary" onClick={() => setIsRoleModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveRole} isLoading={isSavingRole}>
+                <Save size={14} className="mr-1.5" />
+                {editingRole ? "Update" : "Add"} Role
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </DashboardLayout>
   );

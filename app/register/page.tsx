@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: '',
-    username: '',
+    email: '',
     password: '',
     confirmPassword: '',
   });
@@ -51,7 +51,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           name: formData.name,
-          username: formData.username,
+          email: formData.email,
           password: formData.password,
         }),
       });
@@ -123,17 +123,17 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="username" className="label-field">
-                Username
+              <label htmlFor="email" className="label-field">
+                Email
               </label>
               <input
-                id="username"
-                name="username"
-                type="text"
-                value={formData.username}
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="Choose a username"
+                placeholder="you@example.com"
                 required
                 disabled={isLoading}
               />

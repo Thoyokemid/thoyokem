@@ -48,7 +48,7 @@ export default function RecapTab() {
   };
 
   // Get available date range from data
-  const availableDates = processedRecords.map((r) => r.tanggal_absensi).sort();
+  const availableDates = processedRecords.map((r) => r.attendance_date).sort();
   const minDate = availableDates[0] || '';
   const maxDate = availableDates[availableDates.length - 1] || '';
 
@@ -67,9 +67,9 @@ export default function RecapTab() {
   // Preview count — how many employees have records in selected range
   const previewCount = (() => {
     let filtered = processedRecords;
-    if (exportDateFrom) filtered = filtered.filter((r) => r.tanggal_absensi >= exportDateFrom);
-    if (exportDateTo) filtered = filtered.filter((r) => r.tanggal_absensi <= exportDateTo);
-    return new Set(filtered.map((r) => r.nama)).size;
+    if (exportDateFrom) filtered = filtered.filter((r) => r.attendance_date >= exportDateFrom);
+    if (exportDateTo) filtered = filtered.filter((r) => r.attendance_date <= exportDateTo);
+    return new Set(filtered.map((r) => r.employee_name)).size;
   })();
 
   const totalLate = recapData.reduce((sum, r) => sum + r.jumlah_keterlambatan, 0);

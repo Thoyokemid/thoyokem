@@ -5,9 +5,9 @@ import * as XLSX from 'xlsx';
  * Hitung jumlah hari cuti dari date_from sampai date_end (inklusif).
  */
 export function countLeaveDays(leave: LeaveAttendance): number {
-  if (!leave.date_from || !leave.date_end) return 1;
-  const from = new Date(leave.date_from);
-  const end = new Date(leave.date_end);
+  if (!leave.from_date || !leave.to_date) return 1;
+  const from = new Date(leave.from_date);
+  const end = new Date(leave.to_date);
   if (isNaN(from.getTime()) || isNaN(end.getTime())) return 1;
   const diffMs = end.getTime() - from.getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
@@ -22,7 +22,7 @@ export function countUsedLeaveDays(
   registrationId: string
 ): number {
   return leaveData
-    .filter((l) => l.registration_id === registrationId && l.category !== 'sick')
+    .filter((l) => l.employee === registrationId && l.leave_type !== 'sick')
     .reduce((sum, l) => sum + countLeaveDays(l), 0);
 }
 
@@ -48,21 +48,21 @@ export function processAttendanceData(
   const grouped = new Map<string, Map<string, ProcessedDay>>();
 
   rawData.forEach((record) => {
-    const key = `${record.id}-${record.nama}`;
+    const key = `${record.id}-${record.employee_name}`;
     if (!grouped.has(key)) {
       grouped.set(key, new Map());
     }
 
     const dateMap = grouped.get(key)!;
-    if (!dateMap.has(record.tanggal_absensi)) {
-      dateMap.set(record.tanggal_absensi, {});
+    if (!dateMap.has(record.attendance_date)) {
+      dateMap.set(record.attendance_date, {});
     }
 
-    const dayRecord = dateMap.get(record.tanggal_absensi)!;
+    const dayRecord = dateMap.get(record.attendance_date)!;
 
     // Simpan keterangan jika ada
-    if (record.keterangan) {
-      dayRecord.keterangan = record.keterangan;
+    if (record.remarks) {
+      dayRecord.keterangan = record.remarks;
     }
 
     if (record.tipe_absensi === 'Absensi Masuk') {
@@ -77,15 +77,15 @@ export function processAttendanceData(
   const records: AttendanceRecord[] = [];
 
   rawData.forEach((record) => {
-    const key = `${record.id}-${record.nama}`;
+    const key = `${record.id}-${record.employee_name}`;
     const dateMap = grouped.get(key);
     if (!dateMap) return;
 
-    const dayRecord = dateMap.get(record.tanggal_absensi);
+    const dayRecord = dateMap.get(record.attendance_date);
     if (!dayRecord) return;
 
     const existingRecord = records.find(
-      (r) => r.id === record.id && r.tanggal_absensi === record.tanggal_absensi
+      (r) => r.id === record.id && r.attendance_date === record.attendance_date
     );
 
     if (existingRecord) return;
@@ -131,24 +131,24 @@ export function processAttendanceData(
 
     records.push({
       id: record.id,
-      nama: record.nama,
-      jabatan: record.jabatan,
-      tanggal_absensi: record.tanggal_absensi,
-      jam_masuk_target: jamMasukTarget,
-      jam_masuk_actual: jamMasukActual,
-      keterlambatan_menit: keterlambatanMenit,
+      employee_name: record.employee_name,
+      designation: record.designation,
+      attendance_date: record.attendance_date,
+      shift_start: jamMasukTarget,
+      in_time: jamMasukActual,
+      late_entry_minutes: keterlambatanMenit,
       keterangan_masuk: keteranganMasuk,
-      jam_pulang_target: jamPulangTarget,
-      jam_pulang_actual: jamPulangActual,
-      overtime_menit: overtimeMenit,
+      shift_end: jamPulangTarget,
+      out_time: jamPulangActual,
+      overtime_minutes: overtimeMenit,
       keterangan_pulang: keteranganPulang,
-      keterangan: dayRecord.keterangan || '',
+      remarks: dayRecord.keterangan || '',
     });
   });
 
   return records.sort((a, b) => {
-    if (a.nama !== b.nama) return a.nama.localeCompare(b.nama);
-    return a.tanggal_absensi.localeCompare(b.tanggal_absensi);
+    if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name);
+    return a.attendance_date.localeCompare(b.attendance_date);
   });
 }
 
@@ -160,24 +160,24 @@ export function calculateRecap(records: AttendanceRecord[]): AttendanceRecap[] {
   }>();
 
   records.forEach((record) => {
-    if (!employeeMap.has(record.nama)) {
-      employeeMap.set(record.nama, {
+    if (!employeeMap.has(record.employee_name)) {
+      employeeMap.set(record.employee_name, {
         uniqueDates: new Set(),
         keterlambatan: [],
         overtime: [],
       });
     }
 
-    const empData = employeeMap.get(record.nama)!;
+    const empData = employeeMap.get(record.employee_name)!;
 
-    empData.uniqueDates.add(record.tanggal_absensi);
+    empData.uniqueDates.add(record.attendance_date);
 
-    if (record.keterlambatan_menit > 0) {
-      empData.keterlambatan.push(record.keterlambatan_menit);
+    if (record.late_entry_minutes > 0) {
+      empData.keterlambatan.push(record.late_entry_minutes);
     }
 
-    if (record.overtime_menit > 0) {
-      empData.overtime.push(record.overtime_menit);
+    if (record.overtime_minutes > 0) {
+      empData.overtime.push(record.overtime_minutes);
     }
   });
 
@@ -244,18 +244,18 @@ function timeToMinutes(time: string): number {
 export function exportToXLSX(records: AttendanceRecord[]): void {
   const exportData = records.map((r) => ({
     'ID': r.id,
-    'Nama': r.nama,
-    'Jabatan': r.jabatan,
-    'Tanggal Absensi': r.tanggal_absensi,
-    'Jam Masuk (Target)': r.jam_masuk_target,
-    'Jam Masuk (Actual)': r.jam_masuk_actual,
-    'Keterlambatan (menit)': r.keterlambatan_menit,
+    'Nama': r.employee_name,
+    'Jabatan': r.designation,
+    'Tanggal Absensi': r.attendance_date,
+    'Jam Masuk (Target)': r.shift_start,
+    'Jam Masuk (Actual)': r.in_time,
+    'Keterlambatan (menit)': r.late_entry_minutes,
     'Keterangan Masuk': r.keterangan_masuk,
-    'Jam Pulang (Target)': r.jam_pulang_target,
-    'Jam Pulang (Actual)': r.jam_pulang_actual,
-    'Overtime (menit)': r.overtime_menit,
+    'Jam Pulang (Target)': r.shift_end,
+    'Jam Pulang (Actual)': r.out_time,
+    'Overtime (menit)': r.overtime_minutes,
     'Keterangan Pulang': r.keterangan_pulang,
-    'Keterangan': r.keterangan,
+    'Keterangan': r.remarks,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -277,8 +277,8 @@ export function exportRecapToXLSX(
 ): void {
   // Filter records by date range if provided
   let filtered = allRecords;
-  if (dateFrom) filtered = filtered.filter((r) => r.tanggal_absensi >= dateFrom);
-  if (dateTo) filtered = filtered.filter((r) => r.tanggal_absensi <= dateTo);
+  if (dateFrom) filtered = filtered.filter((r) => r.attendance_date >= dateFrom);
+  if (dateTo) filtered = filtered.filter((r) => r.attendance_date <= dateTo);
 
   // Re-calculate recap from filtered records
   const recap = calculateRecap(filtered);

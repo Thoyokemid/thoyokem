@@ -32,3 +32,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# reference docs (not part of app source)
+ERPNext_Database_Schema.xlsx

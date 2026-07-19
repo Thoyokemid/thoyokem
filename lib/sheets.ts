@@ -113,6 +113,87 @@ export async function clearAndWriteSheet(sheetName: string, values: any[][]) {
   }
 }
 
+/**
+ * Read a sheet and return both the header row and each data row parsed as an
+ * object keyed by header name (instead of relying on column position).
+ * This way, reordering/inserting columns in the actual Google Sheet does not
+ * break the app — only the header *names* matter.
+ */
+export async function readSheetAsObjects<T = Record<string, any>>(
+  sheetName: string
+): Promise<{ headers: string[]; records: T[] }> {
+  const rows = await readSheet(sheetName);
+
+  if (!rows || rows.length < 1) {
+    return { headers: [], records: [] };
+  }
+
+  const headers = rows[0].map((h: any) => String(h ?? '').trim());
+
+  const records = rows.slice(1).map((row) => {
+    const obj: Record<string, any> = {};
+    headers.forEach((header, i) => {
+      if (header) obj[header] = row[i] ?? '';
+    });
+    return obj as T;
+  });
+
+  return { headers, records };
+}
+
+/**
+ * Convert a plain object into a row array ordered to match the sheet's
+ * existing header row, so writes always land in the correct column
+ * regardless of how the object's keys were ordered in code.
+ */
+export function objectToRow(headers: string[], obj: Record<string, any>): any[] {
+  return headers.map((header) => obj[header] ?? '');
+}
+
+/**
+ * Find the 0-based data-row index (i.e. index into rows.slice(1)) whose
+ * value in `idField` column matches `idValue`. Returns -1 if not found.
+ */
+export function findRowIndexByField(
+  headers: string[],
+  rows: any[][],
+  idField: string,
+  idValue: string
+): number {
+  const colIndex = headers.indexOf(idField);
+  if (colIndex === -1) return -1;
+  return rows.slice(1).findIndex((row) => String(row[colIndex] ?? '') === String(idValue));
+}
+
+/**
+ * Create a new sheet tab with the given header row if it doesn't already exist.
+ * Safe to call multiple times — no-op if the sheet is already there.
+ */
+export async function ensureSheetExists(sheetName: string, headers: string[]) {
+  const sheets = await getGoogleSheetsClient();
+
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+  });
+
+  const exists = spreadsheet.data.sheets?.some(
+    (s) => s.properties?.title === sheetName
+  );
+
+  if (exists) return false;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [{ addSheet: { properties: { title: sheetName } } }],
+    },
+  });
+
+  await writeSheet(sheetName, 'A1', [headers]);
+
+  return true;
+}
+
 export async function deleteRow(sheetName: string, rowIndex: number) {
   try {
     const sheets = await getGoogleSheetsClient();

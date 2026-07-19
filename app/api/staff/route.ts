@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow } from '@/lib/sheets';
+import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
 import { StaffList } from '@/types';
+
+const SHEET = 'staff_list';
 
 export async function GET() {
   try {
@@ -12,18 +14,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rows = await readSheet('staff_list');
+    const { records } = await readSheetAsObjects<any>(SHEET);
 
-    if (!rows || rows.length < 2) {
-      return NextResponse.json([]);
-    }
-
-    const staff: StaffList[] = rows.slice(1).map((row) => ({
-      id: row[0] || '',
-      registration_id: row[1] || '',
-      name: row[2] || '',
-      birth_date: row[3] || '',
-      leave_quota: row[4] ? parseInt(row[4]) : 12,
+    const staff: StaffList[] = records.map((r) => ({
+      employee_id: r.employee_id || '',
+      user_id: r.user_id || '',
+      employee_name: r.employee_name || '',
+      date_of_birth: r.date_of_birth || '',
+      leave_allocation: r.leave_allocation ? parseInt(r.leave_allocation) : 12,
     }));
 
     return NextResponse.json(staff);
@@ -42,18 +40,18 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const rows = await readSheet('staff_list');
-    const newId = rows.length > 1 ? String(rows.length) : '1';
+    const { headers, records } = await readSheetAsObjects<any>(SHEET);
+    const newId = String(records.length + 1);
 
-    const newStaff = [
-      newId,
-      data.registration_id || '',
-      data.name || '',
-      data.birth_date || '',
-      data.leave_quota ?? 12,
-    ];
+    const newStaff = objectToRow(headers, {
+      employee_id: newId,
+      user_id: data.user_id || '',
+      employee_name: data.employee_name || '',
+      date_of_birth: data.date_of_birth || '',
+      leave_allocation: data.leave_allocation ?? 12,
+    });
 
-    await appendSheet('staff_list', [newStaff]);
+    await appendSheet(SHEET, [newStaff]);
 
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
@@ -71,21 +69,33 @@ export async function PUT(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { id, ...updates } = data;
+    const { employee_id, ...updates } = data;
 
-    const rows = await readSheet('staff_list');
-    const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === id);
+    const rows = await readSheet(SHEET);
+    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
+    const dataRowIndex = findRowIndexByField(headers, rows, 'employee_id', employee_id);
 
-    if (rowIndex === -1) {
+    if (dataRowIndex === -1) {
       return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
     }
 
-    rows[rowIndex][1] = updates.registration_id ?? rows[rowIndex][1];
-    rows[rowIndex][2] = updates.name ?? rows[rowIndex][2];
-    rows[rowIndex][3] = updates.birth_date ?? rows[rowIndex][3];
-    rows[rowIndex][4] = updates.leave_quota ?? rows[rowIndex][4];
+    const sheetRowIndex = dataRowIndex + 1; // absolute index in `rows` (0 = header row)
+    const currentRow = rows[sheetRowIndex] || [];
 
-    await writeSheet('staff_list', `A${rowIndex + 1}:E${rowIndex + 1}`, [rows[rowIndex]]);
+    const currentObj: Record<string, any> = {};
+    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
+
+    const merged = {
+      ...currentObj,
+      user_id: updates.user_id ?? currentObj.user_id,
+      employee_name: updates.employee_name ?? currentObj.employee_name,
+      date_of_birth: updates.date_of_birth ?? currentObj.date_of_birth,
+      leave_allocation: updates.leave_allocation ?? currentObj.leave_allocation,
+    };
+
+    const newRow = objectToRow(headers, merged);
+    const lastCol = String.fromCharCode(65 + headers.length - 1); // A, B, C...
+    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -109,14 +119,15 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID required' }, { status: 400 });
     }
 
-    const rows = await readSheet('staff_list');
-    const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === id);
+    const rows = await readSheet(SHEET);
+    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
+    const dataRowIndex = findRowIndexByField(headers, rows, 'employee_id', id);
 
-    if (rowIndex === -1) {
+    if (dataRowIndex === -1) {
       return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
     }
 
-    await deleteRow('staff_list', rowIndex);
+    await deleteRow(SHEET, dataRowIndex + 1); // +1 to skip header row
 
     return NextResponse.json({ success: true });
   } catch (error) {

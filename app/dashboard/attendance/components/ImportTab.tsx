@@ -43,7 +43,7 @@ export default function ImportTab({ onImported }: ImportTabProps) {
     // Parse preview
     try {
       const result = await parseFile(selectedFile);
-      const dates = Array.from(new Set(result.map((r) => r.tanggal_absensi).filter(Boolean))).sort();
+      const dates = Array.from(new Set(result.map((r) => r.attendance_date).filter(Boolean))).sort();
       setParsed({ data: result, dates });
     } catch {
       setUploadStatus({ type: 'error', message: 'Failed to read file. Please check the format.' });
@@ -97,15 +97,15 @@ export default function ImportTab({ onImported }: ImportTabProps) {
           const mappedData = (jsonData as any[]).map((row) => ({
             cloud_id: String(row['Cloud ID'] || ''),
             id: String(row['ID'] || ''),
-            nama: String(row['Nama'] || ''),
-            tanggal_absensi: String(row['Tanggal Absensi'] || ''),
+            employee_name: String(row['Nama'] || ''),
+            attendance_date: String(row['Tanggal Absensi'] || ''),
             jam_set: String(row['Jam Set'] || ''),
             jam_absensi: String(row['Jam Absensi'] || ''),
             verifikasi: String(row['Verifikasi'] || ''),
             tipe_absensi: String(row['Tipe Absensi'] || ''),
-            jabatan: String(row['Jabatan'] || ''),
-            kantor: String(row['Kantor'] || ''),
-            keterangan: String(row['Keterangan'] || ''),
+            designation: String(row['Jabatan'] || ''),
+            branch: String(row['Kantor'] || ''),
+            remarks: String(row['Keterangan'] || ''),
           }));
 
           resolve(mappedData);

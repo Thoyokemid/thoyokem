@@ -8,13 +8,14 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
+import { ListViewLayout, ListRow, ListRowAvatar } from "@/components/ui/ListView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
 import { generateLeaveLetterPDF } from "@/utils/leaveLetter";
 import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ChevronsUpDown, ShieldOff, Download, X } from "lucide-react";
 
-type SortField = 'name' | 'date_from' | 'date_end' | 'category' | 'created_at';
+type SortField = 'employee_name' | 'from_date' | 'to_date' | 'leave_type' | 'created_at';
 type SortDir = 'asc' | 'desc';
 
 const CATEGORY_STYLES: Record<string, string> = {
@@ -56,7 +57,7 @@ export default function LeavePage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('employee_name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -97,11 +98,11 @@ export default function LeavePage() {
 
     if (searchName.trim()) {
       const q = searchName.toLowerCase();
-      result = result.filter((l) => l.name.toLowerCase().includes(q));
+      result = result.filter((l) => l.employee_name.toLowerCase().includes(q));
     }
-    if (filterCategory) result = result.filter((l) => l.category === filterCategory);
-    if (filterDateFrom) result = result.filter((l) => l.date_from >= filterDateFrom);
-    if (filterDateTo) result = result.filter((l) => l.date_end <= filterDateTo);
+    if (filterCategory) result = result.filter((l) => l.leave_type === filterCategory);
+    if (filterDateFrom) result = result.filter((l) => l.from_date >= filterDateFrom);
+    if (filterDateTo) result = result.filter((l) => l.to_date <= filterDateTo);
 
     result.sort((a, b) => {
       let aVal = a[sortField] || '';
@@ -123,18 +124,8 @@ export default function LeavePage() {
     return filteredLeaves.slice(start, start + pageSize);
   }, [filteredLeaves, currentPage]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('asc'); }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronsUpDown size={12} className="opacity-40" />;
-    return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
-  };
-
   const uniqueNames = useMemo(() =>
-    Array.from(new Set(leaves.map((l) => l.name))).sort(),
+    Array.from(new Set(leaves.map((l) => l.employee_name))).sort(),
   [leaves]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,11 +167,11 @@ export default function LeavePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: editingLeave.id,
-            date_from: formData.date_from,
-            date_end: formData.date_end,
-            category: formData.category,
-            link_url: fileUrl,
-            keterangan: formData.keterangan,
+            from_date: formData.date_from,
+            to_date: formData.date_end,
+            leave_type: formData.category,
+            attachment: fileUrl,
+            description: formData.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -188,20 +179,20 @@ export default function LeavePage() {
         console.error("Error updating leave:", error);
       }
     } else {
-      const selectedStaff = staff.find((s) => s.id === formData.staff_id);
+      const selectedStaff = staff.find((s) => s.employee_id === formData.staff_id);
       if (!selectedStaff) return;
       try {
         const response = await fetch("/api/leave", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            registration_id: selectedStaff.registration_id,
-            name: selectedStaff.name,
-            date_from: formData.date_from,
-            date_end: formData.date_end,
-            category: formData.category,
-            link_url: fileUrl,
-            keterangan: formData.keterangan,
+            employee: selectedStaff.user_id,
+            employee_name: selectedStaff.employee_name,
+            from_date: formData.date_from,
+            to_date: formData.date_end,
+            leave_type: formData.category,
+            attachment: fileUrl,
+            description: formData.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -213,7 +204,7 @@ export default function LeavePage() {
 
   const handleEdit = (leave: LeaveAttendance) => {
     setEditingLeave(leave);
-    setFormData({ staff_id: "", date_from: leave.date_from, date_end: leave.date_end, category: leave.category, link_url: leave.link_url, keterangan: leave.keterangan || "" });
+    setFormData({ staff_id: "", date_from: leave.from_date, date_end: leave.to_date, category: leave.leave_type, link_url: leave.attachment, keterangan: leave.description || "" });
     setIsModalOpen(true);
   };
 
@@ -269,18 +260,6 @@ export default function LeavePage() {
     );
   }
 
-  const ThBtn = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <th
-      className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-1">
-        {children}
-        <SortIcon field={field} />
-      </div>
-    </th>
-  );
-
   const hasActiveFilter = searchName || filterCategory || filterDateFrom || filterDateTo;
 
   return (
@@ -293,19 +272,32 @@ export default function LeavePage() {
         permissions: session.user.permissions,
       }}
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Leave Management</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage employee leave requests</p>
-          </div>
+      <>
+      <ListViewLayout
+        title="Leave Management"
+        subtitle="Manage employee leave requests"
+        primaryAction={
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={14} className="mr-1.5" />
             Add Leave
           </Button>
-        </div>
-
-        <Card>
+        }
+        filterGroups={[
+          {
+            title: 'Category',
+            filters: [
+              { label: 'All', value: '', active: filterCategory === '', onClick: () => setFilterCategory(''), count: leaves.length },
+              ...['sick', 'annual', 'personal', 'emergency'].map((cat) => ({
+                label: CATEGORY_LABELS[cat],
+                value: cat,
+                active: filterCategory === cat,
+                onClick: () => setFilterCategory(cat),
+                count: leaves.filter((l) => l.leave_type === cat).length,
+              })),
+            ],
+          },
+        ]}
+        toolbar={
           <div className="space-y-3">
             <div className="flex flex-col md:flex-row gap-3">
               <div className="flex-1 relative">
@@ -318,21 +310,30 @@ export default function LeavePage() {
                   className="input-field pl-9"
                 />
               </div>
-              <div className="w-full md:w-44">
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="input-field">
-                  <option value="">All Categories</option>
-                  <option value="sick">Sick Leave</option>
-                  <option value="annual">Annual Leave</option>
-                  <option value="personal">Personal Leave</option>
-                  <option value="emergency">Emergency Leave</option>
-                </select>
-              </div>
               <div className="w-full md:w-36">
                 <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="input-field" />
               </div>
               <div className="w-full md:w-36">
                 <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="input-field" />
               </div>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value as SortField)}
+                className="input-field w-full md:w-40"
+              >
+                <option value="employee_name">Sort: Name</option>
+                <option value="from_date">Sort: Date From</option>
+                <option value="to_date">Sort: Date To</option>
+                <option value="leave_type">Sort: Category</option>
+                <option value="created_at">Sort: Created</option>
+              </select>
+              <button
+                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                className="p-2 rounded-md border border-gray-200 dark:border-gray-600 text-gray-500 hover:text-gray-700"
+                title="Toggle sort direction"
+              >
+                {sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
               {hasActiveFilter && <Button variant="secondary" onClick={clearFilters}>Clear</Button>}
             </div>
 
@@ -359,91 +360,50 @@ export default function LeavePage() {
               Showing {filteredLeaves.length} of {leaves.length} records
             </div>
           </div>
-        </Card>
-
+        }
+      >
         {isLoading ? (
-          <Card>
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loading size="lg" />
-              <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Loading leave data...</p>
-            </div>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loading size="lg" />
+            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Loading leave data...</p>
+          </div>
+        ) : paginatedLeaves.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</p>
         ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <ThBtn field="name">Name</ThBtn>
-                    <ThBtn field="date_from">Date From</ThBtn>
-                    <ThBtn field="date_end">Date To</ThBtn>
-                    <ThBtn field="category">Category</ThBtn>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Document</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keterangan</th>
-                    <ThBtn field="created_at">Created</ThBtn>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {paginatedLeaves.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</td>
-                    </tr>
+          <>
+            {paginatedLeaves.map((row) => (
+              <ListRow
+                key={row.id}
+                onClick={() => setDetailLeave(row)}
+                avatar={<ListRowAvatar initials={getInitials(row.employee_name)} />}
+                title={row.employee_name}
+                subtitle={`${row.from_date} → ${row.to_date}${row.description ? ' · ' + row.description : ''}`}
+                meta={
+                  row.attachment ? (
+                    <a href={row.attachment} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                      className="text-primary hover:underline inline-flex items-center gap-1">
+                      <FileText size={12} /> Document
+                    </a>
                   ) : (
-                    paginatedLeaves.map((row) => (
-                      <tr
-                        key={row.id}
-                        onClick={() => setDetailLeave(row)}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <td className="px-3 py-2 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                              {getInitials(row.name)}
-                            </span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">{row.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.date_from}</td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">{row.date_end}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <CategoryBadge category={row.category} />
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          {row.link_url ? (
-                            <a href={row.link_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                              className="text-primary hover:underline text-xs inline-flex items-center gap-1">
-                              <FileText size={12} /> View
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100 max-w-[200px] truncate" title={row.keterangan}>
-                          {row.keterangan || <span className="text-gray-400">-</span>}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">
-                          {new Date(row.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
-                              <Edit size={14} />
-                            </button>
-                            <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    new Date(row.created_at).toLocaleDateString()
+                  )
+                }
+                badges={<CategoryBadge category={row.leave_type} />}
+                actions={
+                  <>
+                    <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                      <Edit size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                }
+              />
+            ))}
 
             {filteredLeaves.length > 0 && (
-              <div className="flex items-center justify-between px-1 pt-3">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Page {currentPage} of {totalPages}
                 </p>
@@ -465,8 +425,9 @@ export default function LeavePage() {
                 </div>
               </div>
             )}
-          </Card>
+          </>
         )}
+      </ListViewLayout>
 
         <Modal isOpen={isModalOpen} onClose={resetForm} title={editingLeave ? "Edit Leave Request" : "Add Leave Request"}>
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -481,7 +442,7 @@ export default function LeavePage() {
                 >
                   <option value="">Select employee</option>
                   {staff.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.employee_id} value={s.employee_id}>{s.employee_name}</option>
                   ))}
                 </select>
               </div>
@@ -490,7 +451,7 @@ export default function LeavePage() {
             {editingLeave && (
               <div>
                 <label className="label-field">Employee</label>
-                <input type="text" value={editingLeave.name} className="input-field bg-gray-100 dark:bg-gray-700" disabled />
+                <input type="text" value={editingLeave.employee_name} className="input-field bg-gray-100 dark:bg-gray-700" disabled />
               </div>
             )}
 
@@ -575,9 +536,9 @@ export default function LeavePage() {
         {/* Detail Modal */}
         <Modal isOpen={!!detailLeave} onClose={() => setDetailLeave(null)} title="Detail Cuti" size="md">
           {detailLeave && (() => {
-            const relatedStaff = staff.find((s) => s.registration_id === detailLeave.registration_id);
-            const quota = relatedStaff?.leave_quota ?? 12;
-            const usedDays = countUsedLeaveDays(leaves, detailLeave.registration_id);
+            const relatedStaff = staff.find((s) => s.user_id === detailLeave.employee);
+            const quota = relatedStaff?.leave_allocation ?? 12;
+            const usedDays = countUsedLeaveDays(leaves, detailLeave.employee);
             const remaining = Math.max(0, quota - usedDays);
             const totalDays = countLeaveDays(detailLeave);
 
@@ -585,22 +546,22 @@ export default function LeavePage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
-                    {getInitials(detailLeave.name)}
+                    {getInitials(detailLeave.employee_name)}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailLeave.name}</p>
-                    <CategoryBadge category={detailLeave.category} />
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailLeave.employee_name}</p>
+                    <CategoryBadge category={detailLeave.leave_type} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
                     <p className="text-gray-500 dark:text-gray-400">Tanggal Mulai</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.date_from}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.from_date}</p>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
                     <p className="text-gray-500 dark:text-gray-400">Tanggal Selesai</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.date_end}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.to_date}</p>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
                     <p className="text-gray-500 dark:text-gray-400">Jumlah Hari</p>
@@ -615,13 +576,13 @@ export default function LeavePage() {
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Keterangan</p>
                   <p className="text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 rounded-md p-2.5 min-h-[2.5rem]">
-                    {detailLeave.keterangan || <span className="text-gray-400">Tidak ada keterangan</span>}
+                    {detailLeave.description || <span className="text-gray-400">Tidak ada keterangan</span>}
                   </p>
                 </div>
 
-                {detailLeave.link_url && (
+                {detailLeave.attachment && (
                   <a
-                    href={detailLeave.link_url}
+                    href={detailLeave.attachment}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline inline-flex items-center gap-1.5"
@@ -647,7 +608,7 @@ export default function LeavePage() {
             );
           })()}
         </Modal>
-      </div>
+      </>
     </DashboardLayout>
   );
 }

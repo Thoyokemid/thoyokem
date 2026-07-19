@@ -7,27 +7,29 @@ import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import ColumnPicker, { ColumnDef } from '@/components/ui/ColumnPicker';
+import { ListRow, ListRowAvatar, StatusBadge } from '@/components/ui/ListView';
 import { AttendanceImport } from '@/types';
 import { getInitials } from '@/utils/format';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, List, Table2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 20;
 
 const ALL_COLUMNS: ColumnDef[] = [
-  { key: 'nama', header: 'Nama' },
-  { key: 'tanggal_absensi', header: 'Tanggal' },
+  { key: 'employee_name', header: 'Nama' },
+  { key: 'attendance_date', header: 'Tanggal' },
   { key: 'jam_absensi', header: 'Jam' },
   { key: 'jam_set', header: 'Jam Set' },
   { key: 'tipe_absensi', header: 'Tipe' },
-  { key: 'jabatan', header: 'Jabatan' },
-  { key: 'kantor', header: 'Kantor' },
+  { key: 'designation', header: 'Jabatan' },
+  { key: 'branch', header: 'Kantor' },
   { key: 'verifikasi', header: 'Verifikasi' },
-  { key: 'keterangan', header: 'Keterangan' },
+  { key: 'remarks', header: 'Keterangan' },
 ];
 
-const DEFAULT_VISIBLE = ['nama', 'tanggal_absensi', 'jam_absensi', 'tipe_absensi', 'jabatan', 'verifikasi'];
+const DEFAULT_VISIBLE = ['employee_name', 'attendance_date', 'jam_absensi', 'tipe_absensi', 'designation', 'verifikasi'];
 const STORAGE_KEY = 'attendance_data_columns';
+const VIEW_MODE_KEY = 'attendance_data_view_mode';
 
 function VerifikasiBadge({ value }: { value: string }) {
   const ok = value?.toLowerCase() === 'vein' || value?.toLowerCase() === 'fingerprint' || value?.toLowerCase() === 'face';
@@ -60,6 +62,7 @@ export default function DataTab() {
   const [page, setPage] = useState(1);
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'report' | 'list'>('report');
 
   useEffect(() => {
     fetchData();
@@ -70,7 +73,13 @@ export default function DataTab() {
         if (Array.isArray(parsed) && parsed.length > 0) setVisibleCols(parsed);
       } catch {}
     }
+    const savedView = localStorage.getItem(VIEW_MODE_KEY);
+    if (savedView === 'report' || savedView === 'list') setViewMode(savedView);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleCols));
@@ -101,12 +110,12 @@ export default function DataTab() {
     if (searchTerm) {
       filtered = filtered.filter(
         (item) =>
-          item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.jabatan.toLowerCase().includes(searchTerm.toLowerCase())
+          item.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.designation.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     if (selectedDate) {
-      filtered = filtered.filter((item) => item.tanggal_absensi === selectedDate);
+      filtered = filtered.filter((item) => item.attendance_date === selectedDate);
     }
     setFilteredData(filtered);
   };
@@ -115,15 +124,15 @@ export default function DataTab() {
     const exportData = filteredData.map((item) => ({
       'Cloud ID': item.cloud_id,
       'ID': item.id,
-      'Nama': item.nama,
-      'Tanggal Absensi': item.tanggal_absensi,
+      'Nama': item.employee_name,
+      'Tanggal Absensi': item.attendance_date,
       'Jam Set': item.jam_set,
       'Jam Absensi': item.jam_absensi,
       'Verifikasi': item.verifikasi,
       'Tipe Absensi': item.tipe_absensi,
-      'Jabatan': item.jabatan,
-      'Kantor': item.kantor,
-      'Keterangan': item.keterangan,
+      'Jabatan': item.designation,
+      'Kantor': item.branch,
+      'Keterangan': item.remarks,
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -163,7 +172,35 @@ export default function DataTab() {
               />
             </div>
             <div className="flex gap-2">
-              <ColumnPicker columns={ALL_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
+              <div className="flex rounded-md border border-gray-200 dark:border-gray-600 overflow-hidden">
+                <button
+                  onClick={() => setViewMode('list')}
+                  title="List View"
+                  className={`px-2.5 py-1.5 text-xs flex items-center gap-1.5 transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-primary text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <List size={13} />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode('report')}
+                  title="Report View"
+                  className={`px-2.5 py-1.5 text-xs flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-600 transition-colors ${
+                    viewMode === 'report'
+                      ? 'bg-primary text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Table2 size={13} />
+                  Report
+                </button>
+              </div>
+              {viewMode === 'report' && (
+                <ColumnPicker columns={ALL_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
+              )}
               <Button onClick={() => setIsExportModalOpen(true)} variant="outline">
                 <Download size={14} className="mr-1.5" />
                 Export
@@ -176,6 +213,40 @@ export default function DataTab() {
         </div>
       </Card>
 
+      {viewMode === 'list' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+          {paginatedData.length === 0 ? (
+            <p className="px-3 py-10 text-center text-sm text-gray-500">No data available</p>
+          ) : (
+            paginatedData.map((row, i) => (
+              <ListRow
+                key={i}
+                avatar={<ListRowAvatar initials={getInitials(row.employee_name || '?')} />}
+                title={row.employee_name}
+                subtitle={`${row.designation || '-'}${row.branch ? ' · ' + row.branch : ''}`}
+                meta={`${row.attendance_date} ${row.jam_absensi || ''}`}
+                badges={
+                  <>
+                    <TipeBadge value={row.tipe_absensi} />
+                    <VerifikasiBadge value={row.verifikasi} />
+                  </>
+                }
+              />
+            ))
+          )}
+          {filteredData.length > 0 && (
+            <div className="px-3 pb-3">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={filteredData.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </div>
+          )}
+        </div>
+      ) : (
       <Card>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -200,7 +271,7 @@ export default function DataTab() {
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                     {columns.map((col) => {
                       const value = row[col.key as keyof AttendanceImport];
-                      if (col.key === 'nama') {
+                      if (col.key === 'employee_name') {
                         return (
                           <td key={col.key} className="px-3 py-2.5 text-xs">
                             <div className="flex items-center gap-2">
@@ -240,6 +311,7 @@ export default function DataTab() {
           />
         )}
       </Card>
+      )}
 
       <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Export Data" size="sm">
         <div className="space-y-4">

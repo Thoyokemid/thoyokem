@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet } from '@/lib/sheets';
+import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
+
+const SHEET = 'registration';
+
+// Role a newly-approved user gets by default. Admin can change it later
+// from Settings → User Access. "2" = Viewer (dashboard-only) in the seed roles.
+const DEFAULT_ROLE_ID = '2';
 
 export async function GET() {
   try {
@@ -13,20 +19,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rows = await readSheet('registration');
+    const { records } = await readSheetAsObjects<any>(SHEET);
 
-    if (!rows || rows.length < 2) {
-      return NextResponse.json([]);
-    }
-
-    const registrations: Registration[] = rows.slice(1).map((row) => ({
-      id: row[0] || '',
-      name: row[1] || '',
-      username: row[2] || '',
-      password: row[3] || '',
-      status: (row[4] || 'pending') as 'pending' | 'approved' | 'rejected',
-      created_at: row[5] || '',
-      update_at: row[6] || '',
+    const registrations: Registration[] = records.map((r) => ({
+      id: r.id || '',
+      name: r.name || '',
+      email: r.email || '',
+      password: r.password || '',
+      status: (r.status || 'pending') as 'pending' | 'approved' | 'rejected',
+      created_at: r.created_at || '',
+      update_at: r.update_at || '',
     }));
 
     return NextResponse.json(registrations);
@@ -40,24 +42,27 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    // Get existing data to generate new ID
-    const rows = await readSheet('registration');
-    const newId = rows.length > 1 ? String(rows.length) : '1';
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      return NextResponse.json({ error: 'Email tidak valid' }, { status: 400 });
+    }
+
+    const { headers, records } = await readSheetAsObjects<any>(SHEET);
+    const newId = String(records.length + 1);
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const now = new Date().toISOString();
 
-    const newRegistration = [
-      newId,
-      data.name || '',
-      data.username || '',
-      hashedPassword,
-      'pending',
-      now,
-      now,
-    ];
+    const newRegistration = objectToRow(headers, {
+      id: newId,
+      name: data.name || '',
+      email: data.email || '',
+      password: hashedPassword,
+      status: 'pending',
+      created_at: now,
+      update_at: now,
+    });
 
-    await appendSheet('registration', [newRegistration]);
+    await appendSheet(SHEET, [newRegistration]);
 
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
@@ -80,47 +85,43 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const rows = await readSheet('registration');
+    const rows = await readSheet(SHEET);
+    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
+    const dataRowIndex = findRowIndexByField(headers, rows, 'id', id);
 
-    if (!rows || rows.length < 2) {
+    if (dataRowIndex === -1) {
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
     }
 
-    const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === id);
-
-    if (rowIndex === -1) {
-      return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
-    }
+    const sheetRowIndex = dataRowIndex + 1;
+    const currentRow = rows[sheetRowIndex] || [];
+    const currentObj: Record<string, any> = {};
+    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
 
     const now = new Date().toISOString();
-    rows[rowIndex][4] = status;
-    rows[rowIndex][6] = now;
 
-    // If approved, add to users sheet
+    // If approved, add to users sheet with a safe default role.
     if (status === 'approved') {
-      const registration = rows[rowIndex];
-      const usersRows = await readSheet('users');
-      const newUserId = usersRows.length > 1 ? String(usersRows.length) : '1';
+      const { headers: userHeaders, records: userRecords } = await readSheetAsObjects<any>('users');
+      const newUserId = String(userRecords.length + 1);
 
-      const newUser = [
-        newUserId,
-        registration[1], // name
-        registration[2], // username
-        registration[3], // password (already hashed)
-        'staff', // role
-        'TRUE', // dashboard
-        'FALSE', // attendance
-        'FALSE', // leave
-        'FALSE', // registration_request
-        'FALSE', // setting
-        '', // last_active
-        'FALSE', // staff (staff management permission)
-      ];
+      const newUser = objectToRow(userHeaders, {
+        id: newUserId,
+        name: currentObj.name,
+        username: currentObj.email,
+        password: currentObj.password, // already hashed
+        role: 'staff',
+        role_id: DEFAULT_ROLE_ID,
+        last_active: '',
+      });
 
       await appendSheet('users', [newUser]);
     }
 
-    await writeSheet('registration', `A${rowIndex + 1}:G${rowIndex + 1}`, [rows[rowIndex]]);
+    const merged = { ...currentObj, status, update_at: now };
+    const newRow = objectToRow(headers, merged);
+    const lastCol = String.fromCharCode(65 + headers.length - 1);
+    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
