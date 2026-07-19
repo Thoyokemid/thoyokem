@@ -14,6 +14,8 @@ import {
   Settings,
   User as UserIcon,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 
@@ -36,8 +38,10 @@ export default function Topbar({ user }: TopbarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [staffMatches, setStaffMatches] = useState<{ employee_name: string }[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string>('');
+  const [isDark, setIsDark] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/profile')
@@ -47,6 +51,28 @@ export default function Topbar({ user }: TopbarProps) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+      return next;
+    });
+  };
 
   const items: SearchItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, enabled: user.permissions.dashboard },
@@ -62,12 +88,14 @@ export default function Topbar({ user }: TopbarProps) {
     (i) => i.enabled && i.name.toLowerCase().includes(query.toLowerCase())
   );
 
-  // Keyboard shortcut: Cmd/Ctrl + K opens search
+  // Keyboard shortcut: Cmd/Ctrl + K opens search AND focuses the input immediately
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
+        // Wait a tick so the input exists / is visible before focusing.
+        requestAnimationFrame(() => searchInputRef.current?.focus());
       }
       if (e.key === 'Escape') setIsSearchOpen(false);
     };
@@ -128,11 +156,12 @@ export default function Topbar({ user }: TopbarProps) {
     .toUpperCase();
 
   return (
-    <div className="hidden md:flex sticky top-0 z-20 items-center justify-between gap-4 px-6 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="flex sticky top-0 z-20 items-center justify-between gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       {/* Global search */}
       <div ref={searchRef} className="relative flex-1 max-w-md">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
         <input
+          ref={searchInputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -140,7 +169,7 @@ export default function Topbar({ user }: TopbarProps) {
           placeholder="Cari modul atau karyawan..."
           className="w-full pl-9 pr-14 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
-        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5">
+        <span className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5">
           ⌘K
         </span>
 
@@ -189,47 +218,58 @@ export default function Topbar({ user }: TopbarProps) {
         )}
       </div>
 
-      {/* Profile dropdown */}
-      <div ref={profileRef} className="relative">
+      <div className="flex items-center gap-2">
+        {/* Theme toggle — sits to the left of the profile dropdown */}
         <button
-          onClick={() => setIsProfileOpen((v) => !v)}
-          className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="flex items-center justify-center w-8 h-8 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
-          {photoUrl ? (
-            <img src={photoUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
-          ) : (
-            <span className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-xs font-bold flex items-center justify-center">
-              {initials}
-            </span>
-          )}
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">
-            {user.name}
-          </span>
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {isProfileOpen && (
-          <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
-            <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
-              <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.role}</p>
+        {/* Profile dropdown */}
+        <div ref={profileRef} className="relative">
+          <button
+            onClick={() => setIsProfileOpen((v) => !v)}
+            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            {photoUrl ? (
+              <img src={photoUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+            ) : (
+              <span className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-xs font-bold flex items-center justify-center">
+                {initials}
+              </span>
+            )}
+            <span className="hidden sm:inline text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">
+              {user.name}
+            </span>
+          </button>
+
+          {isProfileOpen && (
+            <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.role}</p>
+              </div>
+              <Link
+                href="/dashboard/profile"
+                onClick={() => setIsProfileOpen(false)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <UserIcon size={14} />
+                My Profile
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                <LogOut size={14} />
+                Logout
+              </button>
             </div>
-            <Link
-              href="/dashboard/profile"
-              onClick={() => setIsProfileOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <UserIcon size={14} />
-              My Profile
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            >
-              <LogOut size={14} />
-              Logout
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

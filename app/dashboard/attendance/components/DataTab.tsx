@@ -6,11 +6,11 @@ import Loading from '@/components/ui/Loading';
 import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
-import ColumnPicker, { ColumnDef } from '@/components/ui/ColumnPicker';
-import { ListRow, ListRowAvatar, StatusBadge } from '@/components/ui/ListView';
+import { ColumnDef } from '@/components/ui/ColumnPicker';
+import { ListRow, ListRowAvatar, ViewModeDropdown, ViewMode, OverflowMenu, OverflowMenuItem, OverflowMenuColumns } from '@/components/ui/ListView';
 import { AttendanceImport } from '@/types';
 import { getInitials } from '@/utils/format';
-import { Search, Download, List, Table2 } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 20;
@@ -62,7 +62,7 @@ export default function DataTab() {
   const [page, setPage] = useState(1);
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'report' | 'list'>('report');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
     fetchData();
@@ -172,39 +172,15 @@ export default function DataTab() {
               />
             </div>
             <div className="flex gap-2">
-              <div className="flex rounded-md border border-gray-200 dark:border-gray-600 overflow-hidden">
-                <button
-                  onClick={() => setViewMode('list')}
-                  title="List View"
-                  className={`px-2.5 py-1.5 text-xs flex items-center gap-1.5 transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-primary text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <List size={13} />
-                  List
-                </button>
-                <button
-                  onClick={() => setViewMode('report')}
-                  title="Report View"
-                  className={`px-2.5 py-1.5 text-xs flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-600 transition-colors ${
-                    viewMode === 'report'
-                      ? 'bg-primary text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Table2 size={13} />
-                  Report
-                </button>
-              </div>
-              {viewMode === 'report' && (
-                <ColumnPicker columns={ALL_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
-              )}
-              <Button onClick={() => setIsExportModalOpen(true)} variant="outline">
-                <Download size={14} className="mr-1.5" />
-                Export
-              </Button>
+              <ViewModeDropdown mode={viewMode} onChange={setViewMode} />
+              <OverflowMenu>
+                {viewMode === 'report' && (
+                  <OverflowMenuColumns columns={ALL_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
+                )}
+                <OverflowMenuItem icon={Download} onClick={() => setIsExportModalOpen(true)}>
+                  Export
+                </OverflowMenuItem>
+              </OverflowMenu>
             </div>
           </div>
           <div className="text-xs text-gray-600 dark:text-gray-400">

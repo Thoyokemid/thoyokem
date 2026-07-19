@@ -4,15 +4,36 @@ import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
-import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/components/ui/ListView";
+import Pagination from "@/components/ui/Pagination";
+import { ColumnDef } from "@/components/ui/ColumnPicker";
+import {
+  ListViewLayout,
+  ListRow,
+  ListRowAvatar,
+  StatusBadge,
+  ViewModeDropdown,
+  ViewMode,
+  OverflowMenu,
+  OverflowMenuItem,
+  OverflowMenuColumns,
+} from "@/components/ui/ListView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
-import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, X, CalendarDays } from "lucide-react";
+import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, X, CalendarDays, Download } from "lucide-react";
+import * as XLSX from "xlsx";
+
+const STAFF_COLUMNS: ColumnDef[] = [
+  { key: "employee_name", header: "Name" },
+  { key: "user_id", header: "Registration ID" },
+  { key: "date_of_birth", header: "Birth Date" },
+  { key: "leave_allocation", header: "Leave Quota" },
+];
+const DEFAULT_VISIBLE_COLS = ["employee_name", "user_id", "date_of_birth", "leave_allocation"];
+const PAGE_SIZE = 10;
 
 const CATEGORY_STYLES: Record<string, string> = {
   sick: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -39,6 +60,9 @@ export default function StaffPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchName, setSearchName] = useState('');
   const [birthdayFilter, setBirthdayFilter] = useState<'all' | 'has' | 'missing'>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE_COLS);
+  const [page, setPage] = useState(1);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -76,6 +100,29 @@ export default function StaffPage() {
     if (birthdayFilter === 'missing') result = result.filter((s) => !s.date_of_birth);
     return result;
   }, [staff, searchName, birthdayFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchName, birthdayFilter, viewMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE));
+  const paginatedStaff = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredStaff.slice(start, start + PAGE_SIZE);
+  }, [filteredStaff, page]);
+
+  const handleExport = () => {
+    const exportData = filteredStaff.map((s) => ({
+      Name: s.employee_name,
+      'Registration ID': s.user_id,
+      'Birth Date': s.date_of_birth || '',
+      'Leave Quota': s.leave_allocation ?? 12,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff');
+    XLSX.writeFile(workbook, `staff_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,6 +254,15 @@ export default function StaffPage() {
                 className="input-field pl-9"
               />
             </div>
+            <ViewModeDropdown mode={viewMode} onChange={setViewMode} />
+            <OverflowMenu>
+              {viewMode === 'report' && (
+                <OverflowMenuColumns columns={STAFF_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
+              )}
+              <OverflowMenuItem icon={Download} onClick={handleExport}>
+                Export
+              </OverflowMenuItem>
+            </OverflowMenu>
             <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {filteredStaff.length} of {staff.length} staff
             </div>
@@ -219,33 +275,79 @@ export default function StaffPage() {
           </div>
         ) : filteredStaff.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-gray-500">No staff found</p>
+        ) : viewMode === 'list' ? (
+          <>
+            {paginatedStaff.map((s) => (
+              <ListRow
+                key={s.employee_id}
+                onClick={() => setDetailStaff(s)}
+                avatar={<ListRowAvatar initials={getInitials(s.employee_name)} />}
+                title={s.employee_name}
+                subtitle={s.user_id || '-'}
+                meta={
+                  <div className="flex items-center gap-1.5">
+                    {s.date_of_birth && <Cake size={12} className="text-pink-400" />}
+                    {s.date_of_birth || 'No birth date'}
+                  </div>
+                }
+                badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}
+                actions={
+                  <>
+                    <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                      <Edit size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                }
+              />
+            ))}
+            <div className="px-4 pb-3">
+              <Pagination page={page} totalPages={totalPages} totalItems={filteredStaff.length} pageSize={PAGE_SIZE} onChange={setPage} />
+            </div>
+          </>
         ) : (
-          filteredStaff.map((s) => (
-            <ListRow
-              key={s.employee_id}
-              onClick={() => setDetailStaff(s)}
-              avatar={<ListRowAvatar initials={getInitials(s.employee_name)} />}
-              title={s.employee_name}
-              subtitle={s.user_id || '-'}
-              meta={
-                <div className="flex items-center gap-1.5">
-                  {s.date_of_birth && <Cake size={12} className="text-pink-400" />}
-                  {s.date_of_birth || 'No birth date'}
-                </div>
-              }
-              badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}
-              actions={
-                <>
-                  <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
-                    <Edit size={14} />
-                  </button>
-                  <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
-                    <Trash2 size={14} />
-                  </button>
-                </>
-              }
-            />
-          ))
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    {STAFF_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
+                      <th key={col.key} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {col.header}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                  {paginatedStaff.map((s) => (
+                    <tr key={s.employee_id} onClick={() => setDetailStaff(s)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                      {STAFF_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
+                        <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
+                          {String((s as any)[col.key] ?? '-')}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2.5 text-xs">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                            <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 pb-3 pt-1">
+              <Pagination page={page} totalPages={totalPages} totalItems={filteredStaff.length} pageSize={PAGE_SIZE} onChange={setPage} />
+            </div>
+          </>
         )}
       </ListViewLayout>
 

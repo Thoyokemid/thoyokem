@@ -4,16 +4,36 @@ import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
-import { ListViewLayout, ListRow, ListRowAvatar } from "@/components/ui/ListView";
+import { ColumnDef } from "@/components/ui/ColumnPicker";
+import {
+  ListViewLayout,
+  ListRow,
+  ListRowAvatar,
+  ViewModeDropdown,
+  ViewMode,
+  OverflowMenu,
+  OverflowMenuItem,
+  OverflowMenuColumns,
+} from "@/components/ui/ListView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
 import { generateLeaveLetterPDF } from "@/utils/leaveLetter";
-import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ChevronsUpDown, ShieldOff, Download, X } from "lucide-react";
+import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download, X } from "lucide-react";
+import * as XLSX from "xlsx";
+
+const LEAVE_COLUMNS: ColumnDef[] = [
+  { key: "employee_name", header: "Name" },
+  { key: "from_date", header: "Date From" },
+  { key: "to_date", header: "Date To" },
+  { key: "leave_type", header: "Category" },
+  { key: "description", header: "Keterangan" },
+  { key: "created_at", header: "Created" },
+];
+const DEFAULT_VISIBLE_COLS = ["employee_name", "from_date", "to_date", "leave_type", "created_at"];
 
 type SortField = 'employee_name' | 'from_date' | 'to_date' | 'leave_type' | 'created_at';
 type SortDir = 'asc' | 'desc';
@@ -61,6 +81,8 @@ export default function LeavePage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE_COLS);
 
   const [formData, setFormData] = useState({
     staff_id: "",
@@ -232,6 +254,21 @@ export default function LeavePage() {
     setFilterDateTo('');
   };
 
+  const handleExport = () => {
+    const exportData = filteredLeaves.map((l) => ({
+      Name: l.employee_name,
+      'Date From': l.from_date,
+      'Date To': l.to_date,
+      Category: CATEGORY_LABELS[l.leave_type] || l.leave_type,
+      Keterangan: l.description || '',
+      Created: l.created_at,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Leave');
+    XLSX.writeFile(workbook, `leave_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   if (status !== "loading" && !session) redirect("/login");
   if (status === "loading") return <div className="flex items-center justify-center min-h-screen"><Loading size="lg" /></div>;
   if (!session) return null;
@@ -334,6 +371,15 @@ export default function LeavePage() {
               >
                 {sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
+              <ViewModeDropdown mode={viewMode} onChange={setViewMode} />
+              <OverflowMenu>
+                {viewMode === 'report' && (
+                  <OverflowMenuColumns columns={LEAVE_COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
+                )}
+                <OverflowMenuItem icon={Download} onClick={handleExport}>
+                  Export
+                </OverflowMenuItem>
+              </OverflowMenu>
               {hasActiveFilter && <Button variant="secondary" onClick={clearFilters}>Clear</Button>}
             </div>
 
@@ -369,6 +415,56 @@ export default function LeavePage() {
           </div>
         ) : paginatedLeaves.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</p>
+        ) : viewMode === 'report' ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    {LEAVE_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
+                      <th key={col.key} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {col.header}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                  {paginatedLeaves.map((row) => (
+                    <tr key={row.id} onClick={() => setDetailLeave(row)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                      {LEAVE_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
+                        <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
+                          {col.key === 'leave_type'
+                            ? (CATEGORY_LABELS[row.leave_type] || row.leave_type)
+                            : String((row as any)[col.key] ?? '-')}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2.5 text-xs">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                            <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredLeaves.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Page {currentPage} of {totalPages}</p>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
+                  <Button variant="secondary" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <>
             {paginatedLeaves.map((row) => (

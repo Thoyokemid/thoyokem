@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Filter, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Filter, X, List, Table2, ChevronDown, MoreVertical, Download, Columns3, Check } from 'lucide-react';
 
 export interface ListViewFilter {
   label: string;
@@ -190,6 +190,181 @@ export function ListRowAvatar({ initials }: { initials: string }) {
     <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-xs font-bold flex items-center justify-center">
       {initials}
     </span>
+  );
+}
+
+export type ViewMode = 'list' | 'report';
+
+/** ERPNext-style "List View ▾" dropdown to switch between List View and Report View. */
+export function ViewModeDropdown({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const options: { value: ViewMode; label: string; icon: React.ElementType }[] = [
+    { value: 'list', label: 'List View', icon: List },
+    { value: 'report', label: 'Report View', icon: Table2 },
+  ];
+  const current = options.find((o) => o.value === mode) ?? options[0];
+  const CurrentIcon = current.icon;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      >
+        <CurrentIcon size={14} />
+        {current.label}
+        <ChevronDown size={12} className="opacity-60" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 mt-1.5 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 py-1">
+          {options.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                  opt.value === mode
+                    ? 'text-primary font-semibold bg-primary-50 dark:bg-primary-900/20'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Icon size={13} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** ERPNext-style "⋮" overflow menu. Put arbitrary menu content as children. */
+export function OverflowMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      >
+        <MoreVertical size={15} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 py-1.5 max-h-80 overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function OverflowMenuItem({
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  onClick: () => void;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+    >
+      {Icon && <Icon size={13} />}
+      {children}
+    </button>
+  );
+}
+
+/** "Pick Columns" section meant to live inside an OverflowMenu — an inline expandable checklist. */
+export function OverflowMenuColumns({
+  columns,
+  visible,
+  onChange,
+}: {
+  columns: { key: string; header: string }[];
+  visible: string[];
+  onChange: (visible: string[]) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const toggle = (key: string) => {
+    if (visible.includes(key)) {
+      if (visible.length === 1) return;
+      onChange(visible.filter((v) => v !== key));
+    } else {
+      onChange([...visible, key]);
+    }
+  };
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Columns3 size={13} />
+          Pick Columns
+        </span>
+        <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="border-t border-gray-100 dark:border-gray-700 py-1 max-h-56 overflow-y-auto">
+          {columns.map((col) => {
+            const isVisible = visible.includes(col.key);
+            return (
+              <button
+                key={col.key}
+                onClick={() => toggle(col.key)}
+                className="w-full flex items-center justify-between gap-2 pl-6 pr-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <span>{col.header}</span>
+                <span
+                  className={`w-4 h-4 rounded flex items-center justify-center border ${
+                    isVisible ? 'bg-primary border-primary text-white' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                >
+                  {isVisible && <Check size={11} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

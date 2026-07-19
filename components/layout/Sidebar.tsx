@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -14,11 +14,10 @@ import {
   ChevronRight,
   Menu,
   X,
-  Sun,
-  Moon,
-  LogOut,
+  MessageCircle,
+  Mail,
+  Linkedin,
 } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 
 interface SidebarProps {
   permissions: {
@@ -34,27 +33,7 @@ interface SidebarProps {
 export default function Sidebar({ permissions }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
-
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    if (!isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
-
-  useEffect(() => {
-    const theme = localStorage.getItem('theme');
-    if (theme === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
 
   const menuItems = [
     {
@@ -94,10 +73,6 @@ export default function Sidebar({ permissions }: SidebarProps) {
       enabled: permissions.setting,
     },
   ];
-
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' });
-  };
 
   const SidebarContent = () => (
     <>
@@ -153,22 +128,37 @@ export default function Sidebar({ permissions }: SidebarProps) {
         })}
       </nav>
 
-      <div className="p-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-        >
-          {isDark ? <Sun size={16} /> : <Moon size={16} />}
-          {!isCollapsed && <span className="font-medium">{isDark ? 'Light' : 'Dark'}</span>}
-        </button>
-
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-        >
-          <LogOut size={16} />
-          {!isCollapsed && <span className="font-medium">Logout</span>}
-        </button>
+      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        {!isCollapsed && (
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1.5">Developed by Faiz</p>
+        )}
+        <div className="flex items-center gap-2">
+          <a
+            href="https://wa.me/6285215842148"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="WhatsApp"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <MessageCircle size={14} />
+          </a>
+          <a
+            href="mailto:faizramdhan17@gmail.com"
+            title="Email"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Mail size={14} />
+          </a>
+          <a
+            href="https://www.linkedin.com/in/faizramdhann"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="LinkedIn"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Linkedin size={14} />
+          </a>
+        </div>
       </div>
     </>
   );

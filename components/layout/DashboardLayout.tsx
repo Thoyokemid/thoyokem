@@ -16,7 +16,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
       <Sidebar permissions={user.permissions} />
       <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
         <Topbar user={user} />
-        <div className="p-3 pt-16 md:pt-6 md:p-6 flex-1">
+        <div className="p-3 md:p-6 flex-1">
           {children}
         </div>
       </main>
