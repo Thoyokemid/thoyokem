@@ -17,7 +17,7 @@ export interface ListViewFilterGroup {
 }
 
 interface ListViewLayoutProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   primaryAction?: React.ReactNode;
   filterGroups?: ListViewFilterGroup[];
@@ -41,11 +41,13 @@ export function ListViewLayout({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          {subtitle && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>}
-        </div>
+      <div className={`flex ${title || subtitle ? 'flex-col sm:flex-row sm:justify-between sm:items-center' : 'justify-end'} gap-3`}>
+        {(title || subtitle) && (
+          <div>
+            {title && <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>}
+            {subtitle && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {filterGroups.length > 0 && (
             <button

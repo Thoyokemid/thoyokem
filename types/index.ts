@@ -8,6 +8,12 @@ export interface Role {
   registration_request: boolean;
   setting: boolean;
   staff: boolean;
+  inventory: boolean;
+  purchasing: boolean;
+  sales_order: boolean;
+  delivery_order: boolean;
+  can_approve: boolean;
+  is_super_admin: boolean;
 }
 
 // User Types
@@ -133,5 +139,212 @@ export interface SessionUser {
     registration_request: boolean;
     setting: boolean;
     staff: boolean;
+    inventory: boolean;
+    purchasing: boolean;
+    sales_order: boolean;
+    delivery_order: boolean;
+    can_approve: boolean;
   };
+}
+
+// ── Inventory Module ──────────────────────────────────────────────────────
+
+export interface Item {
+  item_code: string;
+  item_name: string;
+  item_group: string;
+  unit: string;
+  purchase_price: number;
+  selling_price: number;
+  reorder_level: number;
+  valuation_method: 'FIFO' | 'Average';
+  opening_qty: number;
+  opening_valuation_rate: number;
+  is_active: boolean;
+}
+
+export interface Warehouse {
+  warehouse_id: string;
+  warehouse_name: string;
+  location: string;
+  is_active: boolean;
+}
+
+export type StockEntryType = 'Material Receipt' | 'Material Issue' | 'Material Transfer';
+
+export interface StockEntry {
+  entry_id: string;
+  entry_type: StockEntryType;
+  item_code: string;
+  source_warehouse: string;
+  target_warehouse: string;
+  qty: number;
+  date: string;
+  remarks: string;
+  status: string;
+  owner: string;
+  creation: string;
+}
+
+export interface StockLedgerEntry {
+  entry_id: string;
+  posting_date: string;
+  item_code: string;
+  warehouse_id: string;
+  voucher_type: string;
+  voucher_id: string;
+  actual_qty: number;
+  valuation_rate: number;
+  qty_after_transaction: number;
+  stock_value: number;
+}
+
+export interface StockBalance {
+  item_code: string;
+  item_name: string;
+  warehouse_id: string;
+  qty_on_hand: number;
+  valuation_rate: number;
+  stock_value: number;
+  last_transaction_date: string;
+}
+
+// ── Purchasing ─────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  supplier_id: string;
+  supplier_name: string;
+  contact: string;
+  phone: string;
+  email: string;
+  address: string;
+  payment_terms: string;
+  is_active: boolean;
+}
+
+export type DocStatus = 'Draft' | 'Submitted' | 'Partially Received' | 'Received' | 'Cancelled' | 'Closed';
+
+export interface PurchaseOrder {
+  po_id: string;
+  supplier_id: string;
+  supplier_name?: string;
+  order_date: string;
+  expected_date: string;
+  status: DocStatus;
+  total_amount: number;
+  owner: string;
+  creation: string;
+}
+
+export interface PurchaseOrderItem {
+  po_id: string;
+  item_code: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  received_qty: number;
+  warehouse_id: string;
+}
+
+export interface PurchaseReceipt {
+  pr_id: string;
+  po_id: string;
+  supplier_id: string;
+  posting_date: string;
+  status: string;
+  owner: string;
+  creation: string;
+}
+
+export interface PurchaseInvoice {
+  pi_id: string;
+  po_id: string;
+  pr_id: string;
+  supplier_id: string;
+  supplier_name?: string;
+  posting_date: string;
+  due_date: string;
+  grand_total: number;
+  outstanding_amount: number;
+  status: string;
+  owner: string;
+  creation: string;
+}
+
+// ── Sales ──────────────────────────────────────────────────────────────────
+
+export interface Customer {
+  customer_id: string;
+  customer_name: string;
+  contact: string;
+  phone: string;
+  email: string;
+  address: string;
+  payment_terms: string;
+  credit_limit: number;
+  is_active: boolean;
+}
+
+export interface SalesOrder {
+  so_id: string;
+  customer_id: string;
+  customer_name?: string;
+  order_date: string;
+  delivery_date: string;
+  status: DocStatus;
+  total_amount: number;
+  owner: string;
+  creation: string;
+}
+
+export interface SalesOrderItem {
+  so_id: string;
+  item_code: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  delivered_qty: number;
+  warehouse_id: string;
+}
+
+export interface DeliveryNote {
+  dn_id: string;
+  so_id: string;
+  customer_id: string;
+  posting_date: string;
+  status: string;
+  owner: string;
+  creation: string;
+}
+
+export interface SalesInvoice {
+  si_id: string;
+  so_id: string;
+  dn_id: string;
+  customer_id: string;
+  customer_name?: string;
+  posting_date: string;
+  due_date: string;
+  grand_total: number;
+  outstanding_amount: number;
+  status: string;
+  owner: string;
+  creation: string;
+}
+
+// ── Payment ────────────────────────────────────────────────────────────────
+
+export interface PaymentEntry {
+  payment_id: string;
+  payment_type: 'Receive' | 'Pay';
+  party_type: 'Customer' | 'Supplier';
+  party_id: string;
+  reference_type: 'Sales Invoice' | 'Purchase Invoice';
+  reference_id: string;
+  paid_amount: number;
+  posting_date: string;
+  mode_of_payment: string;
+  status: string;
+  owner: string;
+  creation: string;
 }

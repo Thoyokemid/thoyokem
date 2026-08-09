@@ -12,6 +12,11 @@ declare module 'next-auth' {
       registration_request: boolean;
       setting: boolean;
       staff: boolean;
+      inventory: boolean;
+      purchasing: boolean;
+      sales_order: boolean;
+      delivery_order: boolean;
+      can_approve: boolean;
     };
   }
 
@@ -30,6 +35,11 @@ declare module 'next-auth' {
         registration_request: boolean;
         setting: boolean;
         staff: boolean;
+        inventory: boolean;
+        purchasing: boolean;
+        sales_order: boolean;
+        delivery_order: boolean;
+        can_approve: boolean;
       };
     };
   }
@@ -47,6 +57,11 @@ declare module 'next-auth/jwt' {
       registration_request: boolean;
       setting: boolean;
       staff: boolean;
+      inventory: boolean;
+      purchasing: boolean;
+      sales_order: boolean;
+      delivery_order: boolean;
+      can_approve: boolean;
     };
   }
 }

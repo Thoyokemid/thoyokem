@@ -16,6 +16,10 @@ import {
   LogOut,
   Sun,
   Moon,
+  Boxes,
+  ShoppingCart,
+  ShoppingBag,
+  Truck,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 
@@ -79,6 +83,10 @@ export default function Topbar({ user }: TopbarProps) {
     { name: 'Attendance', href: '/dashboard/attendance', icon: Clock, enabled: user.permissions.attendance },
     { name: 'Leave', href: '/dashboard/leave', icon: FileText, enabled: user.permissions.leave },
     { name: 'Staff', href: '/dashboard/staff', icon: Users, enabled: user.permissions.staff },
+    { name: 'Inventory', href: '/dashboard/inventory', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Purchasing', href: '/dashboard/purchasing', icon: ShoppingCart, enabled: user.permissions.purchasing },
+    { name: 'Sales Order', href: '/dashboard/sales-order', icon: ShoppingBag, enabled: user.permissions.sales_order },
+    { name: 'Delivery Order', href: '/dashboard/delivery-order', icon: Truck, enabled: user.permissions.delivery_order },
     { name: 'Registration', href: '/dashboard/registration', icon: UserPlus, enabled: user.permissions.registration_request },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings, enabled: user.permissions.setting },
     { name: 'My Profile', href: '/dashboard/profile', icon: UserIcon, enabled: true },

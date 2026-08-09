@@ -32,16 +32,29 @@ export async function getRolePermissions(roleId: string) {
   const { records } = await readSheetAsObjects<any>('roles');
   const role = records.find((r) => String(r.role_id) === String(roleId));
 
+  const noAccess = {
+    dashboard: false,
+    attendance: false,
+    leave: false,
+    registration_request: false,
+    setting: false,
+    staff: false,
+    inventory: false,
+    purchasing: false,
+    sales_order: false,
+    delivery_order: false,
+    can_approve: false,
+  };
+
   if (!role) {
     // Fallback: no access if role can't be resolved
-    return {
-      dashboard: false,
-      attendance: false,
-      leave: false,
-      registration_request: false,
-      setting: false,
-      staff: false,
-    };
+    return noAccess;
+  }
+
+  // Super Admin bypasses every individual flag — always full access,
+  // including to modules added after this role was created.
+  if (toBool(role.is_super_admin)) {
+    return Object.fromEntries(Object.keys(noAccess).map((k) => [k, true])) as typeof noAccess;
   }
 
   return {
@@ -51,6 +64,11 @@ export async function getRolePermissions(roleId: string) {
     registration_request: toBool(role.registration_request),
     setting: toBool(role.setting),
     staff: toBool(role.staff),
+    inventory: toBool(role.inventory),
+    purchasing: toBool(role.purchasing),
+    sales_order: toBool(role.sales_order),
+    delivery_order: toBool(role.delivery_order),
+    can_approve: toBool(role.can_approve),
   };
 }
 

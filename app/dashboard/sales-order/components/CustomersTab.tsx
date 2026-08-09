@@ -1,0 +1,157 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Loading from '@/components/ui/Loading';
+import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { Customer } from '@/types';
+import { Plus, Edit, Trash2, User } from 'lucide-react';
+
+export default function CustomersTab() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [formData, setFormData] = useState({ customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: '' });
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch('/api/customers');
+      if (res.ok) setCustomers(await res.json());
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    setFormData({ customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: '' });
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (c: Customer) => {
+    setEditing(c);
+    setFormData({ customer_id: c.customer_id, customer_name: c.customer_name, contact: c.contact, phone: c.phone, email: c.email, address: c.address, payment_terms: c.payment_terms, credit_limit: String(c.credit_limit) });
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setError('');
+    try {
+      const payload = { ...formData, credit_limit: parseFloat(formData.credit_limit) || 0 };
+      const res = editing
+        ? await fetch('/api/customers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchCustomers();
+      } else {
+        const err = await res.json();
+        setError(err.error || 'Gagal menyimpan customer');
+      }
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      setError('Gagal menyimpan customer');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (customerId: string) => {
+    if (!confirm('Hapus customer ini?')) return;
+    try {
+      const res = await fetch(`/api/customers?customer_id=${customerId}`, { method: 'DELETE' });
+      if (res.ok) fetchCustomers();
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+    }
+  };
+
+  return (
+    <ListViewLayout primaryAction={<Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Customer</Button>}>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : customers.length === 0 ? (
+        <p className="px-3 py-6 text-center text-sm text-gray-500">No customers found</p>
+      ) : (
+        customers.map((c) => (
+          <ListRow
+            key={c.customer_id}
+            avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><User size={14} /></span>}
+            title={c.customer_name}
+            subtitle={`${c.customer_id} · ${c.phone || c.contact || '-'}`}
+            meta={c.payment_terms}
+            badges={!c.is_active ? <StatusBadge label="Inactive" tone="red" /> : undefined}
+            actions={
+              <>
+                <button onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400"><Edit size={14} /></button>
+                <button onClick={() => handleDelete(c.customer_id)} className="text-red-600 hover:text-red-800 dark:text-red-400"><Trash2 size={14} /></button>
+              </>
+            }
+          />
+        ))
+      )}
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editing ? 'Edit Customer' : 'Add Customer'} size="sm">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="label-field">Customer ID</label>
+            <input type="text" value={formData.customer_id} onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })} className="input-field" placeholder="Kosongkan untuk auto-generate" disabled={!!editing} />
+          </div>
+          <div>
+            <label className="label-field">Customer Name</label>
+            <input type="text" value={formData.customer_name} onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })} className="input-field" required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Contact Person</label>
+              <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} className="input-field" />
+            </div>
+            <div>
+              <label className="label-field">Phone</label>
+              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input-field" />
+            </div>
+          </div>
+          <div>
+            <label className="label-field">Email</label>
+            <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="input-field" />
+          </div>
+          <div>
+            <label className="label-field">Address</label>
+            <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="input-field" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Payment Terms</label>
+              <input type="text" value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} className="input-field" placeholder="cth. Net 30" />
+            </div>
+            <div>
+              <label className="label-field">Credit Limit</label>
+              <input type="number" min={0} value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })} className="input-field" />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-2 justify-end pt-2">
+            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" isLoading={isSaving}>{editing ? 'Update' : 'Add'} Customer</Button>
+          </div>
+        </form>
+      </Modal>
+    </ListViewLayout>
+  );
+}

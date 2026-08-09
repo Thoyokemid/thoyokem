@@ -48,7 +48,7 @@ export default async function DashboardPage() {
         permissions: session.user.permissions,
       }}
     >
-      <DashboardContent userName={session.user.name ?? ""} />
+      <DashboardContent userName={session.user.name ?? ""} permissions={session.user.permissions} />
     </DashboardLayout>
   );
 }

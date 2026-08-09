@@ -17,6 +17,10 @@ import {
   MessageCircle,
   Mail,
   Linkedin,
+  Boxes,
+  ShoppingCart,
+  ShoppingBag,
+  Truck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,6 +31,10 @@ interface SidebarProps {
     registration_request: boolean;
     setting: boolean;
     staff: boolean;
+    inventory: boolean;
+    purchasing: boolean;
+    sales_order: boolean;
+    delivery_order: boolean;
   };
 }
 
@@ -59,6 +67,30 @@ export default function Sidebar({ permissions }: SidebarProps) {
       icon: Users,
       href: '/dashboard/staff',
       enabled: permissions.staff,
+    },
+    {
+      name: 'Inventory',
+      icon: Boxes,
+      href: '/dashboard/inventory',
+      enabled: permissions.inventory,
+    },
+    {
+      name: 'Purchasing',
+      icon: ShoppingCart,
+      href: '/dashboard/purchasing',
+      enabled: permissions.purchasing,
+    },
+    {
+      name: 'Sales Order',
+      icon: ShoppingBag,
+      href: '/dashboard/sales-order',
+      enabled: permissions.sales_order,
+    },
+    {
+      name: 'Delivery Order',
+      icon: Truck,
+      href: '/dashboard/delivery-order',
+      enabled: permissions.delivery_order,
     },
     {
       name: 'Registration',

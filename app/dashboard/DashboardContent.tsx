@@ -6,6 +6,7 @@ import Loading from '@/components/ui/Loading';
 import { AttendanceImport, StaffList, LeaveAttendance } from '@/types';
 import { processAttendanceData, calculateRecap, countUsedLeaveDays } from '@/utils/attendance';
 import { useWorkHours } from '@/hooks/useWorkHours';
+import ModuleOverview from '@/components/dashboard/ModuleOverview';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -13,6 +14,12 @@ import { ChevronLeft, ChevronRight, Cake, FileText, Clock, Users, UserCheck, Cal
 
 interface DashboardContentProps {
   userName: string;
+  permissions: {
+    inventory: boolean;
+    purchasing: boolean;
+    sales_order: boolean;
+    delivery_order: boolean;
+  };
 }
 
 const PAGE_SIZE = 10;
@@ -60,7 +67,7 @@ function totalPages(arr: unknown[]): number {
   return Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
 }
 
-export default function DashboardContent({ userName }: DashboardContentProps) {
+export default function DashboardContent({ userName, permissions }: DashboardContentProps) {
   const [attendanceData, setAttendanceData] = useState<AttendanceImport[]>([]);
   const [staffList, setStaffList] = useState<StaffList[]>([]);
   const [leaveData, setLeaveData] = useState<LeaveAttendance[]>([]);
@@ -310,6 +317,8 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
           Welcome back, {userName}!
         </p>
       </div>
+
+      <ModuleOverview permissions={permissions} />
 
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">

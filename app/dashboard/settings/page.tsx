@@ -25,6 +25,11 @@ const PERMISSION_COLS: { key: keyof Omit<Role, "role_id" | "role_name">; label: 
   { key: "attendance", label: "Attendance" },
   { key: "leave", label: "Leave" },
   { key: "staff", label: "Staff" },
+  { key: "inventory", label: "Inventory" },
+  { key: "purchasing", label: "Purchasing" },
+  { key: "sales_order", label: "Sales Order" },
+  { key: "delivery_order", label: "Delivery Order" },
+  { key: "can_approve", label: "Can Approve" },
   { key: "registration_request", label: "Registration" },
   { key: "setting", label: "Settings" },
 ];
@@ -76,6 +81,12 @@ export default function SettingsPage() {
     registration_request: false,
     setting: false,
     staff: false,
+    inventory: false,
+    purchasing: false,
+    sales_order: false,
+    delivery_order: false,
+    can_approve: false,
+    is_super_admin: false,
   });
   const [isSavingRole, setIsSavingRole] = useState(false);
   const [roleError, setRoleError] = useState("");
@@ -174,6 +185,12 @@ export default function SettingsPage() {
       registration_request: false,
       setting: false,
       staff: false,
+      inventory: false,
+    purchasing: false,
+    sales_order: false,
+    delivery_order: false,
+    can_approve: false,
+    is_super_admin: false,
     });
     setRoleError("");
     setIsRoleModalOpen(true);
@@ -189,6 +206,12 @@ export default function SettingsPage() {
       registration_request: role.registration_request,
       setting: role.setting,
       staff: role.staff,
+      inventory: role.inventory,
+      purchasing: role.purchasing,
+      sales_order: role.sales_order,
+      delivery_order: role.delivery_order,
+      can_approve: role.can_approve,
+      is_super_admin: role.is_super_admin,
     });
     setRoleError("");
     setIsRoleModalOpen(true);
@@ -355,10 +378,19 @@ export default function SettingsPage() {
                 ) : (
                   roles.map((role) => (
                     <tr key={role.role_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                      <td className="py-2.5 pr-4 text-xs font-semibold text-gray-900 dark:text-gray-100">{role.role_name}</td>
+                      <td className="py-2.5 pr-4 text-xs font-semibold text-gray-900 dark:text-gray-100">
+                        <div className="flex items-center gap-1.5">
+                          {role.role_name}
+                          {role.is_super_admin && (
+                            <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              SUPER ADMIN
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       {PERMISSION_COLS.map((col) => (
                         <td key={col.key} className="px-3 py-2.5 text-center">
-                          <span className={`inline-block w-2 h-2 rounded-full ${role[col.key] ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+                          <span className={`inline-block w-2 h-2 rounded-full ${role.is_super_admin || role[col.key] ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
                         </td>
                       ))}
                       <td className="px-3 py-2.5">
@@ -470,7 +502,22 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div>
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-2.5">
+              <label className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-400">
+                <input
+                  type="checkbox"
+                  checked={roleForm.is_super_admin}
+                  onChange={(e) => setRoleForm({ ...roleForm, is_super_admin: e.target.checked })}
+                  className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                Super Admin
+              </label>
+              <p className="text-[11px] text-amber-700 dark:text-amber-500 mt-1">
+                Akses penuh ke semua modul, termasuk modul yang ditambahkan nanti. Checkbox di bawah diabaikan kalau ini aktif.
+              </p>
+            </div>
+
+            <div className={roleForm.is_super_admin ? 'opacity-40 pointer-events-none' : ''}>
               <label className="label-field">Permissions</label>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 {PERMISSION_COLS.map((col) => (

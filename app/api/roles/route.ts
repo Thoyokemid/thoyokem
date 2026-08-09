@@ -37,6 +37,12 @@ export async function GET() {
       registration_request: toBool(r.registration_request),
       setting: toBool(r.setting),
       staff: toBool(r.staff),
+      inventory: toBool(r.inventory),
+      purchasing: toBool(r.purchasing),
+      sales_order: toBool(r.sales_order),
+      delivery_order: toBool(r.delivery_order),
+      can_approve: toBool(r.can_approve),
+      is_super_admin: toBool(r.is_super_admin),
     }));
 
     return NextResponse.json(roles);
@@ -64,6 +70,12 @@ export async function POST(request: NextRequest) {
       registration_request: data.registration_request ? 'TRUE' : 'FALSE',
       setting: data.setting ? 'TRUE' : 'FALSE',
       staff: data.staff ? 'TRUE' : 'FALSE',
+      inventory: data.inventory ? 'TRUE' : 'FALSE',
+      purchasing: data.purchasing ? 'TRUE' : 'FALSE',
+      sales_order: data.sales_order ? 'TRUE' : 'FALSE',
+      delivery_order: data.delivery_order ? 'TRUE' : 'FALSE',
+      can_approve: data.can_approve ? 'TRUE' : 'FALSE',
+      is_super_admin: data.is_super_admin ? 'TRUE' : 'FALSE',
     });
 
     await appendSheet(SHEET, [newRole]);
@@ -96,7 +108,7 @@ export async function PUT(request: NextRequest) {
     const currentObj: Record<string, any> = {};
     headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
 
-    const boolFields = ['dashboard', 'attendance', 'leave', 'registration_request', 'setting', 'staff'];
+    const boolFields = ['dashboard', 'attendance', 'leave', 'registration_request', 'setting', 'staff', 'inventory', 'purchasing', 'sales_order', 'delivery_order', 'can_approve', 'is_super_admin'];
     const merged = { ...currentObj };
     if (updates.role_name !== undefined) merged.role_name = updates.role_name;
     boolFields.forEach((f) => {
