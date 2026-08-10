@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard,
-  Clock,
-  FileText,
   UserPlus,
   Users,
   Settings,
@@ -59,22 +57,16 @@ function SidebarInner({ permissions }: SidebarProps) {
       enabled: permissions.dashboard,
     },
     {
-      name: 'Attendance',
-      icon: Clock,
-      href: '/dashboard/attendance',
-      enabled: permissions.attendance,
-    },
-    {
-      name: 'Leave',
-      icon: FileText,
-      href: '/dashboard/leave',
-      enabled: permissions.leave, // ← now uses permission
-    },
-    {
-      name: 'Staff',
+      name: 'HR',
       icon: Users,
-      href: '/dashboard/staff',
-      enabled: permissions.staff,
+      href: '/dashboard/hr',
+      isGroup: true,
+      enabled: permissions.attendance || permissions.leave || permissions.staff,
+      subItems: [
+        { name: 'Attendance', href: '/dashboard/attendance', enabled: permissions.attendance },
+        { name: 'Leave', href: '/dashboard/leave', enabled: permissions.leave },
+        { name: 'Staff', href: '/dashboard/staff', enabled: permissions.staff },
+      ],
     },
     {
       name: 'Inventory',
@@ -131,7 +123,11 @@ function SidebarInner({ permissions }: SidebarProps) {
   ];
 
   useEffect(() => {
-    const active = menuItems.find((item) => item.subItems && pathname === item.href);
+    const active = menuItems.find(
+      (item) =>
+        item.subItems &&
+        (pathname === item.href || item.subItems.some((sub: any) => sub.href === pathname))
+    );
     if (active && !expanded.includes(active.href)) {
       setExpanded((prev) => [...prev, active.href]);
     }
@@ -172,8 +168,11 @@ function SidebarInner({ permissions }: SidebarProps) {
           if (!item.enabled) return null;
 
           const Icon = item.icon;
-          const isOnModule = pathname === item.href;
-          const isActive = isOnModule && !activeTab;
+          const isRouteGroup = !!(item as any).isGroup;
+          const isOnModule = isRouteGroup
+            ? item.subItems!.some((sub: any) => sub.href === pathname)
+            : pathname === item.href;
+          const isActive = isRouteGroup ? false : isOnModule && !activeTab;
           const isExpanded = expanded.includes(item.href);
 
           return (
@@ -185,17 +184,27 @@ function SidebarInner({ permissions }: SidebarProps) {
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                <Link
-                  href={item.href}
-                  onClick={() => {
-                    setIsMobileOpen(false);
-                    if (item.subItems && !expanded.includes(item.href)) toggleExpanded(item.href);
-                  }}
-                  className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0"
-                >
-                  <Icon size={16} className={isActive ? 'text-primary' : ''} />
-                  {!isCollapsed && <span className="truncate">{item.name}</span>}
-                </Link>
+                {isRouteGroup ? (
+                  <button
+                    onClick={() => toggleExpanded(item.href)}
+                    className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0 text-left"
+                  >
+                    <Icon size={16} />
+                    {!isCollapsed && <span className="truncate">{item.name}</span>}
+                  </button>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={() => {
+                      setIsMobileOpen(false);
+                      if (item.subItems && !expanded.includes(item.href)) toggleExpanded(item.href);
+                    }}
+                    className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0"
+                  >
+                    <Icon size={16} className={isActive ? 'text-primary' : ''} />
+                    {!isCollapsed && <span className="truncate">{item.name}</span>}
+                  </Link>
+                )}
                 {item.subItems && !isCollapsed && (
                   <button
                     onClick={() => toggleExpanded(item.href)}
@@ -209,12 +218,14 @@ function SidebarInner({ permissions }: SidebarProps) {
 
               {item.subItems && !isCollapsed && isExpanded && (
                 <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2.5">
-                  {item.subItems.map((sub) => {
-                    const subActive = isOnModule && activeTab === sub.tab;
+                  {item.subItems.map((sub: any) => {
+                    if (isRouteGroup && sub.enabled === false) return null;
+                    const subActive = isRouteGroup ? pathname === sub.href : isOnModule && activeTab === sub.tab;
+                    const subHref = isRouteGroup ? sub.href : `${item.href}?tab=${sub.tab}`;
                     return (
                       <Link
-                        key={sub.tab}
-                        href={`${item.href}?tab=${sub.tab}`}
+                        key={sub.href || sub.tab}
+                        href={subHref}
                         onClick={() => setIsMobileOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                           subActive
