@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
 import { getNextDocId } from '@/lib/numbering';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'sales_invoice';
 const ITEM_SHEET = 'sales_invoice_item';
@@ -100,6 +101,15 @@ export async function POST(request: NextRequest) {
       })
     );
     if (siItemRows.length > 0) await appendSheet(ITEM_SHEET, siItemRows);
+
+    await logActivity({
+      doctype: 'Sales Invoice',
+      documentId: siId,
+      action: 'Created',
+      changedBy: guard.session?.user.name || '',
+      before: null,
+      after: { si_id: siId, so_id, grand_total: grandTotal, status: 'Submitted' },
+    });
 
     return NextResponse.json({ success: true, si_id: siId });
   } catch (error) {

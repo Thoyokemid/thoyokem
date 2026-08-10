@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'users';
 
@@ -72,6 +73,15 @@ export async function PUT(request: NextRequest) {
     const newRow = objectToRow(headers, merged);
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+
+    await logActivity({
+      doctype: 'User',
+      documentId: currentObj.username || id,
+      action: 'Updated',
+      changedBy: session.user.name || '',
+      before: { role_id: currentObj.role_id },
+      after: { role_id: String(role_id) },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

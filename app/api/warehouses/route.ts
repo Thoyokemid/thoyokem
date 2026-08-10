@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { Warehouse } from '@/types';
 
 const SHEET = 'warehouse_list';
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest) {
     });
 
     await appendSheet(SHEET, [newRow]);
+
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newRow[i]));
+    await logActivity({ doctype: 'Warehouse', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+
     return NextResponse.json({ success: true, warehouse_id: newId });
   } catch (error) {
     console.error('Error creating warehouse:', error);
@@ -94,6 +100,8 @@ export async function PUT(request: NextRequest) {
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
+    await logActivity({ doctype: 'Warehouse', documentId: warehouse_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating warehouse:', error);
@@ -117,6 +125,7 @@ export async function DELETE(request: NextRequest) {
     if (dataRowIndex === -1) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
 
     await deleteRow(SHEET, dataRowIndex + 1);
+    await logActivity({ doctype: 'Warehouse', documentId: warehouseId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { warehouse_id: warehouseId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting warehouse:', error);

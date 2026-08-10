@@ -29,3 +29,21 @@ export async function getNextDocId(seriesName: string): Promise<string> {
 
   return `${prefix}${String(next).padStart(5, '0')}`;
 }
+
+/**
+ * ERPNext-style "Cancel & Amend" numbering: PO-2026-00001 -> PO-2026-00001-1 -> -2, etc.
+ * `existingIds` should be every doc id already in that doctype's sheet, so the next
+ * free suffix can be worked out regardless of whether `originalId` is itself an amendment.
+ */
+export function getAmendedDocId(originalId: string, existingIds: string[]): string {
+  const root = originalId.replace(/-\d+$/, '');
+  let max = 0;
+  for (const id of existingIds) {
+    if (id === root) continue;
+    if (id.startsWith(`${root}-`)) {
+      const match = id.slice(root.length).match(/^-(\d+)$/);
+      if (match) max = Math.max(max, parseInt(match[1], 10));
+    }
+  }
+  return `${root}-${max + 1}`;
+}

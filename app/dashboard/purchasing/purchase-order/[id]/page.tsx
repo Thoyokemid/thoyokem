@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
-import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban } from 'lucide-react';
+import ActivityLogView from '@/components/ui/ActivityLogView';
+import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History } from 'lucide-react';
 
 interface PurchaseOrderWithItems {
   po_id: string;
@@ -22,6 +24,7 @@ interface PurchaseOrderWithItems {
   total_amount: number;
   owner: string;
   creation: string;
+  amended_from?: string;
   items: { item_code: string; qty: number; rate: number; amount: number; received_qty: number; warehouse_id: string }[];
 }
 
@@ -41,6 +44,7 @@ const APPROVAL_TONE: Record<string, 'gray' | 'orange' | 'green' | 'red'> = {
 export default function PurchaseOrderDetailPage() {
   const { data: session, status } = useSession();
   const params = useParams();
+  const router = useRouter();
   const id = decodeURIComponent(String(params.id));
   const [po, setPo] = useState<PurchaseOrderWithItems | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,13 +71,20 @@ export default function PurchaseOrderDetailPage() {
     }
   };
 
-  const runAction = async (action: 'submit' | 'receive' | 'cancel' | 'approve' | 'reject') => {
-    if (action === 'cancel' && !confirm('Batalkan PO ini?')) return;
+  const runAction = async (action: 'submit' | 'receive' | 'cancel' | 'approve' | 'reject' | 'amend') => {
+    if (action === 'cancel' && !confirm('Batalkan PO ini? Kalau sudah Received, stok yang sudah masuk akan dibalik.')) return;
+    if (action === 'amend' && !confirm('Buat draft baru dari PO ini?')) return;
     setBusy(true);
     try {
       const res = await fetch('/api/purchase-orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ po_id: id, action }) });
-      if (res.ok) fetchData();
-      else {
+      if (res.ok) {
+        if (action === 'amend') {
+          const data = await res.json();
+          router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(data.po_id)}`);
+        } else {
+          fetchData();
+        }
+      } else {
         const err = await res.json();
         alert(err.error || 'Gagal memproses aksi');
       }
@@ -161,8 +172,11 @@ export default function PurchaseOrderDetailPage() {
               {po.status === 'Received' && (
                 <Button variant="secondary" disabled={busy} onClick={createInvoice}><FileText size={14} className="mr-1.5" />Create Invoice</Button>
               )}
-              {(po.status === 'Draft' || po.status === 'Submitted') && (
+              {(po.status === 'Draft' || po.status === 'Submitted' || po.status === 'Received') && (
                 <Button variant="danger" disabled={busy} onClick={() => runAction('cancel')}><XCircle size={14} className="mr-1.5" />Cancel</Button>
+              )}
+              {po.status === 'Cancelled' && (
+                <Button variant="secondary" disabled={busy} onClick={() => runAction('amend')}><History size={14} className="mr-1.5" />Amend</Button>
               )}
             </>
           )
@@ -179,6 +193,14 @@ export default function PurchaseOrderDetailPage() {
                   { label: 'Total Amount', value: `Rp${po.total_amount.toLocaleString('id-ID')}` },
                   { label: 'Approved By', value: po.approved_by || '-' },
                   { label: 'Owner', value: po.owner || '-' },
+                  {
+                    label: 'Amended From',
+                    value: po.amended_from ? (
+                      <Link href={`/dashboard/purchasing/purchase-order/${encodeURIComponent(po.amended_from)}`} className="text-primary hover:underline">
+                        {po.amended_from}
+                      </Link>
+                    ) : '-',
+                  },
                 ]}
               />
             </DetailSection>
@@ -201,6 +223,9 @@ export default function PurchaseOrderDetailPage() {
                   amount: `Rp${i.amount.toLocaleString('id-ID')}`,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Purchase Order" documentId={po.po_id} />
             </DetailSection>
           </div>
         )}

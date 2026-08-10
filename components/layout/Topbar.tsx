@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -20,6 +20,9 @@ import {
   ShoppingCart,
   ShoppingBag,
   Truck,
+  Package,
+  Warehouse as WarehouseIcon,
+  PackageCheck,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 
@@ -27,25 +30,60 @@ interface TopbarProps {
   user: SessionUser;
 }
 
-interface SearchItem {
+interface ModuleItem {
   name: string;
   href: string;
   icon: React.ElementType;
   enabled: boolean;
-  keywords?: string;
 }
+
+interface SearchResult {
+  id: string;
+  label: string;
+  subtitle?: string;
+  href: string;
+}
+
+interface SearchGroup {
+  type: string;
+  results: SearchResult[];
+}
+
+interface FlatItem {
+  key: string;
+  label: string;
+  subtitle?: string;
+  href: string;
+  icon: React.ElementType;
+}
+
+const TYPE_ICON: Record<string, React.ElementType> = {
+  'Purchase Order': ShoppingCart,
+  'Purchase Invoice': FileText,
+  Supplier: Truck,
+  'Sales Order': ShoppingBag,
+  'Sales Invoice': FileText,
+  Customer: UserIcon,
+  'Delivery Note': PackageCheck,
+  Item: Package,
+  Warehouse: WarehouseIcon,
+  Staff: Users,
+};
 
 export default function Topbar({ user }: TopbarProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [staffMatches, setStaffMatches] = useState<{ employee_name: string }[]>([]);
+  const [searchGroups, setSearchGroups] = useState<SearchGroup[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [isDark, setIsDark] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeItemRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     fetch('/api/profile')
@@ -78,7 +116,7 @@ export default function Topbar({ user }: TopbarProps) {
     });
   };
 
-  const items: SearchItem[] = [
+  const moduleItems: ModuleItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, enabled: user.permissions.dashboard },
     { name: 'Attendance', href: '/dashboard/attendance', icon: Clock, enabled: user.permissions.attendance },
     { name: 'Leave', href: '/dashboard/leave', icon: FileText, enabled: user.permissions.leave },
@@ -92,9 +130,9 @@ export default function Topbar({ user }: TopbarProps) {
     { name: 'My Profile', href: '/dashboard/profile', icon: UserIcon, enabled: true },
   ];
 
-  const filteredItems = items.filter(
-    (i) => i.enabled && i.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const filteredModules = query.trim()
+    ? moduleItems.filter((i) => i.enabled && i.name.toLowerCase().includes(query.toLowerCase()))
+    : [];
 
   // Keyboard shortcut: Cmd/Ctrl + K opens search AND focuses the input immediately
   useEffect(() => {
@@ -102,7 +140,6 @@ export default function Topbar({ user }: TopbarProps) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
-        // Wait a tick so the input exists / is visible before focusing.
         requestAnimationFrame(() => searchInputRef.current?.focus());
       }
       if (e.key === 'Escape') setIsSearchOpen(false);
@@ -125,31 +162,78 @@ export default function Topbar({ user }: TopbarProps) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Search staff by name when query looks like a name search (and user can view staff)
+  // Global search across ERP documents & master data
   useEffect(() => {
-    if (!query.trim() || !user.permissions.staff) {
-      setStaffMatches([]);
+    if (query.trim().length < 2) {
+      setSearchGroups([]);
+      setIsSearching(false);
       return;
     }
+    setIsSearching(true);
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch('/api/staff');
+        const res = await fetch(`/api/global-search?q=${encodeURIComponent(query.trim())}`);
         if (res.ok) {
-          const data: { employee_name: string }[] = await res.json();
-          const q = query.toLowerCase();
-          setStaffMatches(data.filter((s) => s.employee_name.toLowerCase().includes(q)).slice(0, 5));
+          const data = await res.json();
+          setSearchGroups(data.groups || []);
         }
       } catch {
-        setStaffMatches([]);
+        setSearchGroups([]);
+      } finally {
+        setIsSearching(false);
       }
     }, 250);
     return () => clearTimeout(timeout);
-  }, [query, user.permissions.staff]);
+  }, [query]);
+
+  // Flatten module matches + search groups into a single navigable list
+  const flatItems: FlatItem[] = useMemo(() => {
+    const fromModules: FlatItem[] = filteredModules.map((m) => ({
+      key: `module:${m.href}`,
+      label: m.name,
+      href: m.href,
+      icon: m.icon,
+    }));
+    const fromGroups: FlatItem[] = searchGroups.flatMap((g) =>
+      g.results.map((r) => ({
+        key: `${g.type}:${r.id}`,
+        label: r.label,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: TYPE_ICON[g.type] || FileText,
+      }))
+    );
+    return [...fromModules, ...fromGroups];
+  }, [filteredModules, searchGroups]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [flatItems.length, query]);
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
 
   const goTo = (href: string) => {
     setIsSearchOpen(false);
     setQuery('');
     router.push(href);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (flatItems.length > 0) setActiveIndex((i) => (i + 1) % flatItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flatItems.length > 0) setActiveIndex((i) => (i - 1 + flatItems.length) % flatItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = flatItems[activeIndex];
+      if (item) goTo(item.href);
+    } else if (e.key === 'Escape') {
+      setIsSearchOpen(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -163,6 +247,8 @@ export default function Topbar({ user }: TopbarProps) {
     .join('')
     .toUpperCase();
 
+  let runningIndex = -1;
+
   return (
     <div className="flex sticky top-0 z-20 items-center justify-between gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       {/* Global search */}
@@ -174,52 +260,71 @@ export default function Topbar({ user }: TopbarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsSearchOpen(true)}
-          placeholder="Cari modul atau karyawan..."
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Cari dokumen, item, karyawan..."
           className="w-full pl-9 pr-14 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <span className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5">
           ⌘K
         </span>
 
-        {isSearchOpen && (
-          <div className="absolute mt-1.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
-            {filteredItems.length === 0 && staffMatches.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-gray-400 text-center">Tidak ada hasil</p>
+        {isSearchOpen && query.trim().length > 0 && (
+          <div className="absolute mt-1.5 w-full max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+            {flatItems.length === 0 ? (
+              <p className="px-3 py-3 text-xs text-gray-400 text-center">
+                {isSearching ? 'Mencari...' : 'Tidak ada hasil'}
+              </p>
             ) : (
               <>
-                {filteredItems.length > 0 && (
+                {filteredModules.length > 0 && (
                   <div className="py-1">
                     <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Modul</p>
-                    {filteredItems.map((item) => {
-                      const Icon = item.icon;
+                    {filteredModules.map((m) => {
+                      runningIndex += 1;
+                      const idx = runningIndex;
+                      const Icon = m.icon;
                       return (
                         <button
-                          key={item.href}
-                          onClick={() => goTo(item.href)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                          key={m.href}
+                          ref={idx === activeIndex ? activeItemRef : undefined}
+                          onMouseEnter={() => setActiveIndex(idx)}
+                          onClick={() => goTo(m.href)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                            idx === activeIndex ? 'bg-primary-50 dark:bg-primary-900/20 text-primary' : 'text-gray-700 dark:text-gray-200'
+                          }`}
                         >
                           <Icon size={15} />
-                          {item.name}
+                          {m.name}
                         </button>
                       );
                     })}
                   </div>
                 )}
-                {staffMatches.length > 0 && (
-                  <div className="py-1 border-t border-gray-100 dark:border-gray-700">
-                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Karyawan</p>
-                    {staffMatches.map((s) => (
-                      <button
-                        key={s.employee_name}
-                        onClick={() => goTo('/dashboard/staff')}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
-                      >
-                        <Users size={15} />
-                        {s.employee_name}
-                      </button>
-                    ))}
+                {searchGroups.map((group) => (
+                  <div key={group.type} className="py-1 border-t border-gray-100 dark:border-gray-700">
+                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{group.type}</p>
+                    {group.results.map((r) => {
+                      runningIndex += 1;
+                      const idx = runningIndex;
+                      const Icon = TYPE_ICON[group.type] || FileText;
+                      return (
+                        <button
+                          key={`${group.type}:${r.id}`}
+                          ref={idx === activeIndex ? activeItemRef : undefined}
+                          onMouseEnter={() => setActiveIndex(idx)}
+                          onClick={() => goTo(r.href)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                            idx === activeIndex ? 'bg-primary-50 dark:bg-primary-900/20 text-primary' : 'text-gray-700 dark:text-gray-200'
+                          }`}
+                        >
+                          <Icon size={15} className="flex-shrink-0" />
+                          <span className="flex-1 min-w-0 truncate">{r.label}</span>
+                          {r.subtitle && <span className="text-xs text-gray-400 flex-shrink-0">{r.subtitle}</span>}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                ))}
               </>
             )}
           </div>

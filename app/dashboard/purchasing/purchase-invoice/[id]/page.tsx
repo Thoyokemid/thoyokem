@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
+import ActivityLogView from '@/components/ui/ActivityLogView';
 import { PurchaseInvoice } from '@/types';
 import { AlertCircle, Wallet } from 'lucide-react';
 
@@ -175,6 +176,9 @@ export default function PurchaseInvoiceDetailPage() {
                   paid_amount: `Rp${p.paid_amount.toLocaleString('id-ID')}`,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Purchase Invoice" documentId={id} />
             </DetailSection>
           </div>
         )}

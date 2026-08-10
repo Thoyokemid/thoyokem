@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
-import { AlertCircle, Send, XCircle, FileText, Check, Ban } from 'lucide-react';
+import ActivityLogView from '@/components/ui/ActivityLogView';
+import { AlertCircle, Send, XCircle, FileText, Check, Ban, History } from 'lucide-react';
 
 interface SalesOrderWithItems {
   so_id: string;
@@ -21,6 +23,7 @@ interface SalesOrderWithItems {
   approved_by: string;
   total_amount: number;
   owner: string;
+  amended_from?: string;
   items: { item_code: string; qty: number; rate: number; amount: number; delivered_qty: number; warehouse_id: string }[];
 }
 
@@ -40,6 +43,7 @@ const APPROVAL_TONE: Record<string, 'gray' | 'orange' | 'green' | 'red'> = {
 export default function SalesOrderDetailPage() {
   const { data: session, status } = useSession();
   const params = useParams();
+  const router = useRouter();
   const id = decodeURIComponent(String(params.id));
   const [so, setSo] = useState<SalesOrderWithItems | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,13 +70,20 @@ export default function SalesOrderDetailPage() {
     }
   };
 
-  const runAction = async (action: 'submit' | 'cancel' | 'approve' | 'reject') => {
-    if (action === 'cancel' && !confirm('Batalkan SO ini?')) return;
+  const runAction = async (action: 'submit' | 'cancel' | 'approve' | 'reject' | 'amend') => {
+    if (action === 'cancel' && !confirm('Batalkan SO ini? Kalau sudah Delivered, stok yang sudah keluar akan dibalik.')) return;
+    if (action === 'amend' && !confirm('Buat draft baru dari SO ini?')) return;
     setBusy(true);
     try {
       const res = await fetch('/api/sales-orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ so_id: id, action }) });
-      if (res.ok) fetchData();
-      else {
+      if (res.ok) {
+        if (action === 'amend') {
+          const data = await res.json();
+          router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(data.so_id)}`);
+        } else {
+          fetchData();
+        }
+      } else {
         const err = await res.json();
         alert(err.error || 'Gagal memproses aksi');
       }
@@ -157,8 +168,11 @@ export default function SalesOrderDetailPage() {
               {so.status === 'Delivered' && (
                 <Button variant="secondary" disabled={busy} onClick={createInvoice}><FileText size={14} className="mr-1.5" />Create Invoice</Button>
               )}
-              {(so.status === 'Draft' || so.status === 'Confirmed') && (
+              {(so.status === 'Draft' || so.status === 'Confirmed' || so.status === 'Delivered') && (
                 <Button variant="danger" disabled={busy} onClick={() => runAction('cancel')}><XCircle size={14} className="mr-1.5" />Cancel</Button>
+              )}
+              {so.status === 'Cancelled' && (
+                <Button variant="secondary" disabled={busy} onClick={() => runAction('amend')}><History size={14} className="mr-1.5" />Amend</Button>
               )}
             </>
           )
@@ -175,6 +189,14 @@ export default function SalesOrderDetailPage() {
                   { label: 'Total Amount', value: `Rp${so.total_amount.toLocaleString('id-ID')}` },
                   { label: 'Approved By', value: so.approved_by || '-' },
                   { label: 'Owner', value: so.owner || '-' },
+                  {
+                    label: 'Amended From',
+                    value: so.amended_from ? (
+                      <Link href={`/dashboard/sales-order/sales-order/${encodeURIComponent(so.amended_from)}`} className="text-primary hover:underline">
+                        {so.amended_from}
+                      </Link>
+                    ) : '-',
+                  },
                 ]}
               />
             </DetailSection>
@@ -197,6 +219,9 @@ export default function SalesOrderDetailPage() {
                   amount: `Rp${i.amount.toLocaleString('id-ID')}`,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Sales Order" documentId={so.so_id} />
             </DetailSection>
           </div>
         )}

@@ -35,3 +35,5 @@ next-env.d.ts
 
 # reference docs (not part of app source)
 ERPNext_Database_Schema.xlsx
+/docs
+ERP_Schema_Import.xlsx

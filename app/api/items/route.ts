@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { Item } from '@/types';
 
 const SHEET = 'item_list';
@@ -76,6 +77,11 @@ export async function POST(request: NextRequest) {
     });
 
     await appendSheet(SHEET, [newRow]);
+
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newRow[i]));
+    await logActivity({ doctype: 'Item', documentId: data.item_code, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+
     return NextResponse.json({ success: true, item_code: data.item_code });
   } catch (error) {
     console.error('Error creating item:', error);
@@ -114,6 +120,8 @@ export async function PUT(request: NextRequest) {
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
+    await logActivity({ doctype: 'Item', documentId: item_code, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating item:', error);
@@ -139,6 +147,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteRow(SHEET, dataRowIndex + 1);
+    await logActivity({ doctype: 'Item', documentId: itemCode, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { item_code: itemCode } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting item:', error);

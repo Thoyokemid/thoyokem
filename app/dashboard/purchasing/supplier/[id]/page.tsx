@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
+import ActivityLogView from '@/components/ui/ActivityLogView';
 import { Supplier } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -126,6 +127,9 @@ export default function SupplierDetailPage() {
                   total_amount: `Rp${o.total_amount.toLocaleString('id-ID')}`,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Supplier" documentId={supplier.supplier_id} />
             </DetailSection>
           </div>
         )}

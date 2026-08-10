@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
+import ActivityLogView from '@/components/ui/ActivityLogView';
 import { Warehouse, StockBalance } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -98,6 +99,9 @@ export default function WarehouseDetailPage() {
                   stock_value: `Rp${b.stock_value.toLocaleString('id-ID')}`,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Warehouse" documentId={warehouse.warehouse_id} />
             </DetailSection>
           </div>
         )}

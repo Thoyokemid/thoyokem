@@ -257,6 +257,7 @@ export interface PurchaseOrder {
   total_amount: number;
   owner: string;
   creation: string;
+  amended_from?: string;
 }
 
 export interface PurchaseOrderItem {
@@ -318,6 +319,7 @@ export interface SalesOrder {
   total_amount: number;
   owner: string;
   creation: string;
+  amended_from?: string;
 }
 
 export interface SalesOrderItem {
@@ -338,6 +340,7 @@ export interface DeliveryNote {
   status: string;
   owner: string;
   creation: string;
+  amended_from?: string;
 }
 
 export interface SalesInvoice {

@@ -138,39 +138,37 @@ function SidebarInner({ permissions }: SidebarProps) {
 
   const SidebarContent = () => (
     <>
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          {!isCollapsed ? (
-            <div className="min-w-0">
-              <Image
-                src="/Header-Light.png"
-                alt="Thoyokem"
-                width={2000}
-                height={800}
-                priority
-                className="block dark:hidden h-9 w-auto object-contain"
-              />
-              <Image
-                src="/Header-Dark.png"
-                alt="Thoyokem"
-                width={2000}
-                height={800}
-                priority
-                className="hidden dark:block h-9 w-auto object-contain"
-              />
-            </div>
-          ) : (
-            <div className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-              T
-            </div>
-          )}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden md:block p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-          >
-            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-        </div>
+      <div className="p-3 border-b border-gray-200 dark:border-gray-700 relative flex items-center justify-center min-h-[52px]">
+        {!isCollapsed ? (
+          <div className="min-w-0">
+            <Image
+              src="/Header-Light.png"
+              alt="Thoyokem"
+              width={2000}
+              height={800}
+              priority
+              className="block dark:hidden h-9 w-auto object-contain mx-auto"
+            />
+            <Image
+              src="/Header-Dark.png"
+              alt="Thoyokem"
+              width={2000}
+              height={800}
+              priority
+              className="hidden dark:block h-9 w-auto object-contain mx-auto"
+            />
+          </div>
+        ) : (
+          <div className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+            T
+          </div>
+        )}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden md:block absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
       </div>
 
       <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'payment_entry';
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
 
     const currentOutstanding = parseFloat(currentObj.outstanding_amount) || 0;
+    const originalStatus = currentObj.status;
     if (paid_amount > currentOutstanding) {
       return NextResponse.json({ error: `Jumlah bayar (${paid_amount}) melebihi sisa tagihan (${currentOutstanding})` }, { status: 400 });
     }
@@ -106,6 +108,23 @@ export async function POST(request: NextRequest) {
     const newRow = objectToRow(headers, currentObj);
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(invoiceSheet, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+
+    await logActivity({
+      doctype: 'Payment Entry',
+      documentId: paymentId,
+      action: 'Paid',
+      changedBy: guard.session?.user.name || '',
+      before: null,
+      after: { payment_id: paymentId, reference_type, reference_id, paid_amount, mode_of_payment: mode_of_payment || 'Cash' },
+    });
+    await logActivity({
+      doctype: reference_type,
+      documentId: reference_id,
+      action: 'Paid',
+      changedBy: guard.session?.user.name || '',
+      before: { outstanding_amount: currentOutstanding, status: originalStatus },
+      after: { outstanding_amount: newOutstanding, status: currentObj.status },
+    });
 
     return NextResponse.json({ success: true, payment_id: paymentId, outstanding_amount: newOutstanding });
   } catch (error) {

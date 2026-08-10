@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
 import { getNextDocId } from '@/lib/numbering';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'bom';
 const ITEM_SHEET = 'bom_item';
@@ -94,6 +95,15 @@ export async function POST(request: NextRequest) {
     );
     await appendSheet(ITEM_SHEET, compRows);
 
+    await logActivity({
+      doctype: 'BOM',
+      documentId: bomId,
+      action: 'Created',
+      changedBy: guard.session?.user.name || '',
+      before: null,
+      after: { bom_id: bomId, item_code, qty: qty || 1, components: components.map((c: any) => `${c.component_item_code} x${c.qty}`).join(', ') },
+    });
+
     return NextResponse.json({ success: true, bom_id: bomId });
   } catch (error) {
     console.error('Error creating BOM:', error);
@@ -126,6 +136,8 @@ export async function DELETE(request: NextRequest) {
         await deleteRow(ITEM_SHEET, i);
       }
     }
+
+    await logActivity({ doctype: 'BOM', documentId: bomId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { bom_id: bomId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

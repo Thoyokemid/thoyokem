@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
-import { getNextDocId } from '@/lib/numbering';
+import { getNextDocId, getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'sales_order';
 const ITEM_SHEET = 'sales_order_item';
@@ -50,6 +51,7 @@ export async function GET() {
         total_amount: parseFloat(so.total_amount) || 0,
         owner: so.owner,
         creation: so.creation,
+        amended_from: so.amended_from || '',
         items: items
           .filter((i) => i.so_id === so.so_id)
           .map((i) => ({
@@ -117,6 +119,15 @@ export async function POST(request: NextRequest) {
     );
     await appendSheet(ITEM_SHEET, itemRows);
 
+    await logActivity({
+      doctype: 'Sales Order',
+      documentId: soId,
+      action: 'Created',
+      changedBy: guard.session?.user.name || '',
+      before: null,
+      after: { so_id: soId, customer_id, delivery_date: delivery_date || '', status: 'Draft', total_amount: totalAmount },
+    });
+
     return NextResponse.json({ success: true, so_id: soId });
   } catch (error) {
     console.error('Error creating sales order:', error);
@@ -146,17 +157,116 @@ export async function PATCH(request: NextRequest) {
     const currentRow = rows[sheetRowIndex] || [];
     const currentObj: Record<string, any> = {};
     headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
+    const originalObj = { ...currentObj };
 
     const now = new Date().toISOString();
     const session = guard.session;
+    let logAction: any = 'Updated';
 
     if (action === 'submit') {
       if (currentObj.status !== 'Draft') {
         return NextResponse.json({ error: 'Hanya SO berstatus Draft yang bisa di-submit' }, { status: 400 });
       }
       currentObj.status = 'Confirmed';
+      logAction = 'Submitted';
     } else if (action === 'cancel') {
+      if (currentObj.status === 'Cancelled') {
+        return NextResponse.json({ error: 'SO sudah dibatalkan' }, { status: 400 });
+      }
+
+      if (currentObj.status === 'Delivered') {
+        const { records: invoices } = await readSheetAsObjects<any>('sales_invoice');
+        const hasInvoice = invoices.some((inv) => inv.so_id === so_id);
+        if (hasInvoice) {
+          return NextResponse.json({ error: 'Batalkan/hapus Sales Invoice yang terkait SO ini dulu sebelum membatalkan SO' }, { status: 400 });
+        }
+
+        // Reverse the stock impact of the delivery.
+        const { records: soItems } = await readSheetAsObjects<any>(ITEM_SHEET);
+        const items = soItems.filter((i) => i.so_id === so_id);
+        const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
+        for (const item of items) {
+          const deliveredQty = parseFloat(item.delivered_qty) || 0;
+          if (deliveredQty <= 0) continue;
+          const master = itemMaster.find((m) => m.item_code === item.item_code);
+          await appendStockLedgerEntry({
+            itemCode: item.item_code,
+            warehouseId: item.warehouse_id,
+            voucherType: 'Sales Order Cancellation',
+            voucherId: so_id,
+            actualQty: deliveredQty,
+            valuationRate: parseFloat(master?.purchase_price) || 0,
+            postingDate: now.slice(0, 10),
+          });
+        }
+
+        // Mark linked delivery notes as cancelled too (cosmetic, for traceability).
+        const dnRows = await readSheet('delivery_note');
+        const dnHeaders = (dnRows[0] || []).map((h: any) => String(h ?? '').trim());
+        const dnSoCol = dnHeaders.indexOf('so_id');
+        const dnStatusCol = dnHeaders.indexOf('status');
+        for (let i = 1; i < dnRows.length; i++) {
+          if (dnRows[i][dnSoCol] === so_id) dnRows[i][dnStatusCol] = 'Cancelled';
+        }
+        if (dnRows.length > 1) {
+          const lastCol = String.fromCharCode(65 + dnHeaders.length - 1);
+          await writeSheet('delivery_note', `A2:${lastCol}${dnRows.length}`, dnRows.slice(1));
+        }
+      }
+
       currentObj.status = 'Cancelled';
+      logAction = 'Cancelled';
+    } else if (action === 'amend') {
+      if (currentObj.status !== 'Cancelled') {
+        return NextResponse.json({ error: 'Hanya SO yang sudah dibatalkan yang bisa di-amend' }, { status: 400 });
+      }
+
+      const { records: allSos } = await readSheetAsObjects<any>(SHEET);
+      const newSoId = getAmendedDocId(so_id, allSos.map((s) => s.so_id));
+
+      const { records: soItems, headers: soItemHeaders } = await readSheetAsObjects<any>(ITEM_SHEET);
+      const items = soItems.filter((i) => i.so_id === so_id);
+
+      const { headers: soHeaders } = await readSheetAsObjects<any>(SHEET);
+      const newSoRow = objectToRow(soHeaders, {
+        so_id: newSoId,
+        customer_id: currentObj.customer_id,
+        order_date: now.slice(0, 10),
+        delivery_date: currentObj.delivery_date || '',
+        status: 'Draft',
+        total_amount: currentObj.total_amount,
+        approval_status: 'Pending',
+        owner: session?.user.name || '',
+        creation: now,
+        modified_by: session?.user.name || '',
+        modified: now,
+        amended_from: so_id,
+      });
+      await appendSheet(SHEET, [newSoRow]);
+
+      const newItemRows = items.map((i) =>
+        objectToRow(soItemHeaders, {
+          so_id: newSoId,
+          item_code: i.item_code,
+          qty: i.qty,
+          rate: i.rate,
+          amount: i.amount,
+          delivered_qty: 0,
+          warehouse_id: i.warehouse_id,
+        })
+      );
+      await appendSheet(ITEM_SHEET, newItemRows);
+
+      await logActivity({
+        doctype: 'Sales Order',
+        documentId: newSoId,
+        action: 'Amended',
+        changedBy: session?.user.name || '',
+        before: null,
+        after: { so_id: newSoId, amended_from: so_id, status: 'Draft' },
+      });
+
+      return NextResponse.json({ success: true, so_id: newSoId });
     } else if (action === 'approve' || action === 'reject') {
       if (!session?.user.permissions.can_approve) {
         return NextResponse.json({ error: 'Kamu tidak punya izin approve' }, { status: 403 });
@@ -167,6 +277,7 @@ export async function PATCH(request: NextRequest) {
       currentObj.approval_status = action === 'approve' ? 'Approved' : 'Rejected';
       currentObj.approved_by = session?.user.name || '';
       currentObj.approved_at = now;
+      logAction = action === 'approve' ? 'Approved' : 'Rejected';
     } else if (action === 'deliver') {
       if (currentObj.status !== 'Confirmed') {
         return NextResponse.json({ error: 'SO harus berstatus Confirmed sebelum dikirim' }, { status: 400 });
@@ -245,6 +356,7 @@ export async function PATCH(request: NextRequest) {
       await writeSheet(ITEM_SHEET, `A2:${lastItemCol}${soItemRows.length}`, soItemRows.slice(1));
 
       currentObj.status = 'Delivered';
+      logAction = 'Delivered';
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
@@ -255,6 +367,8 @@ export async function PATCH(request: NextRequest) {
     const newRow = objectToRow(headers, currentObj);
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+
+    await logActivity({ doctype: 'Sales Order', documentId: so_id, action: logAction, changedBy: session?.user.name || '', before: originalObj, after: currentObj });
 
     return NextResponse.json({ success: true });
   } catch (error) {

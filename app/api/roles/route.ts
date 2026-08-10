@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, appendSheet, writeSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { Role } from '@/types';
 
 const SHEET = 'roles';
@@ -80,6 +81,10 @@ export async function POST(request: NextRequest) {
 
     await appendSheet(SHEET, [newRole]);
 
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newRole[i]));
+    await logActivity({ doctype: 'Role', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+
     return NextResponse.json({ success: true, role_id: newId });
   } catch (error) {
     console.error('Error creating role:', error);
@@ -119,6 +124,8 @@ export async function PUT(request: NextRequest) {
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
+    await logActivity({ doctype: 'Role', documentId: role_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating role:', error);
@@ -157,6 +164,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteRow(SHEET, dataRowIndex + 1);
+    await logActivity({ doctype: 'Role', documentId: roleId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { role_id: roleId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

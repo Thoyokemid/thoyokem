@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
+import ActivityLogView from '@/components/ui/ActivityLogView';
 import { Item, StockBalance } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { AlertCircle } from 'lucide-react';
@@ -136,6 +137,9 @@ export default function ItemDetailPage() {
                   last_transaction_date: b.last_transaction_date,
                 }))}
               />
+            </DetailSection>
+            <DetailSection title="Riwayat">
+              <ActivityLogView doctype="Item" documentId={item.item_code} />
             </DetailSection>
           </div>
         )}

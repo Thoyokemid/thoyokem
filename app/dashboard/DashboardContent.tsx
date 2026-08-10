@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
+import SplashScreen from '@/components/ui/SplashScreen';
 import { AttendanceImport, StaffList, LeaveAttendance } from '@/types';
 import { processAttendanceData, calculateRecap, countUsedLeaveDays } from '@/utils/attendance';
 import { useWorkHours } from '@/hooks/useWorkHours';
@@ -75,6 +76,7 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
   const [staffList, setStaffList] = useState<StaffList[]>([]);
   const [leaveData, setLeaveData] = useState<LeaveAttendance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
 
   // Chart mode: overtime or keterlambatan
   const [chartMode, setChartMode] = useState<'overtime' | 'keterlambatan'>('overtime');
@@ -94,6 +96,10 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
   const [absenSort, setAbsenSort] = useState<'desc' | 'asc'>('desc');
 
   useEffect(() => {
+    if (sessionStorage.getItem('showSplash')) {
+      setShowSplash(true);
+      sessionStorage.removeItem('showSplash');
+    }
     fetchAll();
   }, []);
 
@@ -305,6 +311,7 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
     .sort((a, b) => absenSort === 'desc' ? b.jumlah - a.jumlah : a.jumlah - b.jumlah);
 
   if (isLoading) {
+    if (showSplash) return <SplashScreen />;
     return (
       <div className="flex items-center justify-center py-20">
         <Loading size="lg" />

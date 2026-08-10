@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
 import { getNextDocId } from '@/lib/numbering';
+import { logActivity } from '@/lib/activityLog';
 
 const SHEET = 'purchase_invoice';
 const ITEM_SHEET = 'purchase_invoice_item';
@@ -100,6 +101,15 @@ export async function POST(request: NextRequest) {
       })
     );
     if (piItemRows.length > 0) await appendSheet(ITEM_SHEET, piItemRows);
+
+    await logActivity({
+      doctype: 'Purchase Invoice',
+      documentId: piId,
+      action: 'Created',
+      changedBy: guard.session?.user.name || '',
+      before: null,
+      after: { pi_id: piId, po_id, grand_total: grandTotal, status: 'Submitted' },
+    });
 
     return NextResponse.json({ success: true, pi_id: piId });
   } catch (error) {
