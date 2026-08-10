@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { StockEntry, Item, Warehouse, StockEntryType, Bom } from '@/types';
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Layers } from 'lucide-react';
 
@@ -25,6 +26,10 @@ const TYPE_ICON: Record<string, React.ElementType> = {
 
 export default function StockEntriesTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('inventory_stock_entries_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_stock_entries_cols', [
+    'entry_id', 'date', 'entry_type', 'item_code', 'source_warehouse', 'target_warehouse', 'qty', 'remarks',
+  ]);
   const [entries, setEntries] = useState<StockEntry[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -100,19 +105,43 @@ export default function StockEntriesTab() {
   const itemName = (code: string) => items.find((i) => i.item_code === code)?.item_name || code;
   const warehouseName = (id: string) => warehouses.find((w) => w.warehouse_id === id)?.warehouse_name || id;
 
+  const REPORT_COLUMNS: ReportColumn<StockEntry>[] = [
+    { key: 'entry_id', header: 'Entry ID' },
+    { key: 'date', header: 'Date' },
+    { key: 'entry_type', header: 'Type', render: (r) => <StatusBadge label={r.entry_type} tone={TYPE_TONE[r.entry_type] || 'gray'} /> },
+    { key: 'item_code', header: 'Item', render: (r) => itemName(r.item_code), exportValue: (r) => itemName(r.item_code) },
+    { key: 'source_warehouse', header: 'Source Warehouse', render: (r) => (r.source_warehouse ? warehouseName(r.source_warehouse) : '-'), exportValue: (r) => (r.source_warehouse ? warehouseName(r.source_warehouse) : '') },
+    { key: 'target_warehouse', header: 'Target Warehouse', render: (r) => (r.target_warehouse ? warehouseName(r.target_warehouse) : '-'), exportValue: (r) => (r.target_warehouse ? warehouseName(r.target_warehouse) : '') },
+    { key: 'qty', header: 'Qty', align: 'right' },
+    { key: 'remarks', header: 'Remarks' },
+    { key: 'owner', header: 'Owner' },
+  ];
+
   return (
     <ListViewLayout
       primaryAction={
-        <Button onClick={openNew}>
-          <Plus size={14} className="mr-1.5" />
-          New Stock Entry
-        </Button>
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(entries, REPORT_COLUMNS, 'stock_entries', 'Stock Entries')}
+          />
+          <Button onClick={openNew}>
+            <Plus size={14} className="mr-1.5" />
+            New Stock Entry
+          </Button>
+        </div>
       }
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loading size="lg" />
         </div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={entries} keyField={(r) => r.entry_id} />
       ) : entries.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No stock entries found</p>
       ) : (

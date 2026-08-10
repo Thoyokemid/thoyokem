@@ -3,10 +3,24 @@
 import { useState, useEffect, useMemo } from 'react';
 import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
+import { ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { StockBalance } from '@/types';
-import { Search, AlertTriangle } from 'lucide-react';
+import { Search, Boxes } from 'lucide-react';
+
+const REPORT_COLUMNS: ReportColumn<StockBalance>[] = [
+  { key: 'item_name', header: 'Item' },
+  { key: 'warehouse_id', header: 'Warehouse' },
+  { key: 'qty_on_hand', header: 'Qty on Hand', align: 'right' },
+  { key: 'valuation_rate', header: 'Valuation Rate', align: 'right', render: (r) => r.valuation_rate.toLocaleString('id-ID') },
+  { key: 'stock_value', header: 'Stock Value', align: 'right', render: (r) => r.stock_value.toLocaleString('id-ID') },
+  { key: 'last_transaction_date', header: 'Last Transaction' },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function StockBalanceTab() {
+  const [viewMode, setViewMode] = useViewMode('inventory_stock_balance_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_stock_balance_cols', DEFAULT_VISIBLE);
   const [balances, setBalances] = useState<StockBalance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,51 +72,47 @@ export default function StockBalanceTab() {
               className="input-field pl-9"
             />
           </div>
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(filtered, REPORT_COLUMNS, 'stock_balance', 'Stock Balance')}
+          />
           <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
             Total nilai stok: <span className="font-semibold text-gray-900 dark:text-gray-100">Rp{totalValue.toLocaleString('id-ID')}</span>
           </div>
         </div>
       </Card>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Warehouse</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Qty on Hand</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Valuation Rate</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stock Value</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Transaction</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-10 text-center text-sm text-gray-500">No stock data available</td>
-                </tr>
-              ) : (
-                filtered.map((b) => (
-                  <tr key={`${b.item_code}::${b.warehouse_id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-3 py-2.5 text-xs font-medium text-gray-900 dark:text-gray-100">
-                      <div className="flex items-center gap-1.5">
-                        {b.qty_on_hand <= 0 && <AlertTriangle size={12} className="text-red-500" />}
-                        {b.item_name}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">{b.warehouse_id}</td>
-                    <td className="px-3 py-2.5 text-xs text-right text-gray-900 dark:text-gray-100 font-medium">{b.qty_on_hand.toLocaleString('id-ID')}</td>
-                    <td className="px-3 py-2.5 text-xs text-right text-gray-700 dark:text-gray-300">Rp{b.valuation_rate.toLocaleString('id-ID')}</td>
-                    <td className="px-3 py-2.5 text-xs text-right text-gray-900 dark:text-gray-100 font-medium">Rp{b.stock_value.toLocaleString('id-ID')}</td>
-                    <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400">{b.last_transaction_date}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        {viewMode === 'report' ? (
+          <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={filtered} keyField={(r) => `${r.item_code}::${r.warehouse_id}`} />
+        ) : filtered.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-gray-500">No stock data available</p>
+        ) : (
+          filtered.map((b) => (
+            <ListRow
+              key={`${b.item_code}::${b.warehouse_id}`}
+              avatar={
+                <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
+                  <Boxes size={14} />
+                </span>
+              }
+              title={b.item_name}
+              subtitle={b.warehouse_id}
+              meta={`Rp${b.stock_value.toLocaleString('id-ID')}`}
+              badges={
+                <>
+                  <StatusBadge label={`${b.qty_on_hand.toLocaleString('id-ID')} qty`} tone="gray" />
+                  {b.qty_on_hand <= 0 && <StatusBadge label="Habis" tone="red" />}
+                </>
+              }
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Bom, Item } from '@/types';
 import { Plus, Trash2, Layers } from 'lucide-react';
 
@@ -13,7 +14,24 @@ interface ComponentLine {
   qty: string;
 }
 
+const REPORT_COLUMNS: ReportColumn<Bom>[] = [
+  { key: 'bom_id', header: 'BOM ID' },
+  { key: 'item_name', header: 'Produk' },
+  { key: 'qty', header: 'Output Qty', align: 'right' },
+  {
+    key: 'components',
+    header: 'Komponen',
+    render: (r) => r.components.map((c) => `${c.component_item_name} x${c.qty}`).join(', '),
+    exportValue: (r) => r.components.map((c) => `${c.component_item_name} x${c.qty}`).join(', '),
+  },
+  { key: 'is_active', header: 'Status', render: (r) => <StatusBadge label={r.is_active ? 'Active' : 'Inactive'} tone={r.is_active ? 'green' : 'gray'} />, exportValue: (r) => (r.is_active ? 'Active' : 'Inactive') },
+  { key: 'owner', header: 'Owner' },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function BomTab() {
+  const [viewMode, setViewMode] = useViewMode('inventory_bom_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_bom_cols', DEFAULT_VISIBLE);
   const [boms, setBoms] = useState<Bom[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,13 +114,27 @@ export default function BomTab() {
 
   return (
     <ListViewLayout
-      primaryAction={<Button onClick={openNew}><Plus size={14} className="mr-1.5" />New BOM</Button>}
+      primaryAction={
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(boms, REPORT_COLUMNS, 'bom', 'BOM')}
+          />
+          <Button onClick={openNew}><Plus size={14} className="mr-1.5" />New BOM</Button>
+        </div>
+      }
     >
       <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
         BOM (Bill of Materials) mendefinisikan produk yang merupakan campuran/rakitan dari beberapa item lain. Produksinya lewat Stock Entries → tipe "Manufacture".
       </div>
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={boms} keyField={(r) => r.bom_id} />
       ) : boms.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">Belum ada BOM. Buat BOM untuk produk campuran.</p>
       ) : (

@@ -8,6 +8,7 @@ import ItemsTab from "./components/ItemsTab";
 import WarehousesTab from "./components/WarehousesTab";
 import StockEntriesTab from "./components/StockEntriesTab";
 import StockBalanceTab from "./components/StockBalanceTab";
+import StockLedgerTab from "./components/StockLedgerTab";
 import BomTab from "./components/BomTab";
 import InventoryOverview from "./components/InventoryOverview";
 import { AlertCircle } from "lucide-react";
@@ -48,6 +49,7 @@ function InventoryPageInner() {
   const titles: Record<string, { title: string; subtitle: string }> = {
     overview: { title: "Inventory", subtitle: "Kelola barang, gudang, dan pergerakan stok" },
     balance: { title: "Stock Balance", subtitle: "Ringkasan stok per item dan warehouse" },
+    ledger: { title: "Stock Ledger", subtitle: "Kartu stok — semua pergerakan masuk/keluar per transaksi" },
     entries: { title: "Stock Entries", subtitle: "Riwayat pergerakan stok" },
     items: { title: "Items", subtitle: "Daftar barang" },
     bom: { title: "Product Campuran (BOM)", subtitle: "Produk hasil campuran/rakitan beberapa item" },
@@ -74,6 +76,7 @@ function InventoryPageInner() {
         <div>
           {activeTab === "overview" && <InventoryOverview />}
           {activeTab === "balance" && <StockBalanceTab />}
+          {activeTab === "ledger" && <StockLedgerTab />}
           {activeTab === "entries" && <StockEntriesTab />}
           {activeTab === "items" && <ItemsTab />}
           {activeTab === "bom" && <BomTab />}

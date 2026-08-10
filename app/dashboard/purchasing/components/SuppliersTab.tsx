@@ -6,11 +6,26 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Supplier } from '@/types';
 import { Plus, Edit, Trash2, Truck } from 'lucide-react';
 
+const REPORT_COLUMNS: ReportColumn<Supplier>[] = [
+  { key: 'supplier_id', header: 'Supplier ID' },
+  { key: 'supplier_name', header: 'Supplier Name' },
+  { key: 'contact', header: 'Contact' },
+  { key: 'phone', header: 'Phone' },
+  { key: 'email', header: 'Email' },
+  { key: 'address', header: 'Address' },
+  { key: 'payment_terms', header: 'Payment Terms' },
+  { key: 'is_active', header: 'Status', render: (r) => <StatusBadge label={r.is_active ? 'Active' : 'Inactive'} tone={r.is_active ? 'green' : 'gray'} />, exportValue: (r) => (r.is_active ? 'Active' : 'Inactive') },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function SuppliersTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('purchasing_suppliers_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('purchasing_suppliers_cols', DEFAULT_VISIBLE);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,9 +99,25 @@ export default function SuppliersTab() {
   };
 
   return (
-    <ListViewLayout primaryAction={<Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Supplier</Button>}>
+    <ListViewLayout
+      primaryAction={
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(suppliers, REPORT_COLUMNS, 'suppliers', 'Suppliers')}
+          />
+          <Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Supplier</Button>
+        </div>
+      }
+    >
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={suppliers} keyField={(r) => r.supplier_id} />
       ) : suppliers.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No suppliers found</p>
       ) : (

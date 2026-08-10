@@ -6,11 +6,27 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Customer } from '@/types';
 import { Plus, Edit, Trash2, User } from 'lucide-react';
 
+const REPORT_COLUMNS: ReportColumn<Customer>[] = [
+  { key: 'customer_id', header: 'Customer ID' },
+  { key: 'customer_name', header: 'Customer Name' },
+  { key: 'contact', header: 'Contact' },
+  { key: 'phone', header: 'Phone' },
+  { key: 'email', header: 'Email' },
+  { key: 'address', header: 'Address' },
+  { key: 'payment_terms', header: 'Payment Terms' },
+  { key: 'credit_limit', header: 'Credit Limit', align: 'right', render: (r) => r.credit_limit.toLocaleString('id-ID') },
+  { key: 'is_active', header: 'Status', render: (r) => <StatusBadge label={r.is_active ? 'Active' : 'Inactive'} tone={r.is_active ? 'green' : 'gray'} />, exportValue: (r) => (r.is_active ? 'Active' : 'Inactive') },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function CustomersTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('sales_customers_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('sales_customers_cols', DEFAULT_VISIBLE);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,9 +101,25 @@ export default function CustomersTab() {
   };
 
   return (
-    <ListViewLayout primaryAction={<Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Customer</Button>}>
+    <ListViewLayout
+      primaryAction={
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(customers, REPORT_COLUMNS, 'customers', 'Customers')}
+          />
+          <Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Customer</Button>
+        </div>
+      }
+    >
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={customers} keyField={(r) => r.customer_id} />
       ) : customers.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No customers found</p>
       ) : (

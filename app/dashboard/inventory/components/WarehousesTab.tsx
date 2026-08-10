@@ -6,11 +6,22 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Warehouse } from '@/types';
 import { Plus, Edit, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 
+const REPORT_COLUMNS: ReportColumn<Warehouse>[] = [
+  { key: 'warehouse_id', header: 'Warehouse ID' },
+  { key: 'warehouse_name', header: 'Warehouse Name' },
+  { key: 'location', header: 'Location' },
+  { key: 'is_active', header: 'Status', render: (r) => <StatusBadge label={r.is_active ? 'Active' : 'Inactive'} tone={r.is_active ? 'green' : 'gray'} />, exportValue: (r) => (r.is_active ? 'Active' : 'Inactive') },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function WarehousesTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('inventory_warehouses_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_warehouses_cols', DEFAULT_VISIBLE);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,16 +101,28 @@ export default function WarehousesTab() {
   return (
     <ListViewLayout
       primaryAction={
-        <Button onClick={openNew}>
-          <Plus size={14} className="mr-1.5" />
-          Add Warehouse
-        </Button>
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(warehouses, REPORT_COLUMNS, 'warehouses', 'Warehouses')}
+          />
+          <Button onClick={openNew}>
+            <Plus size={14} className="mr-1.5" />
+            Add Warehouse
+          </Button>
+        </div>
       }
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loading size="lg" />
         </div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={warehouses} keyField={(r) => r.warehouse_id} />
       ) : warehouses.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No warehouses found</p>
       ) : (

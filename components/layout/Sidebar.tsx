@@ -75,6 +75,7 @@ function SidebarInner({ permissions }: SidebarProps) {
       enabled: permissions.inventory,
       subItems: [
         { name: 'Stock Balance', tab: 'balance' },
+        { name: 'Stock Ledger', tab: 'ledger' },
         { name: 'Stock Entries', tab: 'entries' },
         { name: 'Items', tab: 'items' },
         { name: 'Warehouses', tab: 'warehouses' },

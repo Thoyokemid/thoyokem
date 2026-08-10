@@ -7,6 +7,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
 import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/components/ui/ListView";
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from "@/components/ui/ReportView";
 import { AlertCircle, Truck, PackageCheck } from "lucide-react";
 
 interface SalesOrderWithItems {
@@ -29,6 +30,21 @@ interface DeliveryNoteWithItems {
   items: { item_code: string; delivered_qty: number; warehouse_id: string }[];
 }
 
+const READY_COLUMNS: ReportColumn<SalesOrderWithItems>[] = [
+  { key: 'so_id', header: 'SO ID' },
+  { key: 'customer_name', header: 'Customer' },
+  { key: 'items', header: 'Items', render: (r) => r.items.length, exportValue: (r) => r.items.length },
+  { key: 'total_amount', header: 'Total', align: 'right', render: (r) => r.total_amount.toLocaleString('id-ID') },
+];
+const HISTORY_COLUMNS: ReportColumn<DeliveryNoteWithItems>[] = [
+  { key: 'dn_id', header: 'DN ID' },
+  { key: 'so_id', header: 'SO' },
+  { key: 'customer_name', header: 'Customer' },
+  { key: 'posting_date', header: 'Posting Date' },
+  { key: 'items', header: 'Items', render: (r) => r.items.length, exportValue: (r) => r.items.length },
+  { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone="green" /> },
+];
+
 export default function DeliveryOrderPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -36,6 +52,10 @@ export default function DeliveryOrderPage() {
   const [deliveries, setDeliveries] = useState<DeliveryNoteWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [readyViewMode, setReadyViewMode] = useViewMode('delivery_ready_view');
+  const [readyVisibleCols, setReadyVisibleCols] = useVisibleColumns('delivery_ready_cols', READY_COLUMNS.map((c) => c.key));
+  const [historyViewMode, setHistoryViewMode] = useViewMode('delivery_history_view');
+  const [historyVisibleCols, setHistoryVisibleCols] = useVisibleColumns('delivery_history_cols', HISTORY_COLUMNS.map((c) => c.key));
 
   useEffect(() => {
     if (session?.user.permissions.delivery_order) fetchAll();
@@ -127,8 +147,21 @@ export default function DeliveryOrderPage() {
           <>
             <div>
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ready to Deliver ({readyOrders.length})</h2>
-              <ListViewLayout>
-                {readyOrders.length === 0 ? (
+              <ListViewLayout
+                primaryAction={
+                  <ReportViewControls
+                    viewMode={readyViewMode}
+                    onViewModeChange={setReadyViewMode}
+                    columns={READY_COLUMNS}
+                    visibleColumns={readyVisibleCols}
+                    onVisibleColumnsChange={setReadyVisibleCols}
+                    onExport={() => exportToExcel(readyOrders, READY_COLUMNS, 'ready_to_deliver', 'Ready to Deliver')}
+                  />
+                }
+              >
+                {readyViewMode === 'report' ? (
+                  <ReportTable columns={READY_COLUMNS} visibleColumns={readyVisibleCols} rows={readyOrders} keyField={(r) => r.so_id} />
+                ) : readyOrders.length === 0 ? (
                   <p className="px-3 py-6 text-center text-sm text-gray-500">Tidak ada SO yang siap dikirim</p>
                 ) : (
                   readyOrders.map((so) => (
@@ -156,8 +189,21 @@ export default function DeliveryOrderPage() {
 
             <div>
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Delivery History ({deliveries.length})</h2>
-              <ListViewLayout>
-                {deliveries.length === 0 ? (
+              <ListViewLayout
+                primaryAction={
+                  <ReportViewControls
+                    viewMode={historyViewMode}
+                    onViewModeChange={setHistoryViewMode}
+                    columns={HISTORY_COLUMNS}
+                    visibleColumns={historyVisibleCols}
+                    onVisibleColumnsChange={setHistoryVisibleCols}
+                    onExport={() => exportToExcel(deliveries, HISTORY_COLUMNS, 'delivery_history', 'Delivery History')}
+                  />
+                }
+              >
+                {historyViewMode === 'report' ? (
+                  <ReportTable columns={HISTORY_COLUMNS} visibleColumns={historyVisibleCols} rows={deliveries} keyField={(r) => r.dn_id} />
+                ) : deliveries.length === 0 ? (
                   <p className="px-3 py-6 text-center text-sm text-gray-500">Belum ada pengiriman</p>
                 ) : (
                   deliveries.map((dn) => (

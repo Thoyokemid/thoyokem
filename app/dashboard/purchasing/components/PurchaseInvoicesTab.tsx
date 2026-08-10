@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { PurchaseInvoice } from '@/types';
 import { FileText, Wallet } from 'lucide-react';
 
@@ -15,8 +16,22 @@ const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange'> = {
   Paid: 'green',
 };
 
+const REPORT_COLUMNS: ReportColumn<PurchaseInvoice>[] = [
+  { key: 'pi_id', header: 'Invoice ID' },
+  { key: 'po_id', header: 'PO' },
+  { key: 'supplier_name', header: 'Supplier' },
+  { key: 'posting_date', header: 'Posting Date' },
+  { key: 'due_date', header: 'Due Date' },
+  { key: 'grand_total', header: 'Grand Total', align: 'right', render: (r) => r.grand_total.toLocaleString('id-ID') },
+  { key: 'outstanding_amount', header: 'Outstanding', align: 'right', render: (r) => r.outstanding_amount.toLocaleString('id-ID') },
+  { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone={STATUS_TONE[r.status] || 'gray'} /> },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function PurchaseInvoicesTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('purchasing_invoices_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('purchasing_invoices_cols', DEFAULT_VISIBLE);
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [payModalInvoice, setPayModalInvoice] = useState<PurchaseInvoice | null>(null);
@@ -82,9 +97,22 @@ export default function PurchaseInvoicesTab() {
   };
 
   return (
-    <ListViewLayout>
+    <ListViewLayout
+      primaryAction={
+        <ReportViewControls
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          columns={REPORT_COLUMNS}
+          visibleColumns={visibleCols}
+          onVisibleColumnsChange={setVisibleCols}
+          onExport={() => exportToExcel(invoices, REPORT_COLUMNS, 'purchase_invoices', 'Purchase Invoices')}
+        />
+      }
+    >
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={invoices} keyField={(r) => r.pi_id} />
       ) : invoices.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No invoices found. Invoice dibuat dari tab Purchase Orders (setelah PO diterima).</p>
       ) : (

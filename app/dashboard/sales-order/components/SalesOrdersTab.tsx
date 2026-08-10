@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Customer, Item, Warehouse } from '@/types';
 import { Plus, Trash2, Send, XCircle, FileText, ShoppingBag, Check, Ban } from 'lucide-react';
 
@@ -43,10 +44,24 @@ const APPROVAL_TONE: Record<string, 'gray' | 'orange' | 'green' | 'red'> = {
   Rejected: 'red',
 };
 
+const REPORT_COLUMNS: ReportColumn<SalesOrderWithItems>[] = [
+  { key: 'so_id', header: 'SO ID' },
+  { key: 'customer_name', header: 'Customer' },
+  { key: 'order_date', header: 'Order Date' },
+  { key: 'delivery_date', header: 'Delivery Date' },
+  { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone={STATUS_TONE[r.status] || 'gray'} /> },
+  { key: 'approval_status', header: 'Approval', render: (r) => <StatusBadge label={r.approval_status} tone={APPROVAL_TONE[r.approval_status] || 'gray'} /> },
+  { key: 'approved_by', header: 'Approved By' },
+  { key: 'total_amount', header: 'Total', align: 'right', render: (r) => r.total_amount.toLocaleString('id-ID') },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
+
 export default function SalesOrdersTab() {
   const { data: session } = useSession();
   const router = useRouter();
   const canApprove = !!session?.user.permissions.can_approve;
+  const [viewMode, setViewMode] = useViewMode('sales_orders_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('sales_orders_cols', DEFAULT_VISIBLE);
   const [orders, setOrders] = useState<SalesOrderWithItems[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -169,9 +184,25 @@ export default function SalesOrdersTab() {
   };
 
   return (
-    <ListViewLayout primaryAction={<Button onClick={openNew}><Plus size={14} className="mr-1.5" />New Sales Order</Button>}>
+    <ListViewLayout
+      primaryAction={
+        <div className="flex items-center gap-2">
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(orders, REPORT_COLUMNS, 'sales_orders', 'Sales Orders')}
+          />
+          <Button onClick={openNew}><Plus size={14} className="mr-1.5" />New Sales Order</Button>
+        </div>
+      }
+    >
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={orders} keyField={(r) => r.so_id} />
       ) : orders.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No sales orders found</p>
       ) : (

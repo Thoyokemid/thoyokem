@@ -6,9 +6,25 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Item } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
+
+const REPORT_COLUMNS: ReportColumn<Item>[] = [
+  { key: 'item_code', header: 'Item Code' },
+  { key: 'item_name', header: 'Item Name' },
+  { key: 'item_group', header: 'Group' },
+  { key: 'item_type', header: 'Type' },
+  { key: 'unit', header: 'Unit' },
+  { key: 'currency', header: 'Currency' },
+  { key: 'purchase_price', header: 'Purchase Price', align: 'right', render: (r) => r.purchase_price.toLocaleString('id-ID') },
+  { key: 'selling_price', header: 'Selling Price', align: 'right', render: (r) => r.selling_price.toLocaleString('id-ID') },
+  { key: 'reorder_level', header: 'Reorder Level', align: 'right' },
+  { key: 'valuation_method', header: 'Valuation Method' },
+  { key: 'is_active', header: 'Status', render: (r) => <StatusBadge label={r.is_active ? 'Active' : 'Inactive'} tone={r.is_active ? 'green' : 'gray'} />, exportValue: (r) => (r.is_active ? 'Active' : 'Inactive') },
+];
+const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: number; sellingPrice: number }) {
   const [rate, setRate] = useState<number | null>(null);
@@ -27,6 +43,8 @@ function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: num
 
 export default function ItemsTab() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode('inventory_items_view');
+  const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_items_cols', DEFAULT_VISIBLE);
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -152,14 +170,24 @@ export default function ItemsTab() {
         </Button>
       }
       toolbar={
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-          <input
-            type="text"
-            placeholder="Cari nama atau kode item..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field pl-9"
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <input
+              type="text"
+              placeholder="Cari nama atau kode item..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-field pl-9"
+            />
+          </div>
+          <ReportViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            columns={REPORT_COLUMNS}
+            visibleColumns={visibleCols}
+            onVisibleColumnsChange={setVisibleCols}
+            onExport={() => exportToExcel(filteredItems, REPORT_COLUMNS, 'items', 'Items')}
           />
         </div>
       }
@@ -168,6 +196,8 @@ export default function ItemsTab() {
         <div className="flex items-center justify-center py-12">
           <Loading size="lg" />
         </div>
+      ) : viewMode === 'report' ? (
+        <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={filteredItems} keyField={(r) => r.item_code} />
       ) : filteredItems.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-gray-500">No items found</p>
       ) : (
