@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { redirect, useRouter, useSearchParams } from "next/navigation";
+import { redirect, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PurchaseOrdersTab from "./components/PurchaseOrdersTab";
 import SuppliersTab from "./components/SuppliersTab";
@@ -12,7 +12,6 @@ import { AlertCircle } from "lucide-react";
 
 function PurchasingPageInner() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
 
@@ -42,12 +41,13 @@ function PurchasingPageInner() {
     );
   }
 
-  const tabs = [
-    { id: "overview", label: "Overview" },
-    { id: "orders", label: "Purchase Orders" },
-    { id: "invoices", label: "Invoices" },
-    { id: "suppliers", label: "Suppliers" },
-  ];
+  const titles: Record<string, { title: string; subtitle: string }> = {
+    overview: { title: "Purchasing", subtitle: "Purchase order, penerimaan barang, dan tagihan supplier" },
+    orders: { title: "Purchase Orders", subtitle: "Daftar purchase order" },
+    invoices: { title: "Invoices", subtitle: "Tagihan dari supplier" },
+    suppliers: { title: "Suppliers", subtitle: "Daftar supplier" },
+  };
+  const { title, subtitle } = titles[activeTab] || titles.overview;
 
   return (
     <DashboardLayout
@@ -61,29 +61,11 @@ function PurchasingPageInner() {
     >
       <div className="space-y-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Purchasing</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Purchase order, penerimaan barang, dan tagihan supplier</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         </div>
 
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-6 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => router.push(`/dashboard/purchasing${tab.id === "overview" ? "" : `?tab=${tab.id}`}`)}
-                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="mt-4">
+        <div>
           {activeTab === "overview" && <PurchasingOverview />}
           {activeTab === "orders" && <PurchaseOrdersTab />}
           {activeTab === "invoices" && <PurchaseInvoicesTab />}
