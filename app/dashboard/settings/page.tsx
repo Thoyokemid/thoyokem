@@ -9,7 +9,7 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
 import { Role } from "@/types";
-import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck } from "lucide-react";
+import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck, DollarSign } from "lucide-react";
 
 interface UserWithRole {
   id: string;
@@ -70,6 +70,10 @@ export default function SettingsPage() {
   const [isSavingHours, setIsSavingHours] = useState(false);
   const [hoursMessage, setHoursMessage] = useState("");
 
+  const [usdIdrRate, setUsdIdrRate] = useState("15800");
+  const [isSavingRate, setIsSavingRate] = useState(false);
+  const [rateMessage, setRateMessage] = useState("");
+
   // Role modal state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -109,6 +113,7 @@ export default function SettingsPage() {
           jam_pulang: data.jam_pulang || "17:00",
           toleransi_menit: data.toleransi_menit || "0",
         });
+        setUsdIdrRate(data.usd_idr_rate || "15800");
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -136,6 +141,30 @@ export default function SettingsPage() {
       setHoursMessage("Gagal menyimpan jam kerja.");
     } finally {
       setIsSavingHours(false);
+    }
+  };
+
+  const handleSaveRate = async () => {
+    setIsSavingRate(true);
+    setRateMessage("");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usd_idr_rate: usdIdrRate }),
+      });
+      if (res.ok) {
+        setRateMessage("Kurs berhasil disimpan!");
+      } else {
+        const err = await res.json();
+        setRateMessage(err.error || "Gagal menyimpan kurs.");
+      }
+      setTimeout(() => setRateMessage(""), 4000);
+    } catch (error) {
+      console.error("Error saving exchange rate:", error);
+      setRateMessage("Gagal menyimpan kurs.");
+    } finally {
+      setIsSavingRate(false);
     }
   };
 
@@ -337,6 +366,41 @@ export default function SettingsPage() {
             {hoursMessage && (
               <span className={`text-xs ${hoursMessage.includes("berhasil") ? "text-green-600" : "text-red-600"}`}>
                 {hoursMessage}
+              </span>
+            )}
+          </div>
+        </Card>
+
+        <Card title="Kurs Mata Uang">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-1.5 rounded-md bg-primary-50 dark:bg-primary-900/20 mt-0.5">
+              <DollarSign className="text-primary" size={16} />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Kurs ini dipakai untuk mengkonversi harga item berkurensi USD ke IDR (di Item, Purchase Order, Sales Order, dll).
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="label-field">1 USD = ? IDR</label>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={usdIdrRate}
+                onChange={(e) => setUsdIdrRate(e.target.value)}
+                className="input-field"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Button onClick={handleSaveRate} isLoading={isSavingRate}>
+              <Save size={14} className="mr-1.5" />
+              Simpan Kurs
+            </Button>
+            {rateMessage && (
+              <span className={`text-xs ${rateMessage.includes("berhasil") ? "text-green-600" : "text-red-600"}`}>
+                {rateMessage}
               </span>
             )}
           </div>

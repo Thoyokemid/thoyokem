@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -44,6 +45,7 @@ const APPROVAL_TONE: Record<string, 'gray' | 'orange' | 'green' | 'red'> = {
 
 export default function SalesOrdersTab() {
   const { data: session } = useSession();
+  const router = useRouter();
   const canApprove = !!session?.user.permissions.can_approve;
   const [orders, setOrders] = useState<SalesOrderWithItems[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -176,6 +178,7 @@ export default function SalesOrdersTab() {
         orders.map((so) => (
           <ListRow
             key={so.so_id}
+            onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(so.so_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><ShoppingBag size={14} /></span>}
             title={so.so_id}
             subtitle={`${so.customer_name} · ${so.items.length} item`}

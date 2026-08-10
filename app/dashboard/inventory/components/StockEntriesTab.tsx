@@ -1,29 +1,34 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
-import { StockEntry, Item, Warehouse, StockEntryType } from '@/types';
-import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight } from 'lucide-react';
+import { StockEntry, Item, Warehouse, StockEntryType, Bom } from '@/types';
+import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Layers } from 'lucide-react';
 
-const TYPE_TONE: Record<string, 'green' | 'red' | 'blue'> = {
+const TYPE_TONE: Record<string, 'green' | 'red' | 'blue' | 'purple'> = {
   'Material Receipt': 'green',
   'Material Issue': 'red',
   'Material Transfer': 'blue',
+  'Manufacture': 'purple',
 };
 
 const TYPE_ICON: Record<string, React.ElementType> = {
   'Material Receipt': ArrowDownToLine,
   'Material Issue': ArrowUpFromLine,
   'Material Transfer': ArrowLeftRight,
+  'Manufacture': Layers,
 };
 
 export default function StockEntriesTab() {
+  const router = useRouter();
   const [entries, setEntries] = useState<StockEntry[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [boms, setBoms] = useState<Bom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -44,14 +49,16 @@ export default function StockEntriesTab() {
 
   const fetchAll = async () => {
     try {
-      const [entriesRes, itemsRes, warehousesRes] = await Promise.all([
+      const [entriesRes, itemsRes, warehousesRes, bomsRes] = await Promise.all([
         fetch('/api/stock-entries'),
         fetch('/api/items'),
         fetch('/api/warehouses'),
+        fetch('/api/boms'),
       ]);
       if (entriesRes.ok) setEntries(await entriesRes.json());
       if (itemsRes.ok) setItems(await itemsRes.json());
       if (warehousesRes.ok) setWarehouses(await warehousesRes.json());
+      if (bomsRes.ok) setBoms(await bomsRes.json());
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -121,6 +128,7 @@ export default function StockEntriesTab() {
           return (
             <ListRow
               key={entry.entry_id}
+              onClick={() => router.push(`/dashboard/inventory/stock-entry/${encodeURIComponent(entry.entry_id)}`)}
               avatar={
                 <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                   <Icon size={14} />
@@ -152,11 +160,12 @@ export default function StockEntriesTab() {
               <option value="Material Receipt">Material Receipt (barang masuk)</option>
               <option value="Material Issue">Material Issue (barang keluar)</option>
               <option value="Material Transfer">Material Transfer (antar gudang)</option>
+              <option value="Manufacture">Manufacture (produksi dari BOM)</option>
             </select>
           </div>
 
           <div>
-            <label className="label-field">Item</label>
+            <label className="label-field">{formData.entry_type === 'Manufacture' ? 'Produk (harus punya BOM)' : 'Item'}</label>
             <select
               value={formData.item_code}
               onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
@@ -164,15 +173,35 @@ export default function StockEntriesTab() {
               required
             >
               <option value="">Pilih item</option>
-              {items.map((i) => (
+              {(formData.entry_type === 'Manufacture' ? items.filter((i) => boms.some((b) => b.item_code === i.item_code && b.is_active)) : items).map((i) => (
                 <option key={i.item_code} value={i.item_code}>{i.item_name} ({i.item_code})</option>
               ))}
             </select>
+            {formData.entry_type === 'Manufacture' && boms.filter((b) => b.is_active).length === 0 && (
+              <p className="text-xs text-orange-500 mt-1">Belum ada BOM aktif. Buat dulu di tab "Product Campuran (BOM)".</p>
+            )}
           </div>
 
-          {(formData.entry_type === 'Material Issue' || formData.entry_type === 'Material Transfer') && (
+          {formData.entry_type === 'Manufacture' && formData.item_code && (() => {
+            const bom = boms.find((b) => b.item_code === formData.item_code && b.is_active);
+            if (!bom) return null;
+            const producedQty = parseFloat(formData.qty) || 0;
+            const ratio = producedQty / (bom.qty || 1);
+            return (
+              <div className="rounded-md border border-gray-200 dark:border-gray-700 p-2.5 text-xs space-y-1">
+                <p className="font-medium text-gray-700 dark:text-gray-300">Komponen yang akan dipakai (BOM {bom.bom_id}):</p>
+                {bom.components.map((c) => (
+                  <p key={c.component_item_code} className="text-gray-500 dark:text-gray-400">
+                    {c.component_item_name}: {(c.qty * ratio).toLocaleString('id-ID')}
+                  </p>
+                ))}
+              </div>
+            );
+          })()}
+
+          {(formData.entry_type === 'Material Issue' || formData.entry_type === 'Material Transfer' || formData.entry_type === 'Manufacture') && (
             <div>
-              <label className="label-field">Source Warehouse</label>
+              <label className="label-field">{formData.entry_type === 'Manufacture' ? 'Ambil Komponen dari Warehouse' : 'Source Warehouse'}</label>
               <select
                 value={formData.source_warehouse}
                 onChange={(e) => setFormData({ ...formData, source_warehouse: e.target.value })}
@@ -187,7 +216,7 @@ export default function StockEntriesTab() {
             </div>
           )}
 
-          {(formData.entry_type === 'Material Receipt' || formData.entry_type === 'Material Transfer') && (
+          {(formData.entry_type === 'Material Receipt' || formData.entry_type === 'Material Transfer' || formData.entry_type === 'Manufacture') && (
             <div>
               <label className="label-field">Target Warehouse</label>
               <select

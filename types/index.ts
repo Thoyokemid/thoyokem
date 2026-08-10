@@ -149,6 +149,9 @@ export interface SessionUser {
 
 // ── Inventory Module ──────────────────────────────────────────────────────
 
+export type ItemCurrency = 'IDR' | 'USD';
+export type ItemType = 'Trading' | 'Regular';
+
 export interface Item {
   item_code: string;
   item_name: string;
@@ -161,6 +164,26 @@ export interface Item {
   opening_qty: number;
   opening_valuation_rate: number;
   is_active: boolean;
+  currency: ItemCurrency;
+  item_type: ItemType;
+}
+
+export interface Bom {
+  bom_id: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  is_active: boolean;
+  owner: string;
+  creation: string;
+  components: BomComponent[];
+}
+
+export interface BomComponent {
+  bom_id: string;
+  component_item_code: string;
+  component_item_name?: string;
+  qty: number;
 }
 
 export interface Warehouse {
@@ -170,7 +193,7 @@ export interface Warehouse {
   is_active: boolean;
 }
 
-export type StockEntryType = 'Material Receipt' | 'Material Issue' | 'Material Transfer';
+export type StockEntryType = 'Material Receipt' | 'Material Issue' | 'Material Transfer' | 'Manufacture';
 
 export interface StockEntry {
   entry_id: string;

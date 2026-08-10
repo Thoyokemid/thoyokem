@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import SalesOrdersTab from "./components/SalesOrdersTab";
 import CustomersTab from "./components/CustomersTab";
 import SalesInvoicesTab from "./components/SalesInvoicesTab";
+import SalesOrderOverview from "./components/SalesOrderOverview";
 import { AlertCircle } from "lucide-react";
 
-export default function SalesOrderPage() {
+function SalesOrderPageInner() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("orders");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "overview";
 
   if (status !== "loading" && !session) redirect("/login");
   if (status === "loading") return null;
@@ -40,6 +43,7 @@ export default function SalesOrderPage() {
   }
 
   const tabs = [
+    { id: "overview", label: "Overview" },
     { id: "orders", label: "Sales Orders" },
     { id: "invoices", label: "Invoices" },
     { id: "customers", label: "Customers" },
@@ -66,7 +70,7 @@ export default function SalesOrderPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => router.push(`/dashboard/sales-order${tab.id === "overview" ? "" : `?tab=${tab.id}`}`)}
                 className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? "border-primary text-primary"
@@ -80,11 +84,20 @@ export default function SalesOrderPage() {
         </div>
 
         <div className="mt-4">
+          {activeTab === "overview" && <SalesOrderOverview />}
           {activeTab === "orders" && <SalesOrdersTab />}
           {activeTab === "invoices" && <SalesInvoicesTab />}
           {activeTab === "customers" && <CustomersTab />}
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function SalesOrderPage() {
+  return (
+    <Suspense fallback={null}>
+      <SalesOrderPageInner />
+    </Suspense>
   );
 }

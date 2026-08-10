@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ItemsTab from "./components/ItemsTab";
 import WarehousesTab from "./components/WarehousesTab";
 import StockEntriesTab from "./components/StockEntriesTab";
 import StockBalanceTab from "./components/StockBalanceTab";
+import BomTab from "./components/BomTab";
+import InventoryOverview from "./components/InventoryOverview";
 import { AlertCircle } from "lucide-react";
 
-export default function InventoryPage() {
+function InventoryPageInner() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("balance");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "overview";
 
   if (status !== "loading" && !session) redirect("/login");
   if (status === "loading") return null;
@@ -43,9 +47,11 @@ export default function InventoryPage() {
   }
 
   const tabs = [
+    { id: "overview", label: "Overview" },
     { id: "balance", label: "Stock Balance" },
     { id: "entries", label: "Stock Entries" },
     { id: "items", label: "Items" },
+    { id: "bom", label: "Product Campuran (BOM)" },
     { id: "warehouses", label: "Warehouses" },
   ];
 
@@ -72,7 +78,7 @@ export default function InventoryPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => router.push(`/dashboard/inventory${tab.id === "overview" ? "" : `?tab=${tab.id}`}`)}
                 className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? "border-primary text-primary"
@@ -86,12 +92,22 @@ export default function InventoryPage() {
         </div>
 
         <div className="mt-4">
+          {activeTab === "overview" && <InventoryOverview />}
           {activeTab === "balance" && <StockBalanceTab />}
           {activeTab === "entries" && <StockEntriesTab />}
           {activeTab === "items" && <ItemsTab />}
+          {activeTab === "bom" && <BomTab />}
           {activeTab === "warehouses" && <WarehousesTab />}
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <InventoryPageInner />
+    </Suspense>
   );
 }

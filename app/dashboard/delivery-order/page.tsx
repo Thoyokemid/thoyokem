@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
@@ -31,6 +31,7 @@ interface DeliveryNoteWithItems {
 
 export default function DeliveryOrderPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [readyOrders, setReadyOrders] = useState<SalesOrderWithItems[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryNoteWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,6 +134,7 @@ export default function DeliveryOrderPage() {
                   readyOrders.map((so) => (
                     <ListRow
                       key={so.so_id}
+                      onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(so.so_id)}`)}
                       avatar={<ListRowAvatar initials="SO" />}
                       title={so.so_id}
                       subtitle={`${so.customer_name} · ${so.items.length} item`}
@@ -161,6 +163,7 @@ export default function DeliveryOrderPage() {
                   deliveries.map((dn) => (
                     <ListRow
                       key={dn.dn_id}
+                      onClick={() => router.push(`/dashboard/delivery-order/delivery-note/${encodeURIComponent(dn.dn_id)}`)}
                       avatar={
                         <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center">
                           <PackageCheck size={14} />

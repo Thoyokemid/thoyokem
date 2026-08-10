@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
-import { appendStockLedgerEntry } from '@/lib/stock';
+import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { StockEntry } from '@/types';
 
 const SHEET = 'stock_entry';
@@ -62,11 +62,47 @@ export async function POST(request: NextRequest) {
     if (entry_type === 'Material Transfer' && (!source_warehouse || !target_warehouse)) {
       return NextResponse.json({ error: 'source_warehouse dan target_warehouse wajib diisi untuk Material Transfer' }, { status: 400 });
     }
+    if (entry_type === 'Manufacture' && (!source_warehouse || !target_warehouse)) {
+      return NextResponse.json({ error: 'source_warehouse dan target_warehouse wajib diisi untuk Manufacture' }, { status: 400 });
+    }
 
     // Look up item's valuation rate for stock value calculation.
     const { records: items } = await readSheetAsObjects<any>('item_list');
     const item = items.find((i) => i.item_code === item_code);
-    const valuationRate = item ? parseFloat(item.purchase_price) || 0 : 0;
+    let valuationRate = item ? parseFloat(item.purchase_price) || 0 : 0;
+
+    // Manufacture: consume BOM components first (need their cost to value the finished item).
+    let bomComponents: { component_item_code: string; qty: number; valuationRate: number }[] = [];
+    if (entry_type === 'Manufacture') {
+      const { records: boms } = await readSheetAsObjects<any>('bom');
+      const bom = boms.find((b) => b.item_code === item_code && (b.is_active === '' || b.is_active === 'TRUE' || b.is_active === true));
+      if (!bom) {
+        return NextResponse.json({ error: `Belum ada BOM aktif untuk item ${item_code}` }, { status: 400 });
+      }
+      const bomQty = parseFloat(bom.qty) || 1;
+      const { records: bomItems } = await readSheetAsObjects<any>('bom_item');
+      const lines = bomItems.filter((c) => c.bom_id === bom.bom_id);
+
+      for (const line of lines) {
+        const requiredQty = (parseFloat(line.qty) || 0) * (qty / bomQty);
+        const available = await getCurrentStockQty(line.component_item_code, source_warehouse);
+        if (available < requiredQty) {
+          return NextResponse.json(
+            { error: `Stok komponen ${line.component_item_code} tidak cukup di ${source_warehouse} (tersedia ${available}, butuh ${requiredQty})` },
+            { status: 400 }
+          );
+        }
+        const compItem = items.find((i) => i.item_code === line.component_item_code);
+        bomComponents.push({
+          component_item_code: line.component_item_code,
+          qty: requiredQty,
+          valuationRate: compItem ? parseFloat(compItem.purchase_price) || 0 : 0,
+        });
+      }
+
+      const totalComponentCost = bomComponents.reduce((sum, c) => sum + c.qty * c.valuationRate, 0);
+      valuationRate = qty > 0 ? totalComponentCost / qty : 0;
+    }
 
     const { headers, records } = await readSheetAsObjects<any>(SHEET);
     const newId = String(records.length + 1);
@@ -119,6 +155,27 @@ export async function POST(request: NextRequest) {
         valuationRate,
         postingDate,
       });
+      await appendStockLedgerEntry({
+        itemCode: item_code,
+        warehouseId: target_warehouse,
+        voucherType: 'Stock Entry',
+        voucherId: newId,
+        actualQty: qty,
+        valuationRate,
+        postingDate,
+      });
+    } else if (entry_type === 'Manufacture') {
+      for (const comp of bomComponents) {
+        await appendStockLedgerEntry({
+          itemCode: comp.component_item_code,
+          warehouseId: source_warehouse,
+          voucherType: 'Stock Entry',
+          voucherId: newId,
+          actualQty: -comp.qty,
+          valuationRate: comp.valuationRate,
+          postingDate,
+        });
+      }
       await appendStockLedgerEntry({
         itemCode: item_code,
         warehouseId: target_warehouse,

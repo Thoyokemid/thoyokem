@@ -41,6 +41,8 @@ export async function GET() {
       opening_qty: parseFloat(r.opening_qty) || 0,
       opening_valuation_rate: parseFloat(r.opening_valuation_rate) || 0,
       is_active: true,
+      currency: (r.currency || 'IDR') as 'IDR' | 'USD',
+      item_type: (r.item_type || 'Regular') as 'Trading' | 'Regular',
     }));
 
     const balance = calculateStockBalance(entries, items);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -9,6 +10,7 @@ import { Warehouse } from '@/types';
 import { Plus, Edit, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 
 export default function WarehousesTab() {
+  const router = useRouter();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -104,6 +106,7 @@ export default function WarehousesTab() {
         warehouses.map((w) => (
           <ListRow
             key={w.warehouse_id}
+            onClick={() => router.push(`/dashboard/inventory/warehouse/${encodeURIComponent(w.warehouse_id)}`)}
             avatar={
               <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                 <WarehouseIcon size={14} />

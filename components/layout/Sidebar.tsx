@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard,
   Clock,
@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Menu,
   X,
   MessageCircle,
@@ -38,10 +39,17 @@ interface SidebarProps {
   };
 }
 
-export default function Sidebar({ permissions }: SidebarProps) {
+function SidebarInner({ permissions }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string[]>([]);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab');
+
+  const toggleExpanded = (href: string) => {
+    setExpanded((prev) => (prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]));
+  };
 
   const menuItems = [
     {
@@ -73,18 +81,34 @@ export default function Sidebar({ permissions }: SidebarProps) {
       icon: Boxes,
       href: '/dashboard/inventory',
       enabled: permissions.inventory,
+      subItems: [
+        { name: 'Stock Balance', tab: 'balance' },
+        { name: 'Stock Entries', tab: 'entries' },
+        { name: 'Items', tab: 'items' },
+        { name: 'Warehouses', tab: 'warehouses' },
+      ],
     },
     {
       name: 'Purchasing',
       icon: ShoppingCart,
       href: '/dashboard/purchasing',
       enabled: permissions.purchasing,
+      subItems: [
+        { name: 'Purchase Orders', tab: 'orders' },
+        { name: 'Invoices', tab: 'invoices' },
+        { name: 'Suppliers', tab: 'suppliers' },
+      ],
     },
     {
       name: 'Sales Order',
       icon: ShoppingBag,
       href: '/dashboard/sales-order',
       enabled: permissions.sales_order,
+      subItems: [
+        { name: 'Sales Orders', tab: 'orders' },
+        { name: 'Invoices', tab: 'invoices' },
+        { name: 'Customers', tab: 'customers' },
+      ],
     },
     {
       name: 'Delivery Order',
@@ -105,6 +129,14 @@ export default function Sidebar({ permissions }: SidebarProps) {
       enabled: permissions.setting,
     },
   ];
+
+  useEffect(() => {
+    const active = menuItems.find((item) => item.subItems && pathname === item.href);
+    if (active && !expanded.includes(active.href)) {
+      setExpanded((prev) => [...prev, active.href]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const SidebarContent = () => (
     <>
@@ -140,22 +172,63 @@ export default function Sidebar({ permissions }: SidebarProps) {
           if (!item.enabled) return null;
 
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isOnModule = pathname === item.href;
+          const isActive = isOnModule && !activeTab;
+          const isExpanded = expanded.includes(item.href);
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setIsMobileOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-primary-50 text-primary dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Icon size={16} className={isActive ? 'text-primary' : ''} />
-              {!isCollapsed && <span>{item.name}</span>}
-            </Link>
+            <div key={item.href}>
+              <div
+                className={`flex items-center gap-1 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? 'bg-primary-50 text-primary dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Link
+                  href={item.href}
+                  onClick={() => {
+                    setIsMobileOpen(false);
+                    if (item.subItems && !expanded.includes(item.href)) toggleExpanded(item.href);
+                  }}
+                  className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0"
+                >
+                  <Icon size={16} className={isActive ? 'text-primary' : ''} />
+                  {!isCollapsed && <span className="truncate">{item.name}</span>}
+                </Link>
+                {item.subItems && !isCollapsed && (
+                  <button
+                    onClick={() => toggleExpanded(item.href)}
+                    className="p-2 flex-shrink-0"
+                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                  >
+                    <ChevronDown size={13} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {item.subItems && !isCollapsed && isExpanded && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2.5">
+                  {item.subItems.map((sub) => {
+                    const subActive = isOnModule && activeTab === sub.tab;
+                    return (
+                      <Link
+                        key={sub.tab}
+                        href={`${item.href}?tab=${sub.tab}`}
+                        onClick={() => setIsMobileOpen(false)}
+                        className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                          subActive
+                            ? 'bg-primary-50 text-primary dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {sub.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -231,5 +304,13 @@ export default function Sidebar({ permissions }: SidebarProps) {
         <SidebarContent />
       </aside>
     </>
+  );
+}
+
+export default function Sidebar(props: SidebarProps) {
+  return (
+    <Suspense fallback={null}>
+      <SidebarInner {...props} />
+    </Suspense>
   );
 }

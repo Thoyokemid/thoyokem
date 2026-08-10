@@ -37,6 +37,8 @@ export async function GET() {
       opening_qty: parseFloat(r.opening_qty) || 0,
       opening_valuation_rate: parseFloat(r.opening_valuation_rate) || 0,
       is_active: r.is_active === '' ? true : toBool(r.is_active),
+      currency: (r.currency || 'IDR') as 'IDR' | 'USD',
+      item_type: (r.item_type || 'Regular') as 'Trading' | 'Regular',
     }));
     return NextResponse.json(items);
   } catch (error) {
@@ -69,6 +71,8 @@ export async function POST(request: NextRequest) {
       opening_qty: data.opening_qty ?? 0,
       opening_valuation_rate: data.opening_valuation_rate ?? 0,
       is_active: 'TRUE',
+      currency: data.currency || 'IDR',
+      item_type: data.item_type || 'Regular',
     });
 
     await appendSheet(SHEET, [newRow]);
@@ -101,7 +105,7 @@ export async function PUT(request: NextRequest) {
     headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
 
     const merged = { ...currentObj };
-    ['item_name', 'item_group', 'unit', 'purchase_price', 'selling_price', 'reorder_level', 'valuation_method', 'reorder_level'].forEach((f) => {
+    ['item_name', 'item_group', 'unit', 'purchase_price', 'selling_price', 'reorder_level', 'valuation_method', 'reorder_level', 'currency', 'item_type'].forEach((f) => {
       if (updates[f] !== undefined) merged[f] = updates[f];
     });
     if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';

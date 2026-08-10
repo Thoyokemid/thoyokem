@@ -1,14 +1,32 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { Item } from '@/types';
+import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
 
+function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: number; sellingPrice: number }) {
+  const [rate, setRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchUsdIdrRate().then(setRate);
+  }, []);
+
+  if (rate === null) return null;
+  return (
+    <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
+      Kurs saat ini: $1 = Rp{rate.toLocaleString('id-ID')} · ≈ Rp{toIDR(purchasePrice, 'USD', rate).toLocaleString('id-ID')} (beli) / Rp{toIDR(sellingPrice, 'USD', rate).toLocaleString('id-ID')} (jual)
+    </p>
+  );
+}
+
 export default function ItemsTab() {
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +44,8 @@ export default function ItemsTab() {
     selling_price: '',
     reorder_level: '',
     valuation_method: 'Average',
+    currency: 'IDR',
+    item_type: 'Regular',
   });
 
   useEffect(() => {
@@ -53,7 +73,7 @@ export default function ItemsTab() {
 
   const openNew = () => {
     setEditingItem(null);
-    setFormData({ item_code: '', item_name: '', item_group: '', unit: '', purchase_price: '', selling_price: '', reorder_level: '', valuation_method: 'Average' });
+    setFormData({ item_code: '', item_name: '', item_group: '', unit: '', purchase_price: '', selling_price: '', reorder_level: '', valuation_method: 'Average', currency: 'IDR', item_type: 'Regular' });
     setError('');
     setIsModalOpen(true);
   };
@@ -69,6 +89,8 @@ export default function ItemsTab() {
       selling_price: String(item.selling_price),
       reorder_level: String(item.reorder_level),
       valuation_method: item.valuation_method,
+      currency: item.currency || 'IDR',
+      item_type: item.item_type || 'Regular',
     });
     setError('');
     setIsModalOpen(true);
@@ -88,6 +110,8 @@ export default function ItemsTab() {
         selling_price: parseFloat(formData.selling_price) || 0,
         reorder_level: parseFloat(formData.reorder_level) || 0,
         valuation_method: formData.valuation_method,
+        currency: formData.currency,
+        item_type: formData.item_type,
       };
 
       const res = editingItem
@@ -150,6 +174,7 @@ export default function ItemsTab() {
         filteredItems.map((item) => (
           <ListRow
             key={item.item_code}
+            onClick={() => router.push(`/dashboard/inventory/item/${encodeURIComponent(item.item_code)}`)}
             avatar={
               <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                 <Package size={14} />
@@ -157,8 +182,13 @@ export default function ItemsTab() {
             }
             title={item.item_name}
             subtitle={`${item.item_code} · ${item.item_group || '-'} · ${item.unit || '-'}`}
-            meta={`Jual: Rp${item.selling_price.toLocaleString('id-ID')}`}
-            badges={!item.is_active ? <StatusBadge label="Inactive" tone="red" /> : undefined}
+            meta={`Jual: ${item.currency === 'USD' ? '$' : 'Rp'}${item.selling_price.toLocaleString('id-ID')}`}
+            badges={
+              <>
+                <StatusBadge label={item.item_type} tone={item.item_type === 'Trading' ? 'purple' : 'blue'} />
+                {!item.is_active && <StatusBadge label="Inactive" tone="red" />}
+              </>
+            }
             actions={
               <>
                 <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
@@ -207,7 +237,14 @@ export default function ItemsTab() {
               <input type="text" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="input-field" placeholder="pcs" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="label-field">Currency</label>
+              <select value={formData.currency} onChange={(e) => setFormData({ ...formData, currency: e.target.value })} className="input-field">
+                <option value="IDR">IDR</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
             <div>
               <label className="label-field">Purchase Price</label>
               <input type="number" min={0} value={formData.purchase_price} onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })} className="input-field" />
@@ -217,7 +254,17 @@ export default function ItemsTab() {
               <input type="number" min={0} value={formData.selling_price} onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })} className="input-field" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          {formData.currency === 'USD' && (parseFloat(formData.purchase_price) > 0 || parseFloat(formData.selling_price) > 0) && (
+            <UsdConversionHint purchasePrice={parseFloat(formData.purchase_price) || 0} sellingPrice={parseFloat(formData.selling_price) || 0} />
+          )}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="label-field">Item Type</label>
+              <select value={formData.item_type} onChange={(e) => setFormData({ ...formData, item_type: e.target.value })} className="input-field">
+                <option value="Regular">Regular</option>
+                <option value="Trading">Trading</option>
+              </select>
+            </div>
             <div>
               <label className="label-field">Reorder Level</label>
               <input type="number" min={0} value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} className="input-field" />

@@ -30,6 +30,8 @@ const items: Item[] = [
     opening_qty: 0,
     opening_valuation_rate: 0,
     is_active: true,
+    currency: 'IDR',
+    item_type: 'Regular',
   },
 ];
 

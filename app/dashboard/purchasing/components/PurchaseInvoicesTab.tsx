@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -15,6 +16,7 @@ const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange'> = {
 };
 
 export default function PurchaseInvoicesTab() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [payModalInvoice, setPayModalInvoice] = useState<PurchaseInvoice | null>(null);
@@ -89,6 +91,7 @@ export default function PurchaseInvoicesTab() {
         invoices.map((inv) => (
           <ListRow
             key={inv.pi_id}
+            onClick={() => router.push(`/dashboard/purchasing/purchase-invoice/${encodeURIComponent(inv.pi_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><FileText size={14} /></span>}
             title={inv.pi_id}
             subtitle={`${inv.supplier_name} · PO ${inv.po_id}`}

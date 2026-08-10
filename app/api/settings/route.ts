@@ -7,6 +7,7 @@ const DEFAULTS: Record<string, string> = {
   jam_masuk: '08:00',
   jam_pulang: '17:00',
   toleransi_menit: '0',
+  usd_idr_rate: '15800',
 };
 
 export async function GET() {
@@ -46,7 +47,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const data = await request.json();
-    const merged = { ...DEFAULTS, ...data };
+
+    let existingRows: string[][] = [];
+    try {
+      existingRows = await readSheet('settings');
+    } catch {
+      // "settings" tab doesn't exist yet — nothing to merge with.
+    }
+    const existing: Record<string, string> = {};
+    existingRows.slice(1).forEach((row) => {
+      if (row[0]) existing[row[0]] = row[1] ?? '';
+    });
+
+    const merged = { ...DEFAULTS, ...existing, ...data };
     const entries = Object.entries(merged);
 
     try {

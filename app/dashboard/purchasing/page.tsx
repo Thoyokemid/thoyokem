@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PurchaseOrdersTab from "./components/PurchaseOrdersTab";
 import SuppliersTab from "./components/SuppliersTab";
 import PurchaseInvoicesTab from "./components/PurchaseInvoicesTab";
+import PurchasingOverview from "./components/PurchasingOverview";
 import { AlertCircle } from "lucide-react";
 
-export default function PurchasingPage() {
+function PurchasingPageInner() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("orders");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "overview";
 
   if (status !== "loading" && !session) redirect("/login");
   if (status === "loading") return null;
@@ -40,6 +43,7 @@ export default function PurchasingPage() {
   }
 
   const tabs = [
+    { id: "overview", label: "Overview" },
     { id: "orders", label: "Purchase Orders" },
     { id: "invoices", label: "Invoices" },
     { id: "suppliers", label: "Suppliers" },
@@ -66,7 +70,7 @@ export default function PurchasingPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => router.push(`/dashboard/purchasing${tab.id === "overview" ? "" : `?tab=${tab.id}`}`)}
                 className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? "border-primary text-primary"
@@ -80,11 +84,20 @@ export default function PurchasingPage() {
         </div>
 
         <div className="mt-4">
+          {activeTab === "overview" && <PurchasingOverview />}
           {activeTab === "orders" && <PurchaseOrdersTab />}
           {activeTab === "invoices" && <PurchaseInvoicesTab />}
           {activeTab === "suppliers" && <SuppliersTab />}
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function PurchasingPage() {
+  return (
+    <Suspense fallback={null}>
+      <PurchasingPageInner />
+    </Suspense>
   );
 }

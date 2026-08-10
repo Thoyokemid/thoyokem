@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -9,6 +10,7 @@ import { Supplier } from '@/types';
 import { Plus, Edit, Trash2, Truck } from 'lucide-react';
 
 export default function SuppliersTab() {
+  const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,6 +93,7 @@ export default function SuppliersTab() {
         suppliers.map((s) => (
           <ListRow
             key={s.supplier_id}
+            onClick={() => router.push(`/dashboard/purchasing/supplier/${encodeURIComponent(s.supplier_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><Truck size={14} /></span>}
             title={s.supplier_name}
             subtitle={`${s.supplier_id} · ${s.phone || s.contact || '-'}`}

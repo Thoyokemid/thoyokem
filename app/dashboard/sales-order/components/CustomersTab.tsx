@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -9,6 +10,7 @@ import { Customer } from '@/types';
 import { Plus, Edit, Trash2, User } from 'lucide-react';
 
 export default function CustomersTab() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,6 +94,7 @@ export default function CustomersTab() {
         customers.map((c) => (
           <ListRow
             key={c.customer_id}
+            onClick={() => router.push(`/dashboard/sales-order/customer/${encodeURIComponent(c.customer_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><User size={14} /></span>}
             title={c.customer_name}
             subtitle={`${c.customer_id} · ${c.phone || c.contact || '-'}`}
