@@ -9,7 +9,8 @@ import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Supplier, Item, Warehouse } from '@/types';
-import { Plus, Trash2, Send, PackageCheck, XCircle, FileText, ShoppingCart, Check, Ban } from 'lucide-react';
+import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
+import { Plus, Trash2, Send, PackageCheck, XCircle, FileText, ShoppingCart, Check, Ban, RefreshCw } from 'lucide-react';
 
 interface POItemLine {
   item_code: string;
@@ -75,9 +76,11 @@ export default function PurchaseOrdersTab() {
   const [supplierId, setSupplierId] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [lines, setLines] = useState<POItemLine[]>([{ item_code: '', qty: '', rate: '', warehouse_id: '' }]);
+  const [usdRate, setUsdRate] = useState(15800);
 
   useEffect(() => {
     fetchAll();
+    fetchUsdIdrRate().then(setUsdRate);
   }, []);
 
   const fetchAll = async () => {
@@ -107,8 +110,29 @@ export default function PurchaseOrdersTab() {
     setIsModalOpen(true);
   };
 
+  const generatedRateFor = (itemCode: string): number | null => {
+    const item = items.find((i) => i.item_code === itemCode);
+    if (!item) return null;
+    return Math.round(toIDR(item.purchase_price, item.currency, usdRate));
+  };
+
   const updateLine = (idx: number, field: keyof POItemLine, value: string) => {
-    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
+    setLines((prev) =>
+      prev.map((l, i) => {
+        if (i !== idx) return l;
+        if (field === 'item_code') {
+          const generated = generatedRateFor(value);
+          return { ...l, item_code: value, rate: generated !== null ? String(generated) : l.rate };
+        }
+        return { ...l, [field]: value };
+      })
+    );
+  };
+
+  const regenerateRate = (idx: number) => {
+    const line = lines[idx];
+    const generated = generatedRateFor(line.item_code);
+    if (generated !== null) updateLine(idx, 'rate', String(generated));
   };
 
   const addLine = () => setLines((prev) => [...prev, { item_code: '', qty: '', rate: '', warehouse_id: '' }]);
@@ -296,12 +320,29 @@ export default function PurchaseOrdersTab() {
                     ))}
                   </select>
                   <input type="number" min={0} step="any" placeholder="Qty" value={line.qty} onChange={(e) => updateLine(idx, 'qty', e.target.value)} className="input-field col-span-2 text-xs" required />
-                  <input type="number" min={0} step="any" placeholder="Rate" value={line.rate} onChange={(e) => updateLine(idx, 'rate', e.target.value)} className="input-field col-span-2 text-xs" required />
+                  <div className="col-span-2 relative">
+                    <input type="number" min={0} step="any" placeholder="Rate (IDR)" value={line.rate} onChange={(e) => updateLine(idx, 'rate', e.target.value)} className="input-field text-xs pr-6" required />
+                    {items.find((i) => i.item_code === line.item_code)?.currency === 'USD' && (
+                      <button
+                        type="button"
+                        onClick={() => regenerateRate(idx)}
+                        title="Generate ulang dari harga USD × kurs"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary"
+                      >
+                        <RefreshCw size={12} />
+                      </button>
+                    )}
+                  </div>
                   <button type="button" onClick={() => removeLine(idx)} className="col-span-1 text-red-500 hover:text-red-700">
                     <Trash2 size={14} />
                   </button>
                 </div>
               ))}
+              {lines.some((l) => items.find((i) => i.item_code === l.item_code)?.currency === 'USD') && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Kurs saat ini: $1 = Rp{usdRate.toLocaleString('id-ID')}. Rate untuk item USD otomatis di-generate ke IDR, tapi tetap bisa kamu edit manual.
+                </p>
+              )}
             </div>
             <button type="button" onClick={addLine} className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1">
               <Plus size={12} /> Add row

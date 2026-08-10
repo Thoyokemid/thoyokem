@@ -9,7 +9,7 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
 import { Role } from "@/types";
-import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck, DollarSign } from "lucide-react";
+import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck, DollarSign, RefreshCw } from "lucide-react";
 
 interface UserWithRole {
   id: string;
@@ -72,6 +72,7 @@ export default function SettingsPage() {
 
   const [usdIdrRate, setUsdIdrRate] = useState("15800");
   const [isSavingRate, setIsSavingRate] = useState(false);
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
   const [rateMessage, setRateMessage] = useState("");
 
   // Role modal state
@@ -165,6 +166,27 @@ export default function SettingsPage() {
       setRateMessage("Gagal menyimpan kurs.");
     } finally {
       setIsSavingRate(false);
+    }
+  };
+
+  const handleFetchLiveRate = async () => {
+    setIsFetchingRate(true);
+    setRateMessage("");
+    try {
+      const res = await fetch("/api/exchange-rate");
+      if (res.ok) {
+        const data = await res.json();
+        setUsdIdrRate(String(data.rate));
+        setRateMessage(`Kurs terbaru diambil: $1 = Rp${data.rate.toLocaleString("id-ID")}. Klik Simpan Kurs untuk menerapkannya.`);
+      } else {
+        const err = await res.json();
+        setRateMessage(err.error || "Gagal mengambil kurs dari internet.");
+      }
+    } catch (error) {
+      console.error("Error fetching live exchange rate:", error);
+      setRateMessage("Gagal mengambil kurs dari internet.");
+    } finally {
+      setIsFetchingRate(false);
     }
   };
 
@@ -393,13 +415,17 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-center gap-3 mt-4 flex-wrap">
             <Button onClick={handleSaveRate} isLoading={isSavingRate}>
               <Save size={14} className="mr-1.5" />
               Simpan Kurs
             </Button>
+            <Button variant="secondary" onClick={handleFetchLiveRate} isLoading={isFetchingRate}>
+              <RefreshCw size={14} className="mr-1.5" />
+              Refresh dari Internet
+            </Button>
             {rateMessage && (
-              <span className={`text-xs ${rateMessage.includes("berhasil") ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-xs ${rateMessage.includes("berhasil") || rateMessage.includes("diambil") ? "text-green-600" : "text-red-600"}`}>
                 {rateMessage}
               </span>
             )}
