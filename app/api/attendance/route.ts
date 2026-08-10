@@ -14,8 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Allow dashboard OR attendance permission to read attendance data
-    if (!session.user.permissions.attendance && !session.user.permissions.dashboard) {
+    if (!session.user.permissions.attendance) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

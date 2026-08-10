@@ -56,7 +56,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Sign in to your attendance dashboard
+            Sign in to your thoyokem account
           </p>
         </div>
 

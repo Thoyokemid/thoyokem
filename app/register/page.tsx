@@ -89,7 +89,7 @@ export default function RegisterPage() {
             Create Account
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Register for attendance dashboard access
+            Register for thoyokem account
           </p>
         </div>
 

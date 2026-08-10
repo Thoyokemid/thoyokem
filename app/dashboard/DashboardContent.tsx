@@ -15,6 +15,9 @@ import { ChevronLeft, ChevronRight, Cake, FileText, Clock, Users, UserCheck, Cal
 interface DashboardContentProps {
   userName: string;
   permissions: {
+    attendance: boolean;
+    leave: boolean;
+    staff: boolean;
     inventory: boolean;
     purchasing: boolean;
     sales_order: boolean;
@@ -97,13 +100,13 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
   const fetchAll = async () => {
     try {
       const [attRes, staffRes, leaveRes] = await Promise.all([
-        fetch('/api/attendance'),
-        fetch('/api/staff'),
-        fetch('/api/leave'),
+        permissions.attendance ? fetch('/api/attendance') : Promise.resolve(null),
+        permissions.staff ? fetch('/api/staff') : Promise.resolve(null),
+        permissions.leave ? fetch('/api/leave') : Promise.resolve(null),
       ]);
-      if (attRes.ok) setAttendanceData(await attRes.json());
-      if (staffRes.ok) setStaffList(await staffRes.json());
-      if (leaveRes.ok) setLeaveData(await leaveRes.json());
+      if (attRes?.ok) setAttendanceData(await attRes.json());
+      if (staffRes?.ok) setStaffList(await staffRes.json());
+      if (leaveRes?.ok) setLeaveData(await leaveRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -256,42 +259,42 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
     .reduce((sum, r) => sum + r.late_entry_minutes, 0);
 
   const kpis = [
-    {
+    permissions.staff && {
       label: 'Total Karyawan',
       value: staffList.length,
       icon: Users,
       color: 'text-indigo-500',
       bg: 'bg-indigo-50 dark:bg-indigo-900/20',
     },
-    {
+    permissions.attendance && {
       label: 'Hadir Hari Ini',
       value: hadirHariIni,
       icon: UserCheck,
       color: 'text-green-500',
       bg: 'bg-green-50 dark:bg-green-900/20',
     },
-    {
+    permissions.leave && {
       label: 'Cuti Aktif Hari Ini',
       value: cutiAktifHariIni,
       icon: CalendarClock,
       color: 'text-blue-500',
       bg: 'bg-blue-50 dark:bg-blue-900/20',
     },
-    {
+    permissions.attendance && {
       label: 'Overtime Bulan Ini',
       value: `${overtimeBulanIni} min`,
       icon: TrendingUp,
       color: 'text-purple-500',
       bg: 'bg-purple-50 dark:bg-purple-900/20',
     },
-    {
+    permissions.attendance && {
       label: 'Keterlambatan Bulan Ini',
       value: `${keterlambatanBulanIni} min`,
       icon: TrendingDown,
       color: 'text-red-500',
       bg: 'bg-red-50 dark:bg-red-900/20',
     },
-  ];
+  ].filter(Boolean) as { label: string; value: string | number; icon: typeof Users; color: string; bg: string }[];
 
   // Jumlah absen per orang
   const absenPerOrangData = recap
@@ -321,26 +324,29 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
       <ModuleOverview permissions={permissions} />
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Card key={kpi.label}>
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{kpi.label}</p>
-                  <p className="text-lg md:text-xl font-bold text-gray-900 dark:text-white mt-0.5">{kpi.value}</p>
+      {kpis.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {kpis.map((kpi) => {
+            const Icon = kpi.icon;
+            return (
+              <Card key={kpi.label}>
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{kpi.label}</p>
+                    <p className="text-lg md:text-xl font-bold text-gray-900 dark:text-white mt-0.5">{kpi.value}</p>
+                  </div>
+                  <div className={`p-2 rounded-lg flex-shrink-0 ${kpi.bg}`}>
+                    <Icon className={kpi.color} size={18} />
+                  </div>
                 </div>
-                <div className={`p-2 rounded-lg flex-shrink-0 ${kpi.bg}`}>
-                  <Icon className={kpi.color} size={18} />
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* TOP: Chart */}
+      {permissions.attendance && (
       <Card>
         <div className="flex flex-col gap-2 mb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -467,8 +473,10 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
           </ResponsiveContainer>
         )}
       </Card>
+      )}
 
       {/* Jumlah Absen Per Orang - full width */}
+      {permissions.attendance && (
       <Card>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -541,11 +549,14 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
           </>
         )}
       </Card>
+      )}
 
       {/* BOTTOM 3 SECTIONS */}
+      {(permissions.staff || permissions.attendance) && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* LEFT: Upcoming Birthdays */}
+        {permissions.staff && (
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <div className="p-1.5 rounded-md bg-pink-50 dark:bg-pink-900/20">
@@ -600,8 +611,10 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
             </>
           )}
         </Card>
+        )}
 
         {/* MIDDLE: Leave Quota */}
+        {permissions.staff && permissions.leave && (
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-900/20">
@@ -664,8 +677,10 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
             </>
           )}
         </Card>
+        )}
 
         {/* RIGHT: Top 10 Least Late */}
+        {permissions.attendance && (
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <div className="p-1.5 rounded-md bg-green-50 dark:bg-green-900/20">
@@ -728,7 +743,9 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
             </>
           )}
         </Card>
+        )}
       </div>
+      )}
     </div>
   );
 }

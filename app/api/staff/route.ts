@@ -13,6 +13,9 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    if (!session.user.permissions.staff) {
+      return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
+    }
 
     const { records } = await readSheetAsObjects<any>(SHEET);
 
