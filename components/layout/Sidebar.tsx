@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -139,15 +140,28 @@ function SidebarInner({ permissions }: SidebarProps) {
     <>
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          {!isCollapsed && (
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                T
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-sm font-bold text-gray-900 dark:text-white leading-tight truncate">Thoyokem</h1>
-                <p className="text-[10px] text-gray-400 leading-tight">Workspace</p>
-              </div>
+          {!isCollapsed ? (
+            <div className="min-w-0">
+              <Image
+                src="/Header-Light.png"
+                alt="Thoyokem"
+                width={2000}
+                height={800}
+                priority
+                className="block dark:hidden h-9 w-auto object-contain"
+              />
+              <Image
+                src="/Header-Dark.png"
+                alt="Thoyokem"
+                width={2000}
+                height={800}
+                priority
+                className="hidden dark:block h-9 w-auto object-contain"
+              />
+            </div>
+          ) : (
+            <div className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+              T
             </div>
           )}
           <button
