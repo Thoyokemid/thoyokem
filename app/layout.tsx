@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Thoyokem',
-  description: 'Manage employee for HR',
+  description: 'Manage Thoyokem Dashboard',
   icons: {
     icon: '/Logo-Thoyokem.png',
     apple: '/Logo-Thoyokem.png',

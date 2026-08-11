@@ -79,6 +79,10 @@ export default function SalesOrdersTab() {
   const [lines, setLines] = useState<SOItemLine[]>([{ item_code: '', qty: '', rate: '', warehouse_id: '' }]);
   const [usdRate, setUsdRate] = useState(15800);
   const [scanTargetIdx, setScanTargetIdx] = useState<number | null>(null);
+  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({ customer_name: '', phone: '', address: '' });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [newCustomerError, setNewCustomerError] = useState('');
 
   useEffect(() => {
     fetchAll();
@@ -116,6 +120,35 @@ export default function SalesOrdersTab() {
     const item = items.find((i) => i.item_code === itemCode);
     if (!item) return null;
     return Math.round(toIDR(item.selling_price, item.currency, usdRate));
+  };
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingCustomer(true);
+    setNewCustomerError('');
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomerForm),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const customersRes = await fetch('/api/customers');
+        if (customersRes.ok) setCustomers(await customersRes.json());
+        setCustomerId(data.customer_id);
+        setIsNewCustomerOpen(false);
+        setNewCustomerForm({ customer_name: '', phone: '', address: '' });
+      } else {
+        const err = await res.json();
+        setNewCustomerError(err.error || 'Gagal membuat customer');
+      }
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      setNewCustomerError('Gagal membuat customer');
+    } finally {
+      setIsSavingCustomer(false);
+    }
   };
 
   const handleScan = (decodedText: string) => {
@@ -297,11 +330,23 @@ export default function SalesOrdersTab() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Customer</label>
-              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="input-field" required>
+              <select
+                value={customerId}
+                onChange={(e) => {
+                  if (e.target.value === '__add_new__') {
+                    setIsNewCustomerOpen(true);
+                    return;
+                  }
+                  setCustomerId(e.target.value);
+                }}
+                className="input-field"
+                required
+              >
                 <option value="">Pilih customer</option>
                 {customers.map((c) => (
                   <option key={c.customer_id} value={c.customer_id}>{c.customer_name}</option>
                 ))}
+                <option value="__add_new__">+ Add New Customer</option>
               </select>
             </div>
             <div>
@@ -381,6 +426,44 @@ export default function SalesOrdersTab() {
         </form>
       </Modal>
       <QRScanner isOpen={scanTargetIdx !== null} onClose={() => setScanTargetIdx(null)} onScan={handleScan} />
+
+      <Modal isOpen={isNewCustomerOpen} onClose={() => setIsNewCustomerOpen(false)} title="Add New Customer" size="sm">
+        <form onSubmit={handleCreateCustomer} className="space-y-3">
+          <div>
+            <label className="label-field">Customer Name</label>
+            <input
+              type="text"
+              value={newCustomerForm.customer_name}
+              onChange={(e) => setNewCustomerForm({ ...newCustomerForm, customer_name: e.target.value })}
+              className="input-field"
+              required
+            />
+          </div>
+          <div>
+            <label className="label-field">Phone</label>
+            <input
+              type="text"
+              value={newCustomerForm.phone}
+              onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label-field">Address</label>
+            <input
+              type="text"
+              value={newCustomerForm.address}
+              onChange={(e) => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
+              className="input-field"
+            />
+          </div>
+          {newCustomerError && <p className="text-xs text-red-600">{newCustomerError}</p>}
+          <div className="flex gap-2 justify-end pt-2">
+            <Button type="button" variant="secondary" onClick={() => setIsNewCustomerOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" isLoading={isSavingCustomer}>Add Customer</Button>
+          </div>
+        </form>
+      </Modal>
     </ListViewLayout>
   );
 }
