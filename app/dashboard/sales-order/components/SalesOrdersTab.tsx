@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -61,14 +62,43 @@ const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 export default function SalesOrdersTab() {
   const { data: session } = useSession();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const canApprove = !!session?.user.permissions.can_approve;
   const [viewMode, setViewMode] = useViewMode('sales_orders_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('sales_orders_cols', DEFAULT_VISIBLE);
-  const [orders, setOrders] = useState<SalesOrderWithItems[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
+    queryKey: ['sales-orders'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales-orders');
+      if (!res.ok) throw new Error('Failed to fetch sales orders');
+      return (await res.json()) as SalesOrderWithItems[];
+    },
+  });
+  const { data: customers = [], isLoading: isLoadingCustomers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const res = await fetch('/api/customers');
+      if (!res.ok) throw new Error('Failed to fetch customers');
+      return (await res.json()) as Customer[];
+    },
+  });
+  const { data: items = [], isLoading: isLoadingItems } = useQuery({
+    queryKey: ['items'],
+    queryFn: async () => {
+      const res = await fetch('/api/items');
+      if (!res.ok) throw new Error('Failed to fetch items');
+      return (await res.json()) as Item[];
+    },
+  });
+  const { data: warehouses = [], isLoading: isLoadingWarehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const res = await fetch('/api/warehouses');
+      if (!res.ok) throw new Error('Failed to fetch warehouses');
+      return (await res.json()) as Warehouse[];
+    },
+  });
+  const isLoading = isLoadingOrders || isLoadingCustomers || isLoadingItems || isLoadingWarehouses;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -85,28 +115,8 @@ export default function SalesOrdersTab() {
   const [newCustomerError, setNewCustomerError] = useState('');
 
   useEffect(() => {
-    fetchAll();
     fetchUsdIdrRate().then(setUsdRate);
   }, []);
-
-  const fetchAll = async () => {
-    try {
-      const [ordersRes, customersRes, itemsRes, warehousesRes] = await Promise.all([
-        fetch('/api/sales-orders'),
-        fetch('/api/customers'),
-        fetch('/api/items'),
-        fetch('/api/warehouses'),
-      ]);
-      if (ordersRes.ok) setOrders(await ordersRes.json());
-      if (customersRes.ok) setCustomers(await customersRes.json());
-      if (itemsRes.ok) setItems(await itemsRes.json());
-      if (warehousesRes.ok) setWarehouses(await warehousesRes.json());
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const openNew = () => {
     setCustomerId('');
@@ -134,8 +144,7 @@ export default function SalesOrdersTab() {
       });
       if (res.ok) {
         const data = await res.json();
-        const customersRes = await fetch('/api/customers');
-        if (customersRes.ok) setCustomers(await customersRes.json());
+        await queryClient.invalidateQueries({ queryKey: ['customers'] });
         setCustomerId(data.customer_id);
         setIsNewCustomerOpen(false);
         setNewCustomerForm({ customer_name: '', phone: '', address: '' });
@@ -201,7 +210,7 @@ export default function SalesOrdersTab() {
       const res = await fetch('/api/sales-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
         setIsModalOpen(false);
-        fetchAll();
+        queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
       } else {
         const err = await res.json();
         setError(err.error || 'Gagal membuat sales order');
@@ -220,7 +229,7 @@ export default function SalesOrdersTab() {
     try {
       const res = await fetch('/api/sales-orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ so_id, action }) });
       if (res.ok) {
-        fetchAll();
+        queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
       } else {
         const err = await res.json();
         alert(err.error || 'Gagal memproses aksi');

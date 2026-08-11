@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { getServerSession } from 'next-auth';
@@ -10,10 +10,20 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Thoyokem',
   description: 'Manage Thoyokem Dashboard',
+  manifest: '/manifest.json',
   icons: {
     icon: '/Logo-Thoyokem.png',
-    apple: '/Logo-Thoyokem.png',
+    apple: '/apple-touch-icon.png',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Thoyokem',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#111827',
 };
 
 export default async function RootLayout({

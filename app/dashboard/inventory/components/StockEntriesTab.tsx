@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -27,15 +28,44 @@ const TYPE_ICON: Record<string, React.ElementType> = {
 
 export default function StockEntriesTab() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_stock_entries_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_stock_entries_cols', [
     'entry_id', 'date', 'entry_type', 'item_code', 'source_warehouse', 'target_warehouse', 'qty', 'remarks',
   ]);
-  const [entries, setEntries] = useState<StockEntry[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [boms, setBoms] = useState<Bom[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: entries = [], isLoading: isLoadingEntries } = useQuery({
+    queryKey: ['stock-entries'],
+    queryFn: async () => {
+      const res = await fetch('/api/stock-entries');
+      if (!res.ok) throw new Error('Failed to fetch stock entries');
+      return (await res.json()) as StockEntry[];
+    },
+  });
+  const { data: items = [], isLoading: isLoadingItems } = useQuery({
+    queryKey: ['items'],
+    queryFn: async () => {
+      const res = await fetch('/api/items');
+      if (!res.ok) throw new Error('Failed to fetch items');
+      return (await res.json()) as Item[];
+    },
+  });
+  const { data: warehouses = [], isLoading: isLoadingWarehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const res = await fetch('/api/warehouses');
+      if (!res.ok) throw new Error('Failed to fetch warehouses');
+      return (await res.json()) as Warehouse[];
+    },
+  });
+  const { data: boms = [], isLoading: isLoadingBoms } = useQuery({
+    queryKey: ['boms'],
+    queryFn: async () => {
+      const res = await fetch('/api/boms');
+      if (!res.ok) throw new Error('Failed to fetch boms');
+      return (await res.json()) as Bom[];
+    },
+  });
+  const isLoading = isLoadingEntries || isLoadingItems || isLoadingWarehouses || isLoadingBoms;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -49,29 +79,6 @@ export default function StockEntriesTab() {
     qty: '',
     remarks: '',
   });
-
-  useEffect(() => {
-    fetchAll();
-  }, []);
-
-  const fetchAll = async () => {
-    try {
-      const [entriesRes, itemsRes, warehousesRes, bomsRes] = await Promise.all([
-        fetch('/api/stock-entries'),
-        fetch('/api/items'),
-        fetch('/api/warehouses'),
-        fetch('/api/boms'),
-      ]);
-      if (entriesRes.ok) setEntries(await entriesRes.json());
-      if (itemsRes.ok) setItems(await itemsRes.json());
-      if (warehousesRes.ok) setWarehouses(await warehousesRes.json());
-      if (bomsRes.ok) setBoms(await bomsRes.json());
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const openNew = () => {
     setFormData({ entry_type: 'Material Receipt', item_code: '', source_warehouse: '', target_warehouse: '', qty: '', remarks: '' });
@@ -91,7 +98,7 @@ export default function StockEntriesTab() {
       });
       if (res.ok) {
         setIsModalOpen(false);
-        fetchAll();
+        queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
       } else {
         const err = await res.json();
         setError(err.error || 'Gagal menyimpan stock entry');

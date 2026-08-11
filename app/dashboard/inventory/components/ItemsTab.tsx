@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -57,10 +58,17 @@ function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: num
 
 export default function ItemsTab() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_items_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_items_cols', DEFAULT_VISIBLE);
-  const [items, setItems] = useState<Item[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ['items'],
+    queryFn: async () => {
+      const res = await fetch('/api/items');
+      if (!res.ok) throw new Error('Failed to fetch items');
+      return (await res.json()) as Item[];
+    },
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -79,21 +87,6 @@ export default function ItemsTab() {
     currency: 'IDR',
     item_type: 'Regular',
   });
-
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
-    try {
-      const res = await fetch('/api/items');
-      if (res.ok) setItems(await res.json());
-    } catch (error) {
-      console.error('Error fetching items:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
@@ -171,7 +164,7 @@ export default function ItemsTab() {
 
       if (res.ok) {
         setIsModalOpen(false);
-        fetchItems();
+        queryClient.invalidateQueries({ queryKey: ['items'] });
       } else {
         const err = await res.json();
         setError(err.error || 'Gagal menyimpan item');
@@ -188,7 +181,7 @@ export default function ItemsTab() {
     if (!confirm('Hapus item ini?')) return;
     try {
       const res = await fetch(`/api/items?item_code=${itemCode}`, { method: 'DELETE' });
-      if (res.ok) fetchItems();
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ['items'] });
     } catch (error) {
       console.error('Error deleting item:', error);
     }

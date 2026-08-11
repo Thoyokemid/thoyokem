@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -124,31 +125,23 @@ function CityPicker({ value, onChange }: { value: string; onChange: (v: string) 
 
 export default function WarehousesTab() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_warehouses_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_warehouses_cols', DEFAULT_VISIBLE);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: warehouses = [], isLoading } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const res = await fetch('/api/warehouses');
+      if (!res.ok) throw new Error('Failed to fetch warehouses');
+      return (await res.json()) as Warehouse[];
+    },
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({ warehouse_name: '', location: '', pic: '', phone: '', address: '', postal_code: '' });
-
-  useEffect(() => {
-    fetchWarehouses();
-  }, []);
-
-  const fetchWarehouses = async () => {
-    try {
-      const res = await fetch('/api/warehouses');
-      if (res.ok) setWarehouses(await res.json());
-    } catch (error) {
-      console.error('Error fetching warehouses:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const openNew = () => {
     setEditingWarehouse(null);
@@ -186,7 +179,7 @@ export default function WarehousesTab() {
 
       if (res.ok) {
         setIsModalOpen(false);
-        fetchWarehouses();
+        queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       } else {
         const err = await res.json();
         setError(err.error || 'Gagal menyimpan warehouse');
@@ -203,7 +196,7 @@ export default function WarehousesTab() {
     if (!confirm('Hapus warehouse ini?')) return;
     try {
       const res = await fetch(`/api/warehouses?warehouse_id=${warehouseId}`, { method: 'DELETE' });
-      if (res.ok) fetchWarehouses();
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ['warehouses'] });
     } catch (error) {
       console.error('Error deleting warehouse:', error);
     }
