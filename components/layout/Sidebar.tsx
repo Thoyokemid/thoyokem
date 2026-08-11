@@ -77,6 +77,7 @@ function SidebarInner({ permissions }: SidebarProps) {
         { name: 'Stock Ledger', href: '/dashboard/inventory?tab=ledger' },
         { name: 'Stock Entries', href: '/dashboard/inventory?tab=entries' },
         { name: 'Items', href: '/dashboard/inventory?tab=items' },
+        { name: 'Product Campuran (BOM)', href: '/dashboard/inventory?tab=bom' },
         { name: 'Warehouses', href: '/dashboard/inventory?tab=warehouses' },
       ],
     },

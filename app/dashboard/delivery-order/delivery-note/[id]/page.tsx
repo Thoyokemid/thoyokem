@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
-import { AlertCircle, XCircle, History } from 'lucide-react';
+import { AlertCircle, XCircle, History, Printer, ChevronDown } from 'lucide-react';
 
 interface DeliveryNoteWithItems {
   dn_id: string;
@@ -32,6 +32,7 @@ export default function DeliveryNoteDetailPage() {
   const [dn, setDn] = useState<DeliveryNoteWithItems | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
 
   const hasAccess = !!(session?.user.permissions.delivery_order || session?.user.permissions.sales_order);
 
@@ -117,6 +118,34 @@ export default function DeliveryNoteDetailPage() {
         actions={
           dn && (
             <>
+              <div className="relative">
+                <Button variant="secondary" onClick={() => setIsPrintMenuOpen((v) => !v)}>
+                  <Printer size={14} className="mr-1.5" />Print Surat Jalan<ChevronDown size={14} className="ml-1.5" />
+                </Button>
+                {isPrintMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsPrintMenuOpen(false)} />
+                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20">
+                      {[
+                        { size: 'a4', label: 'A4' },
+                        { size: 'f4', label: 'F4' },
+                        { size: 'thermal', label: 'Thermal' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.size}
+                          onClick={() => {
+                            setIsPrintMenuOpen(false);
+                            router.push(`/dashboard/delivery-order/delivery-note/${encodeURIComponent(id)}/print?size=${opt.size}`);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               {dn.status !== 'Cancelled' && (
                 <Button variant="danger" disabled={busy} onClick={() => runAction('cancel')}><XCircle size={14} className="mr-1.5" />Cancel</Button>
               )}

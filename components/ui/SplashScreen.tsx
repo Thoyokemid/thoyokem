@@ -37,7 +37,7 @@ export default function SplashScreen() {
         ))}
       </div>
 
-      <p className="text-sm text-gray-300">Menyiapkan dashboard...</p>
+      <p className="text-sm text-gray-300">Loading...</p>
     </div>
   );
 }

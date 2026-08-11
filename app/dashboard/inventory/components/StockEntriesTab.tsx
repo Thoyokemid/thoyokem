@@ -7,8 +7,9 @@ import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
+import QRScanner from '@/components/ui/QRScanner';
 import { StockEntry, Item, Warehouse, StockEntryType, Bom } from '@/types';
-import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Layers } from 'lucide-react';
+import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Layers, ScanLine } from 'lucide-react';
 
 const TYPE_TONE: Record<string, 'green' | 'red' | 'blue' | 'purple'> = {
   'Material Receipt': 'green',
@@ -38,6 +39,7 @@ export default function StockEntriesTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     entry_type: 'Material Receipt' as StockEntryType,
@@ -99,6 +101,16 @@ export default function StockEntriesTab() {
       setError('Gagal menyimpan stock entry');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleScan = (decodedText: string) => {
+    const match = items.find((i) => i.item_code === decodedText.trim());
+    if (match) {
+      setFormData((prev) => ({ ...prev, item_code: match.item_code }));
+      setIsScannerOpen(false);
+    } else {
+      setError(`Item dengan kode "${decodedText}" tidak ditemukan`);
     }
   };
 
@@ -195,17 +207,27 @@ export default function StockEntriesTab() {
 
           <div>
             <label className="label-field">{formData.entry_type === 'Manufacture' ? 'Produk (harus punya BOM)' : 'Item'}</label>
-            <select
-              value={formData.item_code}
-              onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
-              className="input-field"
-              required
-            >
-              <option value="">Pilih item</option>
-              {(formData.entry_type === 'Manufacture' ? items.filter((i) => boms.some((b) => b.item_code === i.item_code && b.is_active)) : items).map((i) => (
-                <option key={i.item_code} value={i.item_code}>{i.item_name} ({i.item_code})</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={formData.item_code}
+                onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
+                className="input-field flex-1"
+                required
+              >
+                <option value="">Pilih item</option>
+                {(formData.entry_type === 'Manufacture' ? items.filter((i) => boms.some((b) => b.item_code === i.item_code && b.is_active)) : items).map((i) => (
+                  <option key={i.item_code} value={i.item_code}>{i.item_name} ({i.item_code})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                title="Scan QR Item"
+                className="px-2.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary"
+              >
+                <ScanLine size={16} />
+              </button>
+            </div>
             {formData.entry_type === 'Manufacture' && boms.filter((b) => b.is_active).length === 0 && (
               <p className="text-xs text-orange-500 mt-1">Belum ada BOM aktif. Buat dulu di tab "Product Campuran (BOM)".</p>
             )}
@@ -293,6 +315,7 @@ export default function StockEntriesTab() {
           </div>
         </form>
       </Modal>
+      <QRScanner isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleScan} />
     </ListViewLayout>
   );
 }

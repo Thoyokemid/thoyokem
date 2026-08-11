@@ -12,7 +12,7 @@ import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Edit, Trash2, Search, Package, RefreshCw } from 'lucide-react';
 
 const ITEM_GROUPS = ['Liquid', 'Non-Liquid'];
-const ITEM_UNITS = ['PCS', 'KG', 'L', 'M'];
+const ITEM_UNITS = ['PCS', 'KG', 'G', 'L', 'M'];
 
 // TY + L/NL + random alphanumeric, always exactly 10 chars, no separators.
 function generateItemCode(group: string): string {

@@ -28,8 +28,19 @@ import {
   Info,
   Keyboard,
   ChevronDown,
+  Mail,
+  Github,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
+
+function WhatsAppIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.198.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+      <path d="M12.001 2C6.478 2 2 6.477 2 12c0 1.943.556 3.752 1.517 5.284L2 22l4.865-1.478A9.953 9.953 0 0012.001 22C17.523 22 22 17.523 22 12S17.523 2 12.001 2zm0 18.13a8.11 8.11 0 01-4.29-1.226l-.308-.183-3.117.947.964-3.043-.2-.313A8.09 8.09 0 013.87 12c0-4.487 3.646-8.13 8.131-8.13 4.486 0 8.13 3.643 8.13 8.13 0 4.487-3.644 8.13-8.13 8.13z" />
+    </svg>
+  );
+}
 
 const KEYBOARD_SHORTCUTS: { keys: string; description: string }[] = [
   { keys: '⌘K / Ctrl+K', description: 'Buka pencarian global' },
@@ -440,6 +451,33 @@ export default function Topbar({ user }: TopbarProps) {
         <div className="space-y-3 text-sm text-gray-700 dark:text-gray-200">
           <p className="text-base font-semibold text-gray-900 dark:text-white">Thoyokem Workspace</p>
           <p>Developed by <span className="font-medium">Faiz</span></p>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://wa.me/6285215842148"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="WhatsApp"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-green-600 hover:border-green-600"
+            >
+              <WhatsAppIcon size={15} />
+            </a>
+            <a
+              href="mailto:faizramdhan17@gmail.com"
+              title="Email"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary hover:border-primary"
+            >
+              <Mail size={15} />
+            </a>
+            <a
+              href="https://github.com/faizramdhannn"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="GitHub"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:border-gray-900 dark:hover:border-white"
+            >
+              <Github size={15} />
+            </a>
+          </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Built with</p>
             <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5 list-disc list-inside">

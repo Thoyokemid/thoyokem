@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
+import SplashScreen from '@/components/ui/SplashScreen';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,17 +32,26 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError(result.error);
+        setIsLoading(false);
       } else {
-        sessionStorage.setItem('showSplash', '1');
-        router.push('/dashboard');
-        router.refresh();
+        setShowSplash(true);
+        // Keep the splash on screen for a deliberate 3-5s minimum before switching routes,
+        // so the dashboard never has a chance to flash into view underneath it.
+        const minDuration = 3000 + Math.random() * 2000;
+        setTimeout(() => {
+          router.push('/dashboard');
+          router.refresh();
+        }, minDuration);
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
+
+  if (showSplash) {
+    return <SplashScreen />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">

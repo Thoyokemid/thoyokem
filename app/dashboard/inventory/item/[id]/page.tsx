@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
@@ -10,7 +10,8 @@ import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import { Item, StockBalance } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Download } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function ItemDetailPage() {
   const { data: session, status } = useSession();
@@ -20,6 +21,16 @@ export default function ItemDetailPage() {
   const [balances, setBalances] = useState<StockBalance[]>([]);
   const [usdRate, setUsdRate] = useState(15800);
   const [isLoading, setIsLoading] = useState(true);
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const downloadQr = () => {
+    const canvas = qrRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `${id}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
 
   useEffect(() => {
     if (session?.user.permissions.inventory) fetchData();
@@ -119,6 +130,25 @@ export default function ItemDetailPage() {
                   { label: 'Total Qty on Hand', value: totalQty },
                 ]}
               />
+            </DetailSection>
+            <DetailSection title="QR Code">
+              <div className="flex items-center gap-4">
+                <div ref={qrRef} className="p-3 bg-white rounded-md border border-gray-200 dark:border-gray-700 inline-block">
+                  <QRCodeCanvas value={item.item_code} size={128} />
+                </div>
+                <div className="text-sm">
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                    QR code ini mengkodekan Item Code <span className="font-mono font-medium">{item.item_code}</span>. Scan saat membuat Stock Entry (Transfer) atau Sales Order untuk otomatis memilih item ini.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={downloadQr}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-primary text-white hover:bg-primary-600"
+                  >
+                    <Download size={12} /> Download QR
+                  </button>
+                </div>
+              </div>
             </DetailSection>
             <DetailSection title="Stock Balance by Warehouse">
               <DetailTable

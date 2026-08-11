@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import SplashScreen from '@/components/ui/SplashScreen';
 import Card from '@/components/ui/Card';
 import ModuleOverview from '@/components/dashboard/ModuleOverview';
 import {
@@ -34,25 +32,6 @@ interface QuickAction {
 }
 
 export default function DashboardContent({ userName, permissions }: DashboardContentProps) {
-  const [showSplash, setShowSplash] = useState(false);
-  const [splashMinTimeDone, setSplashMinTimeDone] = useState(false);
-
-  useEffect(() => {
-    if (sessionStorage.getItem('showSplash')) {
-      setShowSplash(true);
-      sessionStorage.removeItem('showSplash');
-      // Keep the splash on screen for a deliberate 3-5s minimum so it doesn't just flash by.
-      const minDuration = 3000 + Math.random() * 2000;
-      setTimeout(() => setSplashMinTimeDone(true), minDuration);
-    } else {
-      setSplashMinTimeDone(true);
-    }
-  }, []);
-
-  if (showSplash && !splashMinTimeDone) {
-    return <SplashScreen />;
-  }
-
   const quickActions: QuickAction[] = [
     { name: 'HR Dashboard', href: '/dashboard/hr', icon: Users, enabled: permissions.attendance || permissions.leave || permissions.staff },
     { name: 'Attendance', href: '/dashboard/attendance', icon: Clock, enabled: permissions.attendance },

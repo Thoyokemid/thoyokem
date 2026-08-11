@@ -8,9 +8,10 @@ import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
+import QRScanner from '@/components/ui/QRScanner';
 import { Customer, Item, Warehouse } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
-import { Plus, Trash2, Send, XCircle, FileText, ShoppingBag, Check, Ban, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Send, XCircle, FileText, ShoppingBag, Check, Ban, RefreshCw, ScanLine } from 'lucide-react';
 
 interface SOItemLine {
   item_code: string;
@@ -77,6 +78,7 @@ export default function SalesOrdersTab() {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [lines, setLines] = useState<SOItemLine[]>([{ item_code: '', qty: '', rate: '', warehouse_id: '' }]);
   const [usdRate, setUsdRate] = useState(15800);
+  const [scanTargetIdx, setScanTargetIdx] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAll();
@@ -114,6 +116,17 @@ export default function SalesOrdersTab() {
     const item = items.find((i) => i.item_code === itemCode);
     if (!item) return null;
     return Math.round(toIDR(item.selling_price, item.currency, usdRate));
+  };
+
+  const handleScan = (decodedText: string) => {
+    if (scanTargetIdx === null) return;
+    const match = items.find((i) => i.item_code === decodedText.trim());
+    if (match) {
+      updateLine(scanTargetIdx, 'item_code', match.item_code);
+      setScanTargetIdx(null);
+    } else {
+      setError(`Item dengan kode "${decodedText}" tidak ditemukan`);
+    }
   };
 
   const updateLine = (idx: number, field: keyof SOItemLine, value: string) => {
@@ -302,19 +315,30 @@ export default function SalesOrdersTab() {
             <div className="space-y-2">
               {lines.map((line, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <select value={line.item_code} onChange={(e) => updateLine(idx, 'item_code', e.target.value)} className="input-field col-span-4 text-xs" required>
+                  <select value={line.item_code} onChange={(e) => updateLine(idx, 'item_code', e.target.value)} className="input-field col-span-2 text-xs" required>
                     <option value="">Item</option>
                     {items.map((i) => (
                       <option key={i.item_code} value={i.item_code}>{i.item_name}</option>
                     ))}
                   </select>
-                  <select value={line.warehouse_id} onChange={(e) => updateLine(idx, 'warehouse_id', e.target.value)} className="input-field col-span-3 text-xs" required>
+                  <button
+                    type="button"
+                    onClick={() => setScanTargetIdx(idx)}
+                    title="Scan QR Item"
+                    className="col-span-1 px-1.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary flex items-center justify-center"
+                  >
+                    <ScanLine size={14} />
+                  </button>
+                  <select value={line.warehouse_id} onChange={(e) => updateLine(idx, 'warehouse_id', e.target.value)} className="input-field col-span-2 text-xs" required>
                     <option value="">Warehouse</option>
                     {warehouses.map((w) => (
                       <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name}</option>
                     ))}
                   </select>
                   <input type="number" min={0} step="any" placeholder="Qty" value={line.qty} onChange={(e) => updateLine(idx, 'qty', e.target.value)} className="input-field col-span-2 text-xs" required />
+                  <div className="col-span-1 text-xs text-gray-500 dark:text-gray-400 text-center" title="Unit yang akan dipotong dari stock">
+                    {items.find((i) => i.item_code === line.item_code)?.unit || '-'}
+                  </div>
                   <div className="col-span-2 relative">
                     <input type="number" min={0} step="any" placeholder="Rate (IDR)" value={line.rate} onChange={(e) => updateLine(idx, 'rate', e.target.value)} className="input-field text-xs pr-6" required />
                     {items.find((i) => i.item_code === line.item_code)?.currency === 'USD' && (
@@ -356,6 +380,7 @@ export default function SalesOrdersTab() {
           </div>
         </form>
       </Modal>
+      <QRScanner isOpen={scanTargetIdx !== null} onClose={() => setScanTargetIdx(null)} onScan={handleScan} />
     </ListViewLayout>
   );
 }

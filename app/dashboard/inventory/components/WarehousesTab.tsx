@@ -34,9 +34,16 @@ function CityPicker({ value, onChange }: { value: string; onChange: (v: string) 
   const [results, setResults] = useState<City[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const justSelectedRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setQuery(value), [value]);
+  useEffect(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+    setQuery(value);
+  }, [value]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -47,7 +54,7 @@ function CityPicker({ value, onChange }: { value: string; onChange: (v: string) 
   }, []);
 
   useEffect(() => {
-    if (!query.trim() || query === value) {
+    if (justSelectedRef.current || !query.trim()) {
       setResults([]);
       return;
     }
@@ -63,12 +70,14 @@ function CityPicker({ value, onChange }: { value: string; onChange: (v: string) 
       }
     }, 300);
     return () => clearTimeout(timeout);
-  }, [query, value]);
+  }, [query]);
 
   const select = (city: City) => {
     const label = `${city.type} ${city.name}, ${city.province}`;
+    justSelectedRef.current = true;
     onChange(label);
     setQuery(label);
+    setResults([]);
     setIsOpen(false);
   };
 
