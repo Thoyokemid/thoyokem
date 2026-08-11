@@ -25,7 +25,7 @@ interface PurchaseOrderWithItems {
   owner: string;
   creation: string;
   amended_from?: string;
-  items: { item_code: string; qty: number; rate: number; amount: number; received_qty: number; warehouse_id: string }[];
+  items: { item_code: string; item_name: string; uom: string; qty: number; rate: number; amount: number; received_qty: number; warehouse_id: string }[];
 }
 
 const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'red'> = {
@@ -207,17 +207,19 @@ export default function PurchaseOrderDetailPage() {
             <DetailSection title="Items">
               <DetailTable
                 columns={[
-                  { key: 'item_code', header: 'Item' },
+                  { key: 'item_name', header: 'Item' },
                   { key: 'warehouse_id', header: 'Warehouse' },
                   { key: 'qty', header: 'Qty', align: 'right' },
+                  { key: 'uom', header: 'Unit' },
                   { key: 'received_qty', header: 'Received', align: 'right' },
                   { key: 'rate', header: 'Rate', align: 'right' },
                   { key: 'amount', header: 'Amount', align: 'right' },
                 ]}
                 rows={po.items.map((i) => ({
-                  item_code: i.item_code,
+                  item_name: `${i.item_name} (${i.item_code})`,
                   warehouse_id: i.warehouse_id,
                   qty: i.qty,
+                  uom: i.uom,
                   received_qty: i.received_qty,
                   rate: `Rp${i.rate.toLocaleString('id-ID')}`,
                   amount: `Rp${i.amount.toLocaleString('id-ID')}`,

@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import {
   LayoutDashboard,
   UserPlus,
@@ -18,6 +19,7 @@ import {
   ShoppingCart,
   ShoppingBag,
   Truck,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,6 +38,8 @@ interface SidebarProps {
 }
 
 function SidebarInner({ permissions }: SidebarProps) {
+  const { data: session } = useSession();
+  const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -124,6 +128,12 @@ function SidebarInner({ permissions }: SidebarProps) {
       icon: Settings,
       href: '/dashboard/settings',
       enabled: permissions.setting,
+    },
+    {
+      name: 'Stock Reconciliation',
+      icon: ShieldAlert,
+      href: '/dashboard/stock-reconciliation',
+      enabled: isSuperAdmin,
     },
   ];
 

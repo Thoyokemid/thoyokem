@@ -18,6 +18,7 @@ declare module 'next-auth' {
       delivery_order: boolean;
       can_approve: boolean;
     };
+    isSuperAdmin: boolean;
   }
 
   interface Session {
@@ -41,6 +42,7 @@ declare module 'next-auth' {
         delivery_order: boolean;
         can_approve: boolean;
       };
+      isSuperAdmin: boolean;
     };
   }
 }
@@ -63,5 +65,6 @@ declare module 'next-auth/jwt' {
       delivery_order: boolean;
       can_approve: boolean;
     };
+    isSuperAdmin: boolean;
   }
 }

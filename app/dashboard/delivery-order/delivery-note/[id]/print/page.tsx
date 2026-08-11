@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Image from 'next/image';
-import { Item, Customer } from '@/types';
+import { Customer } from '@/types';
 import { Printer, ArrowLeft } from 'lucide-react';
 
 interface DeliveryNoteWithItems {
@@ -16,7 +16,7 @@ interface DeliveryNoteWithItems {
   posting_date: string;
   status: string;
   owner: string;
-  items: { item_code: string; delivered_qty: number; warehouse_id: string }[];
+  items: { item_code: string; item_name: string; uom: string; delivered_qty: number; warehouse_id: string }[];
 }
 
 type PaperSize = 'a4' | 'f4' | 'thermal';
@@ -32,7 +32,6 @@ export default function SuratJalanPrintPage() {
   const size = (searchParams.get('size') as PaperSize) || 'a4';
 
   const [dn, setDn] = useState<DeliveryNoteWithItems | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,9 +44,8 @@ export default function SuratJalanPrintPage() {
 
   const fetchData = async () => {
     try {
-      const [dnRes, itemsRes, customersRes] = await Promise.all([
+      const [dnRes, customersRes] = await Promise.all([
         fetch('/api/delivery-notes'),
-        fetch('/api/items').catch(() => null),
         fetch('/api/customers').catch(() => null),
       ]);
       if (dnRes.ok) {
@@ -59,7 +57,6 @@ export default function SuratJalanPrintPage() {
           setCustomer(custList.find((c) => c.customer_id === found.customer_id) || null);
         }
       }
-      if (itemsRes?.ok) setItems(await itemsRes.json());
     } catch (error) {
       console.error('Error fetching surat jalan data:', error);
     } finally {
@@ -78,9 +75,6 @@ export default function SuratJalanPrintPage() {
   if (!dn) {
     return <p className="p-6 text-sm text-gray-500">Delivery note tidak ditemukan.</p>;
   }
-
-  const itemName = (code: string) => items.find((i) => i.item_code === code)?.item_name || code;
-  const itemUnit = (code: string) => items.find((i) => i.item_code === code)?.unit || '-';
 
   return (
     <div className={`surat-jalan-wrapper size-${size}`}>
@@ -163,9 +157,9 @@ export default function SuratJalanPrintPage() {
             {dn.items.map((i, idx) => (
               <tr key={idx}>
                 <td>{idx + 1}</td>
-                <td>{itemName(i.item_code)}</td>
+                <td>{i.item_name}</td>
                 <td className="text-right">{i.delivered_qty}</td>
-                <td>{itemUnit(i.item_code)}</td>
+                <td>{i.uom}</td>
               </tr>
             ))}
           </tbody>

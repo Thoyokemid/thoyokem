@@ -26,8 +26,10 @@ export async function GET() {
     const { records: orders } = await readSheetAsObjects<any>(SHEET);
     const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
     const { records: suppliers } = await readSheetAsObjects<any>('supplier_list');
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
 
     const supplierMap = new Map(suppliers.map((s) => [s.supplier_id, s.supplier_name]));
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const result = orders
       .map((po) => ({
@@ -48,6 +50,8 @@ export async function GET() {
           .map((i) => ({
             po_id: i.po_id,
             item_code: i.item_code,
+            item_name: i.item_name || itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+            uom: i.uom || itemMasterMap.get(i.item_code)?.unit || '-',
             qty: parseFloat(i.qty) || 0,
             rate: parseFloat(i.rate) || 0,
             amount: parseFloat(i.amount) || 0,
@@ -79,6 +83,8 @@ export async function POST(request: NextRequest) {
     const poId = await getNextDocId('PO');
     const now = new Date().toISOString();
     const totalAmount = items.reduce((sum: number, i: any) => sum + (i.qty * i.rate), 0);
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const { headers: poHeaders } = await readSheetAsObjects<any>(SHEET);
     const poRow = objectToRow(poHeaders, {
@@ -101,6 +107,8 @@ export async function POST(request: NextRequest) {
       objectToRow(itemHeaders, {
         po_id: poId,
         item_code: i.item_code,
+        item_name: itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+        uom: itemMasterMap.get(i.item_code)?.unit || '',
         qty: i.qty,
         rate: i.rate,
         amount: i.qty * i.rate,
@@ -234,6 +242,8 @@ export async function PATCH(request: NextRequest) {
         objectToRow(poItemHeaders, {
           po_id: newPoId,
           item_code: i.item_code,
+          item_name: i.item_name || i.item_code,
+          uom: i.uom || '',
           qty: i.qty,
           rate: i.rate,
           amount: i.amount,

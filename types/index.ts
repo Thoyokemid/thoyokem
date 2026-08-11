@@ -145,6 +145,7 @@ export interface SessionUser {
     delivery_order: boolean;
     can_approve: boolean;
   };
+  isSuperAdmin?: boolean;
 }
 
 // ── Inventory Module ──────────────────────────────────────────────────────
@@ -267,6 +268,8 @@ export interface PurchaseOrder {
 export interface PurchaseOrderItem {
   po_id: string;
   item_code: string;
+  item_name: string;
+  uom: string;
   qty: number;
   rate: number;
   amount: number;
@@ -329,6 +332,8 @@ export interface SalesOrder {
 export interface SalesOrderItem {
   so_id: string;
   item_code: string;
+  item_name: string;
+  uom: string;
   qty: number;
   rate: number;
   amount: number;
@@ -345,6 +350,17 @@ export interface DeliveryNote {
   owner: string;
   creation: string;
   amended_from?: string;
+}
+
+export interface DeliveryNoteItem {
+  dn_id: string;
+  so_id: string;
+  item_code: string;
+  item_name: string;
+  uom: string;
+  delivered_qty: number;
+  warehouse_id: string;
+  rate: number;
 }
 
 export interface SalesInvoice {

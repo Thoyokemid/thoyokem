@@ -26,7 +26,9 @@ export async function GET() {
     const { records } = await readSheetAsObjects<any>(SHEET);
     const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
     const { records: customers } = await readSheetAsObjects<any>('customer_list');
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
     const customerMap = new Map(customers.map((c) => [c.customer_id, c.customer_name]));
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const result = records
       .map((dn) => ({
@@ -41,7 +43,14 @@ export async function GET() {
         amended_from: dn.amended_from || '',
         items: items
           .filter((i) => i.dn_id === dn.dn_id)
-          .map((i) => ({ item_code: i.item_code, delivered_qty: parseFloat(i.delivered_qty) || 0, warehouse_id: i.warehouse_id, rate: parseFloat(i.rate) || 0 })),
+          .map((i) => ({
+            item_code: i.item_code,
+            item_name: i.item_name || itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+            uom: i.uom || itemMasterMap.get(i.item_code)?.unit || '-',
+            delivered_qty: parseFloat(i.delivered_qty) || 0,
+            warehouse_id: i.warehouse_id,
+            rate: parseFloat(i.rate) || 0,
+          })),
       }))
       .reverse();
 
@@ -161,6 +170,8 @@ export async function PATCH(request: NextRequest) {
           dn_id: newDnId,
           so_id: currentObj.so_id,
           item_code: i.item_code,
+          item_name: i.item_name || i.item_code,
+          uom: i.uom || '',
           delivered_qty: i.delivered_qty,
           warehouse_id: i.warehouse_id,
           rate: i.rate,

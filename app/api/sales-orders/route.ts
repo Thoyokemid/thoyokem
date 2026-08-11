@@ -35,8 +35,10 @@ export async function GET() {
     const { records: orders } = await readSheetAsObjects<any>(SHEET);
     const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
     const { records: customers } = await readSheetAsObjects<any>('customer_list');
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
 
     const customerMap = new Map(customers.map((c) => [c.customer_id, c.customer_name]));
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const result = orders
       .map((so) => ({
@@ -57,6 +59,9 @@ export async function GET() {
           .map((i) => ({
             so_id: i.so_id,
             item_code: i.item_code,
+            // Old rows created before the snapshot columns existed fall back to a live lookup.
+            item_name: i.item_name || itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+            uom: i.uom || itemMasterMap.get(i.item_code)?.unit || '-',
             qty: parseFloat(i.qty) || 0,
             rate: parseFloat(i.rate) || 0,
             amount: parseFloat(i.amount) || 0,
@@ -88,6 +93,8 @@ export async function POST(request: NextRequest) {
     const soId = await getNextDocId('SO');
     const now = new Date().toISOString();
     const totalAmount = items.reduce((sum: number, i: any) => sum + (i.qty * i.rate), 0);
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const { headers: soHeaders } = await readSheetAsObjects<any>(SHEET);
     const soRow = objectToRow(soHeaders, {
@@ -110,6 +117,8 @@ export async function POST(request: NextRequest) {
       objectToRow(itemHeaders, {
         so_id: soId,
         item_code: i.item_code,
+        item_name: itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+        uom: itemMasterMap.get(i.item_code)?.unit || '',
         qty: i.qty,
         rate: i.rate,
         amount: i.qty * i.rate,
@@ -248,6 +257,8 @@ export async function PATCH(request: NextRequest) {
         objectToRow(soItemHeaders, {
           so_id: newSoId,
           item_code: i.item_code,
+          item_name: i.item_name || i.item_code,
+          uom: i.uom || '',
           qty: i.qty,
           rate: i.rate,
           amount: i.amount,
@@ -321,6 +332,8 @@ export async function PATCH(request: NextRequest) {
           dn_id: dnId,
           so_id,
           item_code: i.item_code,
+          item_name: i.item_name || i.item_code,
+          uom: i.uom || '',
           delivered_qty: i.qty,
           warehouse_id: i.warehouse_id,
           rate: i.rate,

@@ -21,7 +21,7 @@ interface DeliveryNoteWithItems {
   status: string;
   owner: string;
   amended_from?: string;
-  items: { item_code: string; delivered_qty: number; warehouse_id: string }[];
+  items: { item_code: string; item_name: string; uom: string; delivered_qty: number; warehouse_id: string }[];
 }
 
 export default function DeliveryNoteDetailPage() {
@@ -179,11 +179,17 @@ export default function DeliveryNoteDetailPage() {
             <DetailSection title="Items">
               <DetailTable
                 columns={[
-                  { key: 'item_code', header: 'Item' },
+                  { key: 'item_name', header: 'Item' },
                   { key: 'warehouse_id', header: 'Warehouse' },
                   { key: 'delivered_qty', header: 'Delivered Qty', align: 'right' },
+                  { key: 'uom', header: 'Unit' },
                 ]}
-                rows={dn.items.map((i) => ({ item_code: i.item_code, warehouse_id: i.warehouse_id, delivered_qty: i.delivered_qty }))}
+                rows={dn.items.map((i) => ({
+                  item_name: `${i.item_name} (${i.item_code})`,
+                  warehouse_id: i.warehouse_id,
+                  delivered_qty: i.delivered_qty,
+                  uom: i.uom,
+                }))}
               />
             </DetailSection>
             <DetailSection title="Riwayat">

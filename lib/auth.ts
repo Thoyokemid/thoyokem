@@ -27,6 +27,13 @@ export async function updateLastActive(userId: string) {
   }
 }
 
+// ── Utility: is this role flagged as Super Admin? ──
+export async function isSuperAdminRole(roleId: string): Promise<boolean> {
+  const { records } = await readSheetAsObjects<any>('roles');
+  const role = records.find((r) => String(r.role_id) === String(roleId));
+  return !!role && toBool(role.is_super_admin);
+}
+
 // ── Utility: look up a role's permission set by role_id ──
 export async function getRolePermissions(roleId: string) {
   const { records } = await readSheetAsObjects<any>('roles');
@@ -102,6 +109,7 @@ export const authOptions: NextAuthOptions = {
           updateLastActive(user.id);
 
           const permissions = await getRolePermissions(user.role_id);
+          const isSuperAdmin = await isSuperAdminRole(user.role_id);
 
           return {
             id: user.id,
@@ -110,6 +118,7 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
             role_id: user.role_id,
             permissions,
+            isSuperAdmin,
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -125,6 +134,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.role_id = (user as any).role_id;
         token.permissions = user.permissions;
+        token.isSuperAdmin = (user as any).isSuperAdmin;
       }
       return token;
     },
@@ -134,6 +144,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string;
         session.user.role_id = token.role_id as string;
         session.user.permissions = token.permissions as any;
+        session.user.isSuperAdmin = token.isSuperAdmin as boolean;
       }
       return session;
     },
