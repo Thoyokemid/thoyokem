@@ -11,6 +11,12 @@ function toBool(v: any) {
   return v === 'TRUE' || v === true;
 }
 
+function generateWarehouseId(): string {
+  let id = '';
+  for (let i = 0; i < 10; i++) id += Math.floor(Math.random() * 10);
+  return id;
+}
+
 async function requireInventoryAccess() {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
@@ -31,6 +37,10 @@ export async function GET() {
       warehouse_name: r.warehouse_name || '',
       location: r.location || '',
       is_active: r.is_active === '' ? true : toBool(r.is_active),
+      pic: r.pic || '',
+      phone: r.phone || '',
+      address: r.address || '',
+      postal_code: r.postal_code || '',
     }));
     return NextResponse.json(warehouses);
   } catch (error) {
@@ -46,17 +56,20 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = data.warehouse_id || `WH-${String(records.length + 1).padStart(3, '0')}`;
+    const existingIds = new Set(records.map((r) => r.warehouse_id));
 
-    if (records.some((r) => r.warehouse_id === newId)) {
-      return NextResponse.json({ error: 'Warehouse ID sudah dipakai' }, { status: 400 });
-    }
+    let newId = generateWarehouseId();
+    while (existingIds.has(newId)) newId = generateWarehouseId();
 
     const newRow = objectToRow(headers, {
       warehouse_id: newId,
       warehouse_name: data.warehouse_name || '',
       location: data.location || '',
       is_active: 'TRUE',
+      pic: data.pic || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      postal_code: data.postal_code || '',
     });
 
     await appendSheet(SHEET, [newRow]);
@@ -94,6 +107,10 @@ export async function PUT(request: NextRequest) {
     const merged = { ...currentObj };
     if (updates.warehouse_name !== undefined) merged.warehouse_name = updates.warehouse_name;
     if (updates.location !== undefined) merged.location = updates.location;
+    if (updates.pic !== undefined) merged.pic = updates.pic;
+    if (updates.phone !== undefined) merged.phone = updates.phone;
+    if (updates.address !== undefined) merged.address = updates.address;
+    if (updates.postal_code !== undefined) merged.postal_code = updates.postal_code;
     if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';
 
     const newRow = objectToRow(headers, merged);

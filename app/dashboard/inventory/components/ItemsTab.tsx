@@ -9,7 +9,21 @@ import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Item } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
-import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, RefreshCw } from 'lucide-react';
+
+const ITEM_GROUPS = ['Liquid', 'Non-Liquid'];
+const ITEM_UNITS = ['PCS', 'KG', 'L', 'M'];
+
+// TY + L/NL + random alphanumeric, always exactly 10 chars, no separators.
+function generateItemCode(group: string): string {
+  const prefix = `TY${group === 'Liquid' ? 'L' : 'NL'}`;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let random = '';
+  for (let i = 0; i < 10 - prefix.length; i++) {
+    random += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return prefix + random;
+}
 
 const REPORT_COLUMNS: ReportColumn<Item>[] = [
   { key: 'item_code', header: 'Item Code' },
@@ -54,10 +68,10 @@ export default function ItemsTab() {
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    item_code: '',
+    item_code: generateItemCode('Liquid'),
     item_name: '',
-    item_group: '',
-    unit: '',
+    item_group: 'Liquid',
+    unit: 'PCS',
     purchase_price: '',
     selling_price: '',
     reorder_level: '',
@@ -91,9 +105,28 @@ export default function ItemsTab() {
 
   const openNew = () => {
     setEditingItem(null);
-    setFormData({ item_code: '', item_name: '', item_group: '', unit: '', purchase_price: '', selling_price: '', reorder_level: '', valuation_method: 'Average', currency: 'IDR', item_type: 'Regular' });
+    setFormData({
+      item_code: generateItemCode('Liquid'),
+      item_name: '',
+      item_group: 'Liquid',
+      unit: 'PCS',
+      purchase_price: '',
+      selling_price: '',
+      reorder_level: '',
+      valuation_method: 'Average',
+      currency: 'IDR',
+      item_type: 'Regular',
+    });
     setError('');
     setIsModalOpen(true);
+  };
+
+  const handleGroupChange = (group: string) => {
+    setFormData((prev) => ({ ...prev, item_group: group, item_code: editingItem ? prev.item_code : generateItemCode(group) }));
+  };
+
+  const regenerateCode = () => {
+    setFormData((prev) => ({ ...prev, item_code: generateItemCode(prev.item_group) }));
   };
 
   const openEdit = (item: Item) => {
@@ -237,15 +270,25 @@ export default function ItemsTab() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="label-field">Item Code</label>
-            <input
-              type="text"
-              value={formData.item_code}
-              onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
-              className="input-field"
-              placeholder="cth. ITM-001"
-              required
-              disabled={!!editingItem}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.item_code}
+                className="input-field pr-8 font-mono"
+                disabled
+              />
+              {!editingItem && (
+                <button
+                  type="button"
+                  onClick={regenerateCode}
+                  title="Generate ulang kode"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Auto-generate: TY + L/NL + kode acak, 10 karakter</p>
           </div>
           <div>
             <label className="label-field">Item Name</label>
@@ -260,11 +303,19 @@ export default function ItemsTab() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Group</label>
-              <input type="text" value={formData.item_group} onChange={(e) => setFormData({ ...formData, item_group: e.target.value })} className="input-field" />
+              <select value={formData.item_group} onChange={(e) => handleGroupChange(e.target.value)} className="input-field">
+                {ITEM_GROUPS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="label-field">Unit</label>
-              <input type="text" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="input-field" placeholder="pcs" />
+              <select value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="input-field">
+                {ITEM_UNITS.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

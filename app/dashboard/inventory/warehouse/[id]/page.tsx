@@ -82,7 +82,15 @@ export default function WarehouseDetailPage() {
         {warehouse && (
           <div className="space-y-4">
             <DetailSection title="Detail">
-              <FieldGrid fields={[{ label: 'Location', value: warehouse.location || '-' }]} />
+              <FieldGrid
+                fields={[
+                  { label: 'City', value: warehouse.location || '-' },
+                  { label: 'PIC', value: warehouse.pic || '-' },
+                  { label: 'Phone Number', value: warehouse.phone || '-' },
+                  { label: 'Address', value: warehouse.address || '-' },
+                  { label: 'Postal Code', value: warehouse.postal_code || '-' },
+                ]}
+              />
             </DetailSection>
             <DetailSection title="Stock Balance">
               <DetailTable

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import Modal from '@/components/ui/Modal';
 import {
   Search,
   LayoutDashboard,
@@ -23,8 +24,19 @@ import {
   Package,
   Warehouse as WarehouseIcon,
   PackageCheck,
+  HelpCircle,
+  Info,
+  Keyboard,
+  ChevronDown,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
+
+const KEYBOARD_SHORTCUTS: { keys: string; description: string }[] = [
+  { keys: '⌘K / Ctrl+K', description: 'Buka pencarian global' },
+  { keys: '↑ / ↓', description: 'Navigasi hasil pencarian' },
+  { keys: 'Enter', description: 'Buka hasil yang dipilih' },
+  { keys: 'Esc', description: 'Tutup pencarian' },
+];
 
 interface TopbarProps {
   user: SessionUser;
@@ -75,6 +87,9 @@ export default function Topbar({ user }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [searchGroups, setSearchGroups] = useState<SearchGroup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -82,6 +97,7 @@ export default function Topbar({ user }: TopbarProps) {
   const [isDark, setIsDark] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
 
@@ -156,6 +172,9 @@ export default function Topbar({ user }: TopbarProps) {
       }
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setIsProfileOpen(false);
+      }
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setIsHelpOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -250,9 +269,9 @@ export default function Topbar({ user }: TopbarProps) {
   let runningIndex = -1;
 
   return (
-    <div className="flex sticky top-0 z-20 items-center justify-between gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="flex sticky top-0 z-20 items-center justify-end gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       {/* Global search */}
-      <div ref={searchRef} className="relative flex-1 max-w-md">
+      <div ref={searchRef} className="relative w-48 sm:w-64 md:w-72">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
         <input
           ref={searchInputRef}
@@ -269,7 +288,7 @@ export default function Topbar({ user }: TopbarProps) {
         </span>
 
         {isSearchOpen && query.trim().length > 0 && (
-          <div className="absolute mt-1.5 w-full max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+          <div className="absolute right-0 mt-1.5 w-80 sm:w-96 max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
             {flatItems.length === 0 ? (
               <p className="px-3 py-3 text-xs text-gray-400 text-center">
                 {isSearching ? 'Mencari...' : 'Tidak ada hasil'}
@@ -332,6 +351,38 @@ export default function Topbar({ user }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Help dropdown — About & Keyboard Shortcuts */}
+        <div ref={helpRef} className="relative">
+          <button
+            onClick={() => setIsHelpOpen((v) => !v)}
+            title="Help"
+            className="flex items-center gap-1 justify-center h-8 px-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <HelpCircle size={16} />
+            <span className="hidden sm:inline text-xs font-medium">Help</span>
+            <ChevronDown size={12} className={`transition-transform ${isHelpOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isHelpOpen && (
+            <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
+              <button
+                onClick={() => { setIsHelpOpen(false); setIsAboutOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Info size={14} />
+                About
+              </button>
+              <button
+                onClick={() => { setIsHelpOpen(false); setIsShortcutsOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Keyboard size={14} />
+                Keyboard Shortcut
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Theme toggle — sits to the left of the profile dropdown */}
         <button
           onClick={toggleTheme}
@@ -384,6 +435,36 @@ export default function Topbar({ user }: TopbarProps) {
           )}
         </div>
       </div>
+
+      <Modal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} title="About" size="sm">
+        <div className="space-y-3 text-sm text-gray-700 dark:text-gray-200">
+          <p className="text-base font-semibold text-gray-900 dark:text-white">Thoyokem Workspace</p>
+          <p>Developed by <span className="font-medium">Faiz</span></p>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Built with</p>
+            <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5 list-disc list-inside">
+              <li>Next.js 14 (App Router) + TypeScript</li>
+              <li>Tailwind CSS</li>
+              <li>NextAuth (Credentials/JWT)</li>
+              <li>Google Sheets API (data layer)</li>
+              <li>Recharts, Framer Motion, Lucide Icons</li>
+            </ul>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} title="Keyboard Shortcut" size="sm">
+        <div className="space-y-1.5">
+          {KEYBOARD_SHORTCUTS.map((s) => (
+            <div key={s.keys} className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-gray-700 last:border-0">
+              <span className="text-sm text-gray-600 dark:text-gray-300">{s.description}</span>
+              <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5">
+                {s.keys}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

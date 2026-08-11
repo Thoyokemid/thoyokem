@@ -189,8 +189,12 @@ export interface BomComponent {
 export interface Warehouse {
   warehouse_id: string;
   warehouse_name: string;
-  location: string;
+  location: string; // City (searchable picker) — column name kept as "location" for backward compatibility
   is_active: boolean;
+  pic: string;
+  phone: string;
+  address: string;
+  postal_code: string;
 }
 
 export type StockEntryType = 'Material Receipt' | 'Material Issue' | 'Material Transfer' | 'Manufacture';

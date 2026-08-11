@@ -14,9 +14,6 @@ import {
   ChevronDown,
   Menu,
   X,
-  MessageCircle,
-  Mail,
-  Linkedin,
   Boxes,
   ShoppingCart,
   ShoppingBag,
@@ -61,10 +58,11 @@ function SidebarInner({ permissions }: SidebarProps) {
       name: 'HR',
       icon: Users,
       href: '/dashboard/hr',
-      isGroup: true,
       enabled: permissions.attendance || permissions.leave || permissions.staff,
       subItems: [
-        { name: 'Attendance', href: '/dashboard/attendance', enabled: permissions.attendance },
+        { name: 'Attendance Data', href: '/dashboard/attendance?tab=data', enabled: permissions.attendance },
+        { name: 'Attendance Report', href: '/dashboard/attendance?tab=report', enabled: permissions.attendance },
+        { name: 'Attendance Recap', href: '/dashboard/attendance?tab=recap', enabled: permissions.attendance },
         { name: 'Leave', href: '/dashboard/leave', enabled: permissions.leave },
         { name: 'Staff', href: '/dashboard/staff', enabled: permissions.staff },
       ],
@@ -75,11 +73,11 @@ function SidebarInner({ permissions }: SidebarProps) {
       href: '/dashboard/inventory',
       enabled: permissions.inventory,
       subItems: [
-        { name: 'Stock Balance', tab: 'balance' },
-        { name: 'Stock Ledger', tab: 'ledger' },
-        { name: 'Stock Entries', tab: 'entries' },
-        { name: 'Items', tab: 'items' },
-        { name: 'Warehouses', tab: 'warehouses' },
+        { name: 'Stock Balance', href: '/dashboard/inventory?tab=balance' },
+        { name: 'Stock Ledger', href: '/dashboard/inventory?tab=ledger' },
+        { name: 'Stock Entries', href: '/dashboard/inventory?tab=entries' },
+        { name: 'Items', href: '/dashboard/inventory?tab=items' },
+        { name: 'Warehouses', href: '/dashboard/inventory?tab=warehouses' },
       ],
     },
     {
@@ -88,9 +86,9 @@ function SidebarInner({ permissions }: SidebarProps) {
       href: '/dashboard/purchasing',
       enabled: permissions.purchasing,
       subItems: [
-        { name: 'Purchase Orders', tab: 'orders' },
-        { name: 'Invoices', tab: 'invoices' },
-        { name: 'Suppliers', tab: 'suppliers' },
+        { name: 'Purchase Orders', href: '/dashboard/purchasing?tab=orders' },
+        { name: 'Invoices', href: '/dashboard/purchasing?tab=invoices' },
+        { name: 'Suppliers', href: '/dashboard/purchasing?tab=suppliers' },
       ],
     },
     {
@@ -99,9 +97,9 @@ function SidebarInner({ permissions }: SidebarProps) {
       href: '/dashboard/sales-order',
       enabled: permissions.sales_order,
       subItems: [
-        { name: 'Sales Orders', tab: 'orders' },
-        { name: 'Invoices', tab: 'invoices' },
-        { name: 'Customers', tab: 'customers' },
+        { name: 'Sales Orders', href: '/dashboard/sales-order?tab=orders' },
+        { name: 'Invoices', href: '/dashboard/sales-order?tab=invoices' },
+        { name: 'Customers', href: '/dashboard/sales-order?tab=customers' },
       ],
     },
     {
@@ -109,6 +107,10 @@ function SidebarInner({ permissions }: SidebarProps) {
       icon: Truck,
       href: '/dashboard/delivery-order',
       enabled: permissions.delivery_order,
+      subItems: [
+        { name: 'Ready to Deliver', href: '/dashboard/delivery-order?tab=ready' },
+        { name: 'Delivery History', href: '/dashboard/delivery-order?tab=history' },
+      ],
     },
     {
       name: 'Registration',
@@ -124,11 +126,13 @@ function SidebarInner({ permissions }: SidebarProps) {
     },
   ];
 
+  const stripQuery = (url: string) => url.split('?')[0];
+
   useEffect(() => {
     const active = menuItems.find(
       (item) =>
         item.subItems &&
-        (pathname === item.href || item.subItems.some((sub: any) => sub.href === pathname))
+        (pathname === item.href || item.subItems.some((sub: any) => stripQuery(sub.href) === pathname))
     );
     if (active && !expanded.includes(active.href)) {
       setExpanded((prev) => [...prev, active.href]);
@@ -181,11 +185,8 @@ function SidebarInner({ permissions }: SidebarProps) {
           if (!item.enabled) return null;
 
           const Icon = item.icon;
-          const isRouteGroup = !!(item as any).isGroup;
-          const isOnModule = isRouteGroup
-            ? item.subItems!.some((sub: any) => sub.href === pathname)
-            : pathname === item.href;
-          const isActive = isRouteGroup ? false : isOnModule && !activeTab;
+          const currentUrl = pathname + (activeTab ? `?tab=${activeTab}` : '');
+          const isActive = pathname === item.href && !activeTab;
           const isExpanded = expanded.includes(item.href);
 
           return (
@@ -197,27 +198,17 @@ function SidebarInner({ permissions }: SidebarProps) {
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                {isRouteGroup ? (
-                  <button
-                    onClick={() => toggleExpanded(item.href)}
-                    className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0 text-left"
-                  >
-                    <Icon size={16} />
-                    {!isCollapsed && <span className="truncate">{item.name}</span>}
-                  </button>
-                ) : (
-                  <Link
-                    href={item.href}
-                    onClick={() => {
-                      setIsMobileOpen(false);
-                      if (item.subItems && !expanded.includes(item.href)) toggleExpanded(item.href);
-                    }}
-                    className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0"
-                  >
-                    <Icon size={16} className={isActive ? 'text-primary' : ''} />
-                    {!isCollapsed && <span className="truncate">{item.name}</span>}
-                  </Link>
-                )}
+                <Link
+                  href={item.href}
+                  onClick={() => {
+                    setIsMobileOpen(false);
+                    if (item.subItems && !expanded.includes(item.href)) toggleExpanded(item.href);
+                  }}
+                  className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0"
+                >
+                  <Icon size={16} className={isActive ? 'text-primary' : ''} />
+                  {!isCollapsed && <span className="truncate">{item.name}</span>}
+                </Link>
                 {item.subItems && !isCollapsed && (
                   <button
                     onClick={() => toggleExpanded(item.href)}
@@ -232,13 +223,12 @@ function SidebarInner({ permissions }: SidebarProps) {
               {item.subItems && !isCollapsed && isExpanded && (
                 <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2.5">
                   {item.subItems.map((sub: any) => {
-                    if (isRouteGroup && sub.enabled === false) return null;
-                    const subActive = isRouteGroup ? pathname === sub.href : isOnModule && activeTab === sub.tab;
-                    const subHref = isRouteGroup ? sub.href : `${item.href}?tab=${sub.tab}`;
+                    if (sub.enabled === false) return null;
+                    const subActive = sub.href === currentUrl;
                     return (
                       <Link
-                        key={sub.href || sub.tab}
-                        href={subHref}
+                        key={sub.href}
+                        href={sub.href}
                         onClick={() => setIsMobileOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                           subActive
@@ -256,39 +246,6 @@ function SidebarInner({ permissions }: SidebarProps) {
           );
         })}
       </nav>
-
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-        {!isCollapsed && (
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1.5">Developed by Faiz</p>
-        )}
-        <div className="flex items-center gap-2">
-          <a
-            href="https://wa.me/6285215842148"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="WhatsApp"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <MessageCircle size={14} />
-          </a>
-          <a
-            href="mailto:faizramdhan17@gmail.com"
-            title="Email"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Mail size={14} />
-          </a>
-          <a
-            href="https://www.linkedin.com/in/faizramdhann"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="LinkedIn"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Linkedin size={14} />
-          </a>
-        </div>
-      </div>
     </>
   );
 

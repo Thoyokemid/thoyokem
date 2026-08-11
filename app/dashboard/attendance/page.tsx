@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ImportTab from "./components/ImportTab";
 import DataTab from "./components/DataTab";
@@ -12,18 +12,18 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { AlertCircle, Upload } from "lucide-react";
 
-export default function AttendancePage() {
+function AttendancePageInner() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("data");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "data";
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
 
-  // Redirect if not authenticated
   if (status !== "loading" && !session) {
     redirect("/login");
   }
 
-  // Return null during auth check
   if (status === "loading") {
     return null;
   }
@@ -32,7 +32,6 @@ export default function AttendancePage() {
     return null;
   }
 
-  // Access denied
   if (!session.user.permissions.attendance) {
     return (
       <DashboardLayout
@@ -59,11 +58,12 @@ export default function AttendancePage() {
     );
   }
 
-  const tabs = [
-    { id: "data", label: "Data" },
-    { id: "report", label: "Report" },
-    { id: "recap", label: "Recap" },
-  ];
+  const titles: Record<string, { title: string; subtitle: string }> = {
+    data: { title: "Attendance Data", subtitle: "Riwayat absensi karyawan" },
+    report: { title: "Attendance Report", subtitle: "Laporan keterlambatan & overtime" },
+    recap: { title: "Attendance Recap", subtitle: "Rekap kehadiran per karyawan" },
+  };
+  const { title, subtitle } = titles[activeTab] || titles.data;
 
   return (
     <DashboardLayout
@@ -79,11 +79,9 @@ export default function AttendancePage() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-              Attendance Management
+              {title}
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Manage employee attendance records
-            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
           </div>
           <Button onClick={() => setIsImportModalOpen(true)} variant="outline" size="sm">
             <Upload size={14} className="mr-1.5" />
@@ -91,25 +89,7 @@ export default function AttendancePage() {
           </Button>
         </div>
 
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-6 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="mt-4">
+        <div>
           {activeTab === "data" && <DataTab key={dataRefreshKey} />}
           {activeTab === "report" && <ReportTab />}
           {activeTab === "recap" && <RecapTab />}
@@ -126,9 +106,18 @@ export default function AttendancePage() {
           onImported={() => {
             setDataRefreshKey((k) => k + 1);
             setIsImportModalOpen(false);
+            router.push("/dashboard/attendance?tab=data");
           }}
         />
       </Modal>
     </DashboardLayout>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <Suspense fallback={null}>
+      <AttendancePageInner />
+    </Suspense>
   );
 }
