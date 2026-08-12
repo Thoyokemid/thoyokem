@@ -34,9 +34,10 @@ interface SalesOrderWithItems {
   items: { item_code: string; qty: number; rate: number; amount: number; delivered_qty: number; warehouse_id: string }[];
 }
 
-const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'red'> = {
+const STATUS_TONE: Record<string, 'gray' | 'blue' | 'orange' | 'green' | 'red'> = {
   Draft: 'gray',
   Confirmed: 'blue',
+  'In Delivery': 'orange',
   Delivered: 'green',
   Cancelled: 'red',
 };

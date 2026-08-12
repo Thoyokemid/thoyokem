@@ -221,6 +221,22 @@ export async function PATCH(request: NextRequest) {
           const lastCol = String.fromCharCode(65 + dnHeaders.length - 1);
           await writeSheet('delivery_note', `A2:${lastCol}${dnRows.length}`, dnRows.slice(1));
         }
+      } else if (currentObj.status === 'In Delivery') {
+        // DN hasn't reached Good Issued yet — nothing has left the warehouse, so just
+        // void the in-flight delivery note(s) instead of reversing any stock.
+        const dnRows = await readSheet('delivery_note');
+        const dnHeaders = (dnRows[0] || []).map((h: any) => String(h ?? '').trim());
+        const dnSoCol = dnHeaders.indexOf('so_id');
+        const dnStatusCol = dnHeaders.indexOf('status');
+        for (let i = 1; i < dnRows.length; i++) {
+          if (dnRows[i][dnSoCol] === so_id && dnRows[i][dnStatusCol] !== 'Good Issued') {
+            dnRows[i][dnStatusCol] = 'Cancelled';
+          }
+        }
+        if (dnRows.length > 1) {
+          const lastCol = String.fromCharCode(65 + dnHeaders.length - 1);
+          await writeSheet('delivery_note', `A2:${lastCol}${dnRows.length}`, dnRows.slice(1));
+        }
       }
 
       currentObj.status = 'Cancelled';
@@ -298,7 +314,6 @@ export async function PATCH(request: NextRequest) {
       }
 
       const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
-      const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
       const soItems = items.filter((i) => i.so_id === so_id);
 
       // Guard against negative stock.
@@ -312,6 +327,9 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
+      // Stock is NOT deducted here — the DN starts in the warehouse fulfillment
+      // pipeline (Unallocated -> Pick Confirmed -> Packing Completed -> Good Issued)
+      // and only Good Issue actually moves stock. See app/api/delivery-notes/route.ts action=good_issue.
       const dnId = await getNextDocId('DN');
       const { headers: dnHeaders } = await readSheetAsObjects<any>('delivery_note');
       const dnRow = objectToRow(dnHeaders, {
@@ -319,7 +337,7 @@ export async function PATCH(request: NextRequest) {
         so_id,
         customer_id: currentObj.customer_id,
         posting_date: now.slice(0, 10),
-        status: 'Submitted',
+        status: 'Unallocated',
         approval_status: 'Approved',
         owner: session?.user.name || '',
         creation: now,
@@ -341,35 +359,8 @@ export async function PATCH(request: NextRequest) {
       );
       await appendSheet('delivery_note_item', dnItemRows);
 
-      for (const item of soItems) {
-        const master = itemMaster.find((m) => m.item_code === item.item_code);
-        const valuationRate = parseFloat(master?.purchase_price) || 0;
-        await appendStockLedgerEntry({
-          itemCode: item.item_code,
-          warehouseId: item.warehouse_id,
-          voucherType: 'Delivery Note',
-          voucherId: dnId,
-          actualQty: -(parseFloat(item.qty) || 0),
-          valuationRate,
-          postingDate: now.slice(0, 10),
-        });
-      }
-
-      const soItemRows = await readSheet(ITEM_SHEET);
-      const soItemHeaders = (soItemRows[0] || []).map((h: any) => String(h ?? '').trim());
-      const soCol = soItemHeaders.indexOf('so_id');
-      const qtyCol = soItemHeaders.indexOf('qty');
-      const deliveredCol = soItemHeaders.indexOf('delivered_qty');
-      for (let i = 1; i < soItemRows.length; i++) {
-        if (soItemRows[i][soCol] === so_id) {
-          soItemRows[i][deliveredCol] = soItemRows[i][qtyCol];
-        }
-      }
-      const lastItemCol = String.fromCharCode(65 + soItemHeaders.length - 1);
-      await writeSheet(ITEM_SHEET, `A2:${lastItemCol}${soItemRows.length}`, soItemRows.slice(1));
-
-      currentObj.status = 'Delivered';
-      logAction = 'Delivered';
+      currentObj.status = 'In Delivery';
+      logAction = 'Updated';
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -20,10 +20,9 @@ import {
   OverflowMenuItem,
   OverflowMenuColumns,
 } from "@/components/ui/ListView";
-import { LeaveAttendance, StaffList } from "@/types";
+import { StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
-import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, X, CalendarDays, Download } from "lucide-react";
+import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const STAFF_COLUMNS: ColumnDef[] = [
@@ -35,28 +34,13 @@ const STAFF_COLUMNS: ColumnDef[] = [
 const DEFAULT_VISIBLE_COLS = ["employee_name", "user_id", "date_of_birth", "leave_allocation"];
 const PAGE_SIZE = 10;
 
-const CATEGORY_STYLES: Record<string, string> = {
-  sick: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  annual: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  personal: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  emergency: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  sick: 'Sick Leave',
-  annual: 'Annual Leave',
-  personal: 'Personal Leave',
-  emergency: 'Emergency Leave',
-};
-
 export default function StaffPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [staff, setStaff] = useState<StaffList[]>([]);
-  const [leaves, setLeaves] = useState<LeaveAttendance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffList | null>(null);
-  const [detailStaff, setDetailStaff] = useState<StaffList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchName, setSearchName] = useState('');
   const [birthdayFilter, setBirthdayFilter] = useState<'all' | 'has' | 'missing'>('all');
@@ -77,12 +61,8 @@ export default function StaffPage() {
 
   const fetchData = async () => {
     try {
-      const [staffRes, leavesRes] = await Promise.all([
-        fetch("/api/staff"),
-        fetch("/api/leave"),
-      ]);
+      const staffRes = await fetch("/api/staff");
       if (staffRes.ok) setStaff(await staffRes.json());
-      if (leavesRes.ok) setLeaves(await leavesRes.json());
     } catch (error) {
       console.error("Error fetching staff:", error);
     } finally {
@@ -280,7 +260,7 @@ export default function StaffPage() {
             {paginatedStaff.map((s) => (
               <ListRow
                 key={s.employee_id}
-                onClick={() => setDetailStaff(s)}
+                onClick={() => router.push(`/dashboard/hr/staff/${encodeURIComponent(s.employee_id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(s.employee_name)} />}
                 title={s.employee_name}
                 subtitle={s.user_id || '-'}
@@ -323,7 +303,7 @@ export default function StaffPage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                   {paginatedStaff.map((s) => (
-                    <tr key={s.employee_id} onClick={() => setDetailStaff(s)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                    <tr key={s.employee_id} onClick={() => router.push(`/dashboard/hr/staff/${encodeURIComponent(s.employee_id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
                       {STAFF_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
                         <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
                           {String((s as any)[col.key] ?? '-')}
@@ -409,101 +389,6 @@ export default function StaffPage() {
           </form>
         </Modal>
 
-        {/* Detail Modal */}
-        <Modal isOpen={!!detailStaff} onClose={() => setDetailStaff(null)} title="Detail Karyawan" size="lg">
-          {detailStaff && (() => {
-            const staffLeaves = leaves
-              .filter((l) => l.employee === detailStaff.user_id)
-              .sort((a, b) => b.from_date.localeCompare(a.from_date));
-            const quota = detailStaff.leave_allocation ?? 12;
-            const used = countUsedLeaveDays(leaves, detailStaff.user_id);
-            const remaining = Math.max(0, quota - used);
-
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
-                    {getInitials(detailStaff.employee_name)}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailStaff.employee_name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detailStaff.user_id || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-xs">
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Tanggal Lahir</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailStaff.date_of_birth || '-'}</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Kuota Cuti</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{quota} hari/tahun</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Sisa Kuota</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{remaining} / {quota} hari</p>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <CalendarDays size={14} className="text-gray-500" />
-                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                      Riwayat Cuti ({staffLeaves.length})
-                    </p>
-                  </div>
-
-                  {staffLeaves.length === 0 ? (
-                    <p className="text-xs text-gray-500 text-center py-6 bg-gray-50 dark:bg-gray-700 rounded-md">
-                      Belum ada riwayat cuti
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto border border-gray-100 dark:border-gray-700 rounded-md">
-                      <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-900">
-                          <tr>
-                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dari</th>
-                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sampai</th>
-                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hari</th>
-                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kategori</th>
-                            <th className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-                          {staffLeaves.map((l) => (
-                            <tr key={l.id}>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.from_date}</td>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{l.to_date}</td>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100">{countLeaveDays(l)}</td>
-                              <td className="px-2.5 py-1.5 text-xs">
-                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                  CATEGORY_STYLES[l.leave_type] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                                }`}>
-                                  {CATEGORY_LABELS[l.leave_type] || l.leave_type}
-                                </span>
-                              </td>
-                              <td className="px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[160px] truncate" title={l.description}>
-                                {l.description || '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <Button variant="secondary" onClick={() => setDetailStaff(null)}>
-                    <X size={14} className="mr-1.5" />
-                    Tutup
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-        </Modal>
       </>
     </DashboardLayout>
   );

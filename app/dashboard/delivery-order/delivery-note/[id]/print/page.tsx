@@ -76,6 +76,14 @@ export default function SuratJalanPrintPage() {
     return <p className="p-6 text-sm text-gray-500">Delivery note tidak ditemukan.</p>;
   }
 
+  if (dn.status !== 'Good Issued') {
+    return (
+      <p className="p-6 text-sm text-gray-500">
+        Surat Jalan baru bisa dicetak setelah delivery ini melewati proses Good Issue (status saat ini: {dn.status}).
+      </p>
+    );
+  }
+
   return (
     <div className={`surat-jalan-wrapper size-${size}`}>
       <style jsx global>{`

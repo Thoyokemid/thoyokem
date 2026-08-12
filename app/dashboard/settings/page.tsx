@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -61,6 +61,7 @@ function formatLastActive(iso: string | undefined): string {
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -467,7 +468,11 @@ export default function SettingsPage() {
                   </tr>
                 ) : (
                   roles.map((role) => (
-                    <tr key={role.role_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <tr
+                      key={role.role_id}
+                      onClick={() => router.push(`/dashboard/settings/role/${encodeURIComponent(role.role_id)}`)}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    >
                       <td className="py-2.5 pr-4 text-xs font-semibold text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-1.5">
                           {role.role_name}
@@ -483,7 +488,7 @@ export default function SettingsPage() {
                           <span className={`inline-block w-2 h-2 rounded-full ${role.is_super_admin || role[col.key] ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
                         </td>
                       ))}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-2">
                           <button onClick={() => openEditRole(role)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
                             <Edit size={14} />
@@ -528,12 +533,16 @@ export default function SettingsPage() {
                     </tr>
                   ) : (
                     users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr
+                        key={user.id}
+                        onClick={() => router.push(`/dashboard/settings/user/${encodeURIComponent(user.id)}`)}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                      >
                         <td className="py-2.5 pr-4">
                           <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{user.name}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</p>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <select
                             value={user.role_id}
                             onChange={(e) => handleRoleAssign(user.id, e.target.value)}

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
+import { logActivity } from '@/lib/activityLog';
 import { StockEntry } from '@/types';
 
 const SHEET = 'stock_entry';
@@ -186,6 +187,10 @@ export async function POST(request: NextRequest) {
         postingDate,
       });
     }
+
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newRow[i]));
+    await logActivity({ doctype: 'Stock Entry', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
 
     return NextResponse.json({ success: true, entry_id: newId });
   } catch (error) {

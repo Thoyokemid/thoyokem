@@ -300,6 +300,7 @@ export interface PurchaseInvoice {
   status: string;
   owner: string;
   creation: string;
+  items?: { item_code: string; item_name: string; uom: string; qty: number; rate: number; amount: number }[];
 }
 
 // ── Sales ──────────────────────────────────────────────────────────────────
@@ -376,6 +377,7 @@ export interface SalesInvoice {
   status: string;
   owner: string;
   creation: string;
+  items?: { item_code: string; item_name: string; uom: string; qty: number; rate: number; amount: number }[];
 }
 
 // ── Payment ────────────────────────────────────────────────────────────────

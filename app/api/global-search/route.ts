@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
           const results = records
             .filter((r) => match(r.employee_name))
             .slice(0, MAX_PER_GROUP)
-            .map((r) => ({ id: r.employee_id, label: r.employee_name, subtitle: 'Staff', href: `/dashboard/staff` }));
+            .map((r) => ({ id: r.employee_id, label: r.employee_name, subtitle: 'Staff', href: `/dashboard/hr/staff` }));
           if (results.length) groups.push({ type: 'Staff', results });
         })
       );

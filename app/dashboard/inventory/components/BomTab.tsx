@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -30,6 +31,7 @@ const REPORT_COLUMNS: ReportColumn<Bom>[] = [
 const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function BomTab() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useViewMode('inventory_bom_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_bom_cols', DEFAULT_VISIBLE);
   const [boms, setBoms] = useState<Bom[]>([]);
@@ -141,6 +143,7 @@ export default function BomTab() {
         boms.map((b) => (
           <ListRow
             key={b.bom_id}
+            onClick={() => router.push(`/dashboard/inventory/bom/${encodeURIComponent(b.bom_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center"><Layers size={14} /></span>}
             title={b.item_name || b.item_code}
             subtitle={`${b.bom_id} · Output ${b.qty} · ${b.components.length} komponen`}

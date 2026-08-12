@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
 
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
 
     await appendSheet(SHEET, [newRegistration]);
 
+    await logActivity({ doctype: 'Registration', documentId: newId, action: 'Created', changedBy: data.name || data.email || '', before: null, after: { name: data.name, email: data.email, status: 'pending' } });
+
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
     console.error('Error creating registration:', error);
@@ -116,12 +119,25 @@ export async function PATCH(request: NextRequest) {
       });
 
       await appendSheet('users', [newUser]);
+
+      const newUserObj: Record<string, any> = {};
+      userHeaders.forEach((h, i) => (newUserObj[h] = newUser[i]));
+      await logActivity({ doctype: 'User', documentId: newUserId, action: 'Created', changedBy: session.user.name || '', before: null, after: newUserObj });
     }
 
     const merged = { ...currentObj, status, update_at: now };
     const newRow = objectToRow(headers, merged);
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+
+    await logActivity({
+      doctype: 'Registration',
+      documentId: id,
+      action: status === 'approved' ? 'Approved' : 'Rejected',
+      changedBy: session.user.name || '',
+      before: currentObj,
+      after: merged,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

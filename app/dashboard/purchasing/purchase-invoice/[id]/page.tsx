@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import { PurchaseInvoice } from '@/types';
-import { AlertCircle, Wallet } from 'lucide-react';
+import { AlertCircle, Wallet, Printer } from 'lucide-react';
 
 interface PaymentEntry {
   payment_id: string;
@@ -30,6 +30,7 @@ const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange'> = {
 
 export default function PurchaseInvoiceDetailPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const params = useParams();
   const id = decodeURIComponent(String(params.id));
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null);
@@ -142,9 +143,16 @@ export default function PurchaseInvoiceDetailPage() {
         notFound={!isLoading && !invoice}
         badges={invoice && <StatusBadge label={invoice.status} tone={STATUS_TONE[invoice.status] || 'gray'} />}
         actions={
-          invoice && invoice.outstanding_amount > 0 ? (
-            <Button variant="secondary" onClick={openPay}><Wallet size={14} className="mr-1.5" />Pay</Button>
-          ) : undefined
+          invoice && (
+            <>
+              <Button variant="secondary" onClick={() => router.push(`/dashboard/purchasing/purchase-invoice/${encodeURIComponent(id)}/print?size=a4`)}>
+                <Printer size={14} className="mr-1.5" />Print
+              </Button>
+              {invoice.outstanding_amount > 0 && (
+                <Button variant="secondary" onClick={openPay}><Wallet size={14} className="mr-1.5" />Pay</Button>
+              )}
+            </>
+          )
         }
       >
         {invoice && (
@@ -152,7 +160,7 @@ export default function PurchaseInvoiceDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Supplier', value: invoice.supplier_name },
+                  { label: 'Supplier', value: <Link href={`/dashboard/purchasing/supplier/${encodeURIComponent(invoice.supplier_id)}`} className="text-primary hover:underline">{invoice.supplier_name}</Link> },
                   { label: 'Purchase Order', value: <Link href={`/dashboard/purchasing/purchase-order/${encodeURIComponent(invoice.po_id)}`} className="text-primary hover:underline">{invoice.po_id}</Link> },
                   { label: 'Posting Date', value: invoice.posting_date },
                   { label: 'Due Date', value: invoice.due_date || '-' },

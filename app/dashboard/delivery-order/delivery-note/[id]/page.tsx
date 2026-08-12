@@ -10,7 +10,15 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
-import { AlertCircle, XCircle, History, Printer, ChevronDown } from 'lucide-react';
+import { AlertCircle, XCircle, History, Printer, ChevronDown, ClipboardCheck, PackageCheck, Truck } from 'lucide-react';
+
+const STATUS_TONE: Record<string, 'gray' | 'orange' | 'blue' | 'green' | 'red'> = {
+  Unallocated: 'gray',
+  'Pick Confirmed': 'orange',
+  'Packing Completed': 'blue',
+  'Good Issued': 'green',
+  Cancelled: 'red',
+};
 
 interface DeliveryNoteWithItems {
   dn_id: string;
@@ -55,9 +63,10 @@ export default function DeliveryNoteDetailPage() {
     }
   };
 
-  const runAction = async (action: 'cancel' | 'amend') => {
-    if (action === 'cancel' && !confirm('Batalkan delivery ini? Stok yang sudah keluar akan dikembalikan.')) return;
+  const runAction = async (action: 'confirm_pick' | 'complete_pack' | 'good_issue' | 'cancel' | 'amend') => {
+    if (action === 'cancel' && !confirm(dn?.status === 'Good Issued' ? 'Batalkan delivery ini? Stok yang sudah keluar akan dikembalikan.' : 'Batalkan delivery ini?')) return;
     if (action === 'amend' && !confirm('Kirim ulang delivery ini (buat DN baru)?')) return;
+    if (action === 'good_issue' && !confirm('Konfirmasi Good Issue? Stok akan langsung terpotong dan tidak bisa dibatalkan tanpa proses Cancel.')) return;
     setBusy(true);
     try {
       const res = await fetch('/api/delivery-notes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dn_id: id, action }) });
@@ -114,38 +123,49 @@ export default function DeliveryNoteDetailPage() {
         subtitle={dn ? `${dn.customer_name} · SO ${dn.so_id} · dikirim oleh ${dn.owner || '-'}` : undefined}
         isLoading={isLoading}
         notFound={!isLoading && !dn}
-        badges={dn && <StatusBadge label={dn.status} tone={dn.status === 'Cancelled' ? 'red' : 'green'} />}
+        badges={dn && <StatusBadge label={dn.status} tone={STATUS_TONE[dn.status] || 'gray'} />}
         actions={
           dn && (
             <>
-              <div className="relative">
-                <Button variant="secondary" onClick={() => setIsPrintMenuOpen((v) => !v)}>
-                  <Printer size={14} className="mr-1.5" />Print Surat Jalan<ChevronDown size={14} className="ml-1.5" />
-                </Button>
-                {isPrintMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setIsPrintMenuOpen(false)} />
-                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20">
-                      {[
-                        { size: 'a4', label: 'A4' },
-                        { size: 'f4', label: 'F4' },
-                        { size: 'thermal', label: 'Thermal' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.size}
-                          onClick={() => {
-                            setIsPrintMenuOpen(false);
-                            router.push(`/dashboard/delivery-order/delivery-note/${encodeURIComponent(id)}/print?size=${opt.size}`);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+              {dn.status === 'Good Issued' && (
+                <div className="relative">
+                  <Button variant="secondary" onClick={() => setIsPrintMenuOpen((v) => !v)}>
+                    <Printer size={14} className="mr-1.5" />Print Surat Jalan<ChevronDown size={14} className="ml-1.5" />
+                  </Button>
+                  {isPrintMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsPrintMenuOpen(false)} />
+                      <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20">
+                        {[
+                          { size: 'a4', label: 'A4' },
+                          { size: 'f4', label: 'F4' },
+                          { size: 'thermal', label: 'Thermal' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.size}
+                            onClick={() => {
+                              setIsPrintMenuOpen(false);
+                              router.push(`/dashboard/delivery-order/delivery-note/${encodeURIComponent(id)}/print?size=${opt.size}`);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {dn.status === 'Unallocated' && (
+                <Button variant="secondary" disabled={busy} onClick={() => runAction('confirm_pick')}><ClipboardCheck size={14} className="mr-1.5" />Confirm Pick</Button>
+              )}
+              {dn.status === 'Pick Confirmed' && (
+                <Button variant="secondary" disabled={busy} onClick={() => runAction('complete_pack')}><PackageCheck size={14} className="mr-1.5" />Complete Packing</Button>
+              )}
+              {dn.status === 'Packing Completed' && (
+                <Button variant="primary" disabled={busy} onClick={() => runAction('good_issue')}><Truck size={14} className="mr-1.5" />Good Issue</Button>
+              )}
               {dn.status !== 'Cancelled' && (
                 <Button variant="danger" disabled={busy} onClick={() => runAction('cancel')}><XCircle size={14} className="mr-1.5" />Cancel</Button>
               )}
@@ -161,8 +181,22 @@ export default function DeliveryNoteDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Customer', value: dn.customer_name },
-                  { label: 'Sales Order', value: dn.so_id },
+                  {
+                    label: 'Customer',
+                    value: (
+                      <Link href={`/dashboard/sales-order/customer/${encodeURIComponent(dn.customer_id)}`} className="text-primary hover:underline">
+                        {dn.customer_name}
+                      </Link>
+                    ),
+                  },
+                  {
+                    label: 'Sales Order',
+                    value: (
+                      <Link href={`/dashboard/sales-order/sales-order/${encodeURIComponent(dn.so_id)}`} className="text-primary hover:underline">
+                        {dn.so_id}
+                      </Link>
+                    ),
+                  },
                   { label: 'Posting Date', value: dn.posting_date },
                   { label: 'Owner', value: dn.owner || '-' },
                   {
@@ -185,8 +219,16 @@ export default function DeliveryNoteDetailPage() {
                   { key: 'uom', header: 'Unit' },
                 ]}
                 rows={dn.items.map((i) => ({
-                  item_name: `${i.item_name} (${i.item_code})`,
-                  warehouse_id: i.warehouse_id,
+                  item_name: (
+                    <Link href={`/dashboard/inventory/item/${encodeURIComponent(i.item_code)}`} className="text-primary hover:underline">
+                      {i.item_name} ({i.item_code})
+                    </Link>
+                  ),
+                  warehouse_id: (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(i.warehouse_id)}`} className="text-primary hover:underline">
+                      {i.warehouse_id}
+                    </Link>
+                  ),
                   delivered_qty: i.delivered_qty,
                   uom: i.uom,
                 }))}

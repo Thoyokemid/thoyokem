@@ -17,13 +17,21 @@ interface DeliveryNoteWithItems {
   items: { item_code: string; delivered_qty: number; warehouse_id: string }[];
 }
 
+const STATUS_TONE: Record<string, 'gray' | 'orange' | 'blue' | 'green' | 'red'> = {
+  Unallocated: 'gray',
+  'Pick Confirmed': 'orange',
+  'Packing Completed': 'blue',
+  'Good Issued': 'green',
+  Cancelled: 'red',
+};
+
 const HISTORY_COLUMNS: ReportColumn<DeliveryNoteWithItems>[] = [
   { key: 'dn_id', header: 'DN ID' },
   { key: 'so_id', header: 'SO' },
   { key: 'customer_name', header: 'Customer' },
   { key: 'posting_date', header: 'Posting Date' },
   { key: 'items', header: 'Items', render: (r) => r.items.length, exportValue: (r) => r.items.length },
-  { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone={r.status === 'Cancelled' ? 'red' : 'green'} /> },
+  { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone={STATUS_TONE[r.status] || 'gray'} /> },
 ];
 
 export default function DeliveryHistoryTab() {
@@ -80,7 +88,7 @@ export default function DeliveryHistoryTab() {
             title={dn.dn_id}
             subtitle={`${dn.customer_name} · SO ${dn.so_id} · ${dn.items.length} item`}
             meta={dn.posting_date}
-            badges={<StatusBadge label={dn.status} tone={dn.status === 'Cancelled' ? 'red' : 'green'} />}
+            badges={<StatusBadge label={dn.status} tone={STATUS_TONE[dn.status] || 'gray'} />}
           />
         ))
       )}

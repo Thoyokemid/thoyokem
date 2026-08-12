@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
-import { AlertCircle, Send, XCircle, FileText, Check, Ban, History } from 'lucide-react';
+import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer } from 'lucide-react';
 
 interface SalesOrderWithItems {
   so_id: string;
@@ -27,9 +27,10 @@ interface SalesOrderWithItems {
   items: { item_code: string; item_name: string; uom: string; qty: number; rate: number; amount: number; delivered_qty: number; warehouse_id: string }[];
 }
 
-const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'red'> = {
+const STATUS_TONE: Record<string, 'gray' | 'blue' | 'orange' | 'green' | 'red'> = {
   Draft: 'gray',
   Confirmed: 'blue',
+  'In Delivery': 'orange',
   Delivered: 'green',
   Cancelled: 'red',
 };
@@ -156,6 +157,9 @@ export default function SalesOrderDetailPage() {
         actions={
           so && (
             <>
+              <Button variant="secondary" onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(id)}/print?size=a4`)}>
+                <Printer size={14} className="mr-1.5" />Print
+              </Button>
               {so.status === 'Draft' && (
                 <Button variant="secondary" disabled={busy} onClick={() => runAction('submit')}><Send size={14} className="mr-1.5" />Confirm</Button>
               )}
@@ -183,7 +187,14 @@ export default function SalesOrderDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Customer', value: so.customer_name },
+                  {
+                    label: 'Customer',
+                    value: (
+                      <Link href={`/dashboard/sales-order/customer/${encodeURIComponent(so.customer_id)}`} className="text-primary hover:underline">
+                        {so.customer_name}
+                      </Link>
+                    ),
+                  },
                   { label: 'Order Date', value: so.order_date },
                   { label: 'Delivery Date', value: so.delivery_date || '-' },
                   { label: 'Total Amount', value: `Rp${so.total_amount.toLocaleString('id-ID')}` },
@@ -212,8 +223,16 @@ export default function SalesOrderDetailPage() {
                   { key: 'amount', header: 'Amount', align: 'right' },
                 ]}
                 rows={so.items.map((i) => ({
-                  item_name: `${i.item_name} (${i.item_code})`,
-                  warehouse_id: i.warehouse_id,
+                  item_name: (
+                    <Link href={`/dashboard/inventory/item/${encodeURIComponent(i.item_code)}`} className="text-primary hover:underline">
+                      {i.item_name} ({i.item_code})
+                    </Link>
+                  ),
+                  warehouse_id: (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(i.warehouse_id)}`} className="text-primary hover:underline">
+                      {i.warehouse_id}
+                    </Link>
+                  ),
                   qty: i.qty,
                   uom: i.uom,
                   delivered_qty: i.delivered_qty,

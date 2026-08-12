@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { StaffList } from '@/types';
 
 const SHEET = 'staff_list';
@@ -56,6 +57,10 @@ export async function POST(request: NextRequest) {
 
     await appendSheet(SHEET, [newStaff]);
 
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newStaff[i]));
+    await logActivity({ doctype: 'Staff', documentId: newId, action: 'Created', changedBy: session.user.name || '', before: null, after: newObj });
+
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
     console.error('Error creating staff:', error);
@@ -100,6 +105,8 @@ export async function PUT(request: NextRequest) {
     const lastCol = String.fromCharCode(65 + headers.length - 1); // A, B, C...
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
+    await logActivity({ doctype: 'Staff', documentId: employee_id, action: 'Updated', changedBy: session.user.name || '', before: currentObj, after: merged });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating staff:', error);
@@ -131,6 +138,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteRow(SHEET, dataRowIndex + 1); // +1 to skip header row
+
+    await logActivity({ doctype: 'Staff', documentId: id, action: 'Deleted', changedBy: session.user.name || '', before: null, after: { employee_id: id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

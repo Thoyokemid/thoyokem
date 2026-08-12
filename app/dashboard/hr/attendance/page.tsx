@@ -106,7 +106,7 @@ function AttendancePageInner() {
           onImported={() => {
             setDataRefreshKey((k) => k + 1);
             setIsImportModalOpen(false);
-            router.push("/dashboard/attendance?tab=data");
+            router.push("/dashboard/hr/attendance?tab=data");
           }}
         />
       </Modal>

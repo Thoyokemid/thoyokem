@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import { SalesInvoice } from '@/types';
-import { AlertCircle, Wallet } from 'lucide-react';
+import { AlertCircle, Wallet, Printer } from 'lucide-react';
 
 interface PaymentEntry {
   payment_id: string;
@@ -30,6 +30,7 @@ const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange'> = {
 
 export default function SalesInvoiceDetailPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const params = useParams();
   const id = decodeURIComponent(String(params.id));
   const [invoice, setInvoice] = useState<SalesInvoice | null>(null);
@@ -142,9 +143,16 @@ export default function SalesInvoiceDetailPage() {
         notFound={!isLoading && !invoice}
         badges={invoice && <StatusBadge label={invoice.status} tone={STATUS_TONE[invoice.status] || 'gray'} />}
         actions={
-          invoice && invoice.outstanding_amount > 0 ? (
-            <Button variant="secondary" onClick={openPay}><Wallet size={14} className="mr-1.5" />Receive Payment</Button>
-          ) : undefined
+          invoice && (
+            <>
+              <Button variant="secondary" onClick={() => router.push(`/dashboard/sales-order/sales-invoice/${encodeURIComponent(id)}/print?size=a4`)}>
+                <Printer size={14} className="mr-1.5" />Print
+              </Button>
+              {invoice.outstanding_amount > 0 && (
+                <Button variant="secondary" onClick={openPay}><Wallet size={14} className="mr-1.5" />Receive Payment</Button>
+              )}
+            </>
+          )
         }
       >
         {invoice && (
@@ -152,7 +160,7 @@ export default function SalesInvoiceDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Customer', value: invoice.customer_name },
+                  { label: 'Customer', value: <Link href={`/dashboard/sales-order/customer/${encodeURIComponent(invoice.customer_id)}`} className="text-primary hover:underline">{invoice.customer_name}</Link> },
                   { label: 'Sales Order', value: <Link href={`/dashboard/sales-order/sales-order/${encodeURIComponent(invoice.so_id)}`} className="text-primary hover:underline">{invoice.so_id}</Link> },
                   { label: 'Delivery Note', value: invoice.dn_id ? <Link href={`/dashboard/delivery-order/delivery-note/${encodeURIComponent(invoice.dn_id)}`} className="text-primary hover:underline">{invoice.dn_id}</Link> : '-' },
                   { label: 'Posting Date', value: invoice.posting_date },

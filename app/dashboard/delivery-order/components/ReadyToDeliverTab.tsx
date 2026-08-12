@@ -51,7 +51,7 @@ export default function ReadyToDeliverTab() {
   };
 
   const handleDeliver = async (so_id: string) => {
-    if (!confirm(`Kirim semua item untuk ${so_id}? Ini akan mengurangi stok.`)) return;
+    if (!confirm(`Mulai proses pengiriman untuk ${so_id}? Stok baru terpotong setelah Good Issue di tahap Pick/Pack.`)) return;
     setBusyId(so_id);
     try {
       const res = await fetch('/api/sales-orders', {

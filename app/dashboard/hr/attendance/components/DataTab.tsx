@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
 import Button from '@/components/ui/Button';
@@ -54,6 +55,7 @@ function TipeBadge({ value }: { value: string }) {
 }
 
 export default function DataTab() {
+  const router = useRouter();
   const [data, setData] = useState<AttendanceImport[]>([]);
   const [filteredData, setFilteredData] = useState<AttendanceImport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -197,6 +199,7 @@ export default function DataTab() {
             paginatedData.map((row, i) => (
               <ListRow
                 key={i}
+                onClick={() => router.push(`/dashboard/hr/attendance/record/${encodeURIComponent(row.id || row.cloud_id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(row.employee_name || '?')} />}
                 title={row.employee_name}
                 subtitle={`${row.designation || '-'}${row.branch ? ' · ' + row.branch : ''}`}

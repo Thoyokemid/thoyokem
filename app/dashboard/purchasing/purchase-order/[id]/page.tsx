@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
-import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History } from 'lucide-react';
+import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer } from 'lucide-react';
 
 interface PurchaseOrderWithItems {
   po_id: string;
@@ -157,6 +157,9 @@ export default function PurchaseOrderDetailPage() {
         actions={
           po && (
             <>
+              <Button variant="secondary" onClick={() => router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(id)}/print?size=a4`)}>
+                <Printer size={14} className="mr-1.5" />Print
+              </Button>
               {po.status === 'Draft' && (
                 <Button variant="secondary" disabled={busy} onClick={() => runAction('submit')}><Send size={14} className="mr-1.5" />Submit</Button>
               )}
@@ -187,7 +190,14 @@ export default function PurchaseOrderDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Supplier', value: po.supplier_name },
+                  {
+                    label: 'Supplier',
+                    value: (
+                      <Link href={`/dashboard/purchasing/supplier/${encodeURIComponent(po.supplier_id)}`} className="text-primary hover:underline">
+                        {po.supplier_name}
+                      </Link>
+                    ),
+                  },
                   { label: 'Order Date', value: po.order_date },
                   { label: 'Expected Date', value: po.expected_date || '-' },
                   { label: 'Total Amount', value: `Rp${po.total_amount.toLocaleString('id-ID')}` },
@@ -216,8 +226,16 @@ export default function PurchaseOrderDetailPage() {
                   { key: 'amount', header: 'Amount', align: 'right' },
                 ]}
                 rows={po.items.map((i) => ({
-                  item_name: `${i.item_name} (${i.item_code})`,
-                  warehouse_id: i.warehouse_id,
+                  item_name: (
+                    <Link href={`/dashboard/inventory/item/${encodeURIComponent(i.item_code)}`} className="text-primary hover:underline">
+                      {i.item_name} ({i.item_code})
+                    </Link>
+                  ),
+                  warehouse_id: (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(i.warehouse_id)}`} className="text-primary hover:underline">
+                      {i.warehouse_id}
+                    </Link>
+                  ),
                   qty: i.qty,
                   uom: i.uom,
                   received_qty: i.received_qty,

@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Mail,
   Github,
+  Bell,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 
@@ -72,6 +73,15 @@ interface SearchGroup {
   results: SearchResult[];
 }
 
+interface NotificationItem {
+  doctype: string;
+  id: string;
+  label: string;
+  subtitle: string;
+  href: string;
+  action: string;
+}
+
 interface FlatItem {
   key: string;
   label: string;
@@ -99,6 +109,8 @@ export default function Topbar({ user }: TopbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [searchGroups, setSearchGroups] = useState<SearchGroup[]>([]);
@@ -109,6 +121,7 @@ export default function Topbar({ user }: TopbarProps) {
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
 
@@ -119,6 +132,21 @@ export default function Topbar({ user }: TopbarProps) {
         if (data?.photo_url) setPhotoUrl(data.photo_url);
       })
       .catch(() => {});
+  }, []);
+
+  const fetchNotifications = () => {
+    fetch('/api/notifications')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.items) setNotifications(data.items);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -145,15 +173,39 @@ export default function Topbar({ user }: TopbarProps) {
 
   const moduleItems: ModuleItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, enabled: user.permissions.dashboard },
-    { name: 'Attendance', href: '/dashboard/attendance', icon: Clock, enabled: user.permissions.attendance },
-    { name: 'Leave', href: '/dashboard/leave', icon: FileText, enabled: user.permissions.leave },
-    { name: 'Staff', href: '/dashboard/staff', icon: Users, enabled: user.permissions.staff },
+
+    { name: 'HR Dashboard', href: '/dashboard/hr', icon: Users, enabled: user.permissions.attendance || user.permissions.leave || user.permissions.staff },
+    { name: 'Attendance Data', href: '/dashboard/hr/attendance?tab=data', icon: Clock, enabled: user.permissions.attendance },
+    { name: 'Attendance Report', href: '/dashboard/hr/attendance?tab=report', icon: Clock, enabled: user.permissions.attendance },
+    { name: 'Attendance Recap', href: '/dashboard/hr/attendance?tab=recap', icon: Clock, enabled: user.permissions.attendance },
+    { name: 'Leave', href: '/dashboard/hr/leave', icon: FileText, enabled: user.permissions.leave },
+    { name: 'Staff', href: '/dashboard/hr/staff', icon: Users, enabled: user.permissions.staff },
+
     { name: 'Inventory', href: '/dashboard/inventory', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Stock Balance', href: '/dashboard/inventory?tab=balance', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Stock Ledger', href: '/dashboard/inventory?tab=ledger', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Stock Entries', href: '/dashboard/inventory?tab=entries', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Items', href: '/dashboard/inventory?tab=items', icon: Package, enabled: user.permissions.inventory },
+    { name: 'Product Campuran (BOM)', href: '/dashboard/inventory?tab=bom', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Warehouses', href: '/dashboard/inventory?tab=warehouses', icon: WarehouseIcon, enabled: user.permissions.inventory },
+
     { name: 'Purchasing', href: '/dashboard/purchasing', icon: ShoppingCart, enabled: user.permissions.purchasing },
+    { name: 'Purchase Orders', href: '/dashboard/purchasing?tab=orders', icon: ShoppingCart, enabled: user.permissions.purchasing },
+    { name: 'Purchase Invoices', href: '/dashboard/purchasing?tab=invoices', icon: FileText, enabled: user.permissions.purchasing },
+    { name: 'Suppliers', href: '/dashboard/purchasing?tab=suppliers', icon: Truck, enabled: user.permissions.purchasing },
+
     { name: 'Sales Order', href: '/dashboard/sales-order', icon: ShoppingBag, enabled: user.permissions.sales_order },
+    { name: 'Sales Orders', href: '/dashboard/sales-order?tab=orders', icon: ShoppingBag, enabled: user.permissions.sales_order },
+    { name: 'Sales Invoices', href: '/dashboard/sales-order?tab=invoices', icon: FileText, enabled: user.permissions.sales_order },
+    { name: 'Customers', href: '/dashboard/sales-order?tab=customers', icon: UserIcon, enabled: user.permissions.sales_order },
+
     { name: 'Delivery Order', href: '/dashboard/delivery-order', icon: Truck, enabled: user.permissions.delivery_order },
+    { name: 'Ready to Deliver', href: '/dashboard/delivery-order?tab=ready', icon: Truck, enabled: user.permissions.delivery_order },
+    { name: 'Delivery History', href: '/dashboard/delivery-order?tab=history', icon: PackageCheck, enabled: user.permissions.delivery_order },
+
     { name: 'Registration', href: '/dashboard/registration', icon: UserPlus, enabled: user.permissions.registration_request },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings, enabled: user.permissions.setting },
+    { name: 'Stock Reconciliation', href: '/dashboard/stock-reconciliation', icon: Boxes, enabled: !!user.isSuperAdmin },
     { name: 'My Profile', href: '/dashboard/profile', icon: UserIcon, enabled: true },
   ];
 
@@ -186,6 +238,9 @@ export default function Topbar({ user }: TopbarProps) {
       }
       if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
         setIsHelpOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setIsNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -362,6 +417,54 @@ export default function Topbar({ user }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Notifications — items needing this user's action */}
+        <div ref={notifRef} className="relative">
+          <button
+            onClick={() => setIsNotifOpen((v) => !v)}
+            title="Notifikasi"
+            className="relative flex items-center justify-center h-8 w-8 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Bell size={16} />
+            {notifications.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                {notifications.length > 9 ? '9+' : notifications.length}
+              </span>
+            )}
+          </button>
+
+          {isNotifOpen && (
+            <div className="absolute right-0 mt-1.5 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">Perlu Aksi Saya</p>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-gray-400">Tidak ada yang perlu dikerjakan</p>
+                ) : (
+                  notifications.map((n) => (
+                    <button
+                      key={`${n.doctype}:${n.id}`}
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        router.push(n.href);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-50 dark:border-gray-700/50 last:border-0"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{n.label}</span>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 flex-shrink-0">
+                          {n.action}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{n.subtitle}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Help dropdown — About & Keyboard Shortcuts */}
         <div ref={helpRef} className="relative">
           <button

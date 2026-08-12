@@ -20,6 +20,31 @@ export interface ActivityLogEntry {
   changes: FieldChange[];
 }
 
+// Which permission is required to view the log/comments for a given doctype.
+// Shared by app/api/activity-log/route.ts and app/api/comments/route.ts — keep in sync
+// with every doctype that has a detail page + "Riwayat" section.
+export function requiredDoctypePerms(perms: any): Record<string, boolean> {
+  return {
+    Item: perms.inventory,
+    Warehouse: perms.inventory,
+    'Stock Entry': perms.inventory,
+    BOM: perms.inventory,
+    Supplier: perms.purchasing,
+    'Purchase Order': perms.purchasing,
+    'Purchase Invoice': perms.purchasing,
+    Customer: perms.sales_order,
+    'Sales Order': perms.sales_order,
+    'Sales Invoice': perms.sales_order,
+    'Delivery Note': perms.delivery_order || perms.sales_order,
+    'Payment Entry': perms.purchasing || perms.sales_order,
+    User: perms.setting,
+    Role: perms.setting,
+    Staff: perms.staff,
+    Leave: perms.leave,
+    Registration: perms.registration_request,
+  };
+}
+
 // Fields not worth diffing/logging (bookkeeping columns, not meaningful business data).
 const IGNORE_FIELDS = new Set(['modified', 'modified_by', 'creation', 'owner']);
 

@@ -55,10 +55,11 @@ export async function GET() {
 
     const discrepancies: Discrepancy[] = [];
 
-    // ── Delivery Note: expect -delivered_qty per line for every non-cancelled DN ──
+    // ── Delivery Note: expect -delivered_qty per line, but ONLY once a DN has
+    // gone through Good Issue — earlier-stage DNs haven't touched stock yet. ──
     const dnStatusMap = new Map(dnData.records.map((d) => [d.dn_id, d.status]));
     for (const line of dnItemData.records) {
-      if (dnStatusMap.get(line.dn_id) === 'Cancelled') continue;
+      if (dnStatusMap.get(line.dn_id) !== 'Good Issued') continue;
       const expected = -(parseFloat(line.delivered_qty) || 0);
       if (expected === 0) continue;
       const key = `Delivery Note::${line.dn_id}::${line.item_code}::${line.warehouse_id}`;

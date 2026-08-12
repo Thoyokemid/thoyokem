@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
 import { ListRow, StatusBadge } from '@/components/ui/ListView';
@@ -19,6 +20,7 @@ const REPORT_COLUMNS: ReportColumn<StockBalance>[] = [
 const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function StockBalanceTab() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useViewMode('inventory_stock_balance_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_stock_balance_cols', DEFAULT_VISIBLE);
   const [balances, setBalances] = useState<StockBalance[]>([]);
@@ -95,6 +97,7 @@ export default function StockBalanceTab() {
           filtered.map((b) => (
             <ListRow
               key={`${b.item_code}::${b.warehouse_id}`}
+              onClick={() => router.push(`/dashboard/inventory/item/${encodeURIComponent(b.item_code)}`)}
               avatar={
                 <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                   <Boxes size={14} />

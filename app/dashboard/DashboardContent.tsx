@@ -34,9 +34,9 @@ interface QuickAction {
 export default function DashboardContent({ userName, permissions }: DashboardContentProps) {
   const quickActions: QuickAction[] = [
     { name: 'HR Dashboard', href: '/dashboard/hr', icon: Users, enabled: permissions.attendance || permissions.leave || permissions.staff },
-    { name: 'Attendance', href: '/dashboard/attendance', icon: Clock, enabled: permissions.attendance },
-    { name: 'Leave', href: '/dashboard/leave', icon: FileText, enabled: permissions.leave },
-    { name: 'Staff', href: '/dashboard/staff', icon: Users, enabled: permissions.staff },
+    { name: 'Attendance', href: '/dashboard/hr/attendance', icon: Clock, enabled: permissions.attendance },
+    { name: 'Leave', href: '/dashboard/hr/leave', icon: FileText, enabled: permissions.leave },
+    { name: 'Staff', href: '/dashboard/hr/staff', icon: Users, enabled: permissions.staff },
     { name: 'Inventory', href: '/dashboard/inventory', icon: Boxes, enabled: permissions.inventory },
     { name: 'Purchasing', href: '/dashboard/purchasing', icon: ShoppingCart, enabled: permissions.purchasing },
     { name: 'Sales Order', href: '/dashboard/sales-order', icon: ShoppingBag, enabled: permissions.sales_order },

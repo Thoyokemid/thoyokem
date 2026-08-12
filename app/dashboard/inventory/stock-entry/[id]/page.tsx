@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
+import ActivityLogView from '@/components/ui/ActivityLogView';
 import { StockEntry } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -74,20 +76,46 @@ export default function StockEntryDetailPage() {
         badges={entry && <StatusBadge label={entry.status || 'Submitted'} tone="green" />}
       >
         {entry && (
+          <div className="space-y-4">
           <DetailSection title="Detail">
             <FieldGrid
               fields={[
                 { label: 'Entry Type', value: entry.entry_type },
-                { label: 'Item', value: entry.item_code },
+                {
+                  label: 'Item',
+                  value: (
+                    <Link href={`/dashboard/inventory/item/${encodeURIComponent(entry.item_code)}`} className="text-primary hover:underline">
+                      {entry.item_code}
+                    </Link>
+                  ),
+                },
                 { label: 'Qty', value: entry.qty },
-                { label: 'Source Warehouse', value: entry.source_warehouse || '-' },
-                { label: 'Target Warehouse', value: entry.target_warehouse || '-' },
+                {
+                  label: 'Source Warehouse',
+                  value: entry.source_warehouse ? (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(entry.source_warehouse)}`} className="text-primary hover:underline">
+                      {entry.source_warehouse}
+                    </Link>
+                  ) : '-',
+                },
+                {
+                  label: 'Target Warehouse',
+                  value: entry.target_warehouse ? (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(entry.target_warehouse)}`} className="text-primary hover:underline">
+                      {entry.target_warehouse}
+                    </Link>
+                  ) : '-',
+                },
                 { label: 'Date', value: entry.date },
                 { label: 'Remarks', value: entry.remarks || '-' },
                 { label: 'Owner', value: entry.owner || '-' },
               ]}
             />
           </DetailSection>
+          <DetailSection title="Riwayat">
+            <ActivityLogView doctype="Stock Entry" documentId={entry.entry_id} />
+          </DetailSection>
+          </div>
         )}
       </DetailView>
     </DashboardLayout>

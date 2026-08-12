@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
@@ -101,7 +102,11 @@ export default function WarehouseDetailPage() {
                   { key: 'stock_value', header: 'Stock Value', align: 'right' },
                 ]}
                 rows={balances.map((b) => ({
-                  item_name: b.item_name,
+                  item_name: (
+                    <Link href={`/dashboard/inventory/item/${encodeURIComponent(b.item_code)}`} className="text-primary hover:underline">
+                      {b.item_name}
+                    </Link>
+                  ),
                   qty_on_hand: b.qty_on_hand,
                   valuation_rate: `Rp${b.valuation_rate.toLocaleString('id-ID')}`,
                   stock_value: `Rp${b.stock_value.toLocaleString('id-ID')}`,

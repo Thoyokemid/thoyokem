@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
@@ -160,7 +161,11 @@ export default function ItemDetailPage() {
                   { key: 'last_transaction_date', header: 'Last Transaction' },
                 ]}
                 rows={balances.map((b) => ({
-                  warehouse_id: b.warehouse_id,
+                  warehouse_id: (
+                    <Link href={`/dashboard/inventory/warehouse/${encodeURIComponent(b.warehouse_id)}`} className="text-primary hover:underline">
+                      {b.warehouse_id}
+                    </Link>
+                  ),
                   qty_on_hand: b.qty_on_hand,
                   valuation_rate: `Rp${b.valuation_rate.toLocaleString('id-ID')}`,
                   stock_value: `Rp${b.stock_value.toLocaleString('id-ID')}`,

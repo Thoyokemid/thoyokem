@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -20,9 +20,7 @@ import {
 } from "@/components/ui/ListView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { countLeaveDays, countUsedLeaveDays } from "@/utils/attendance";
-import { generateLeaveLetterPDF } from "@/utils/leaveLetter";
-import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download, X } from "lucide-react";
+import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const LEAVE_COLUMNS: ColumnDef[] = [
@@ -64,12 +62,12 @@ function CategoryBadge({ category }: { category: string }) {
 
 export default function LeavePage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [leaves, setLeaves] = useState<LeaveAttendance[]>([]);
   const [staff, setStaff] = useState<StaffList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLeave, setEditingLeave] = useState<LeaveAttendance | null>(null);
-  const [detailLeave, setDetailLeave] = useState<LeaveAttendance | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
@@ -431,7 +429,7 @@ export default function LeavePage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                   {paginatedLeaves.map((row) => (
-                    <tr key={row.id} onClick={() => setDetailLeave(row)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                    <tr key={row.id} onClick={() => router.push(`/dashboard/hr/leave/${encodeURIComponent(row.id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
                       {LEAVE_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
                         <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
                           {col.key === 'leave_type'
@@ -470,7 +468,7 @@ export default function LeavePage() {
             {paginatedLeaves.map((row) => (
               <ListRow
                 key={row.id}
-                onClick={() => setDetailLeave(row)}
+                onClick={() => router.push(`/dashboard/hr/leave/${encodeURIComponent(row.id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(row.employee_name)} />}
                 title={row.employee_name}
                 subtitle={`${row.from_date} → ${row.to_date}${row.description ? ' · ' + row.description : ''}`}
@@ -629,81 +627,6 @@ export default function LeavePage() {
           </form>
         </Modal>
 
-        {/* Detail Modal */}
-        <Modal isOpen={!!detailLeave} onClose={() => setDetailLeave(null)} title="Detail Cuti" size="md">
-          {detailLeave && (() => {
-            const relatedStaff = staff.find((s) => s.user_id === detailLeave.employee);
-            const quota = relatedStaff?.leave_allocation ?? 12;
-            const usedDays = countUsedLeaveDays(leaves, detailLeave.employee);
-            const remaining = Math.max(0, quota - usedDays);
-            const totalDays = countLeaveDays(detailLeave);
-
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">
-                    {getInitials(detailLeave.employee_name)}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{detailLeave.employee_name}</p>
-                    <CategoryBadge category={detailLeave.leave_type} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Tanggal Mulai</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.from_date}</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Tanggal Selesai</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{detailLeave.to_date}</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Jumlah Hari</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{totalDays} hari</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-2.5">
-                    <p className="text-gray-500 dark:text-gray-400">Sisa Kuota Cuti</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">{remaining} / {quota} hari</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Keterangan</p>
-                  <p className="text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 rounded-md p-2.5 min-h-[2.5rem]">
-                    {detailLeave.description || <span className="text-gray-400">Tidak ada keterangan</span>}
-                  </p>
-                </div>
-
-                {detailLeave.attachment && (
-                  <a
-                    href={detailLeave.attachment}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline inline-flex items-center gap-1.5"
-                  >
-                    <FileText size={13} /> Lihat dokumen pendukung
-                  </a>
-                )}
-
-                <div className="flex gap-2 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <Button variant="secondary" onClick={() => setDetailLeave(null)}>
-                    <X size={14} className="mr-1.5" />
-                    Tutup
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => generateLeaveLetterPDF(detailLeave, { quota, usedDays })}
-                  >
-                    <Download size={14} className="mr-1.5" />
-                    Download Surat Cuti
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-        </Modal>
       </>
     </DashboardLayout>
   );

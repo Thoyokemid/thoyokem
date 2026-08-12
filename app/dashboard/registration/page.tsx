@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
@@ -13,6 +14,7 @@ import { AlertCircle, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export default function RegistrationPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
@@ -166,6 +168,7 @@ export default function RegistrationPage() {
           filteredRegistrations.map((registration) => (
             <ListRow
               key={registration.id}
+              onClick={() => router.push(`/dashboard/registration/${encodeURIComponent(registration.id)}`)}
               avatar={<ListRowAvatar initials={getInitials(registration.name)} />}
               title={registration.name}
               subtitle={registration.email}

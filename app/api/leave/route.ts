@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, updateLastActive } from '@/lib/auth';
 import { readSheet, appendSheet, writeSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { logActivity } from '@/lib/activityLog';
 import { LeaveAttendance } from '@/types';
 
 const SHEET = 'leave_attendance';
@@ -76,6 +77,10 @@ export async function POST(request: NextRequest) {
 
     await appendSheet(SHEET, [newLeave]);
 
+    const newObj: Record<string, any> = {};
+    headers.forEach((h, i) => (newObj[h] = newLeave[i]));
+    await logActivity({ doctype: 'Leave', documentId: newId, action: 'Created', changedBy: session.user.name || '', before: null, after: newObj });
+
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
     console.error('Error creating leave:', error);
@@ -129,6 +134,8 @@ export async function PUT(request: NextRequest) {
     const lastCol = String.fromCharCode(65 + headers.length - 1);
     await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
 
+    await logActivity({ doctype: 'Leave', documentId: id, action: 'Updated', changedBy: session.user.name || '', before: currentObj, after: merged });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating leave:', error);
@@ -166,6 +173,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteRow(SHEET, dataRowIndex + 1);
+
+    await logActivity({ doctype: 'Leave', documentId: id, action: 'Deleted', changedBy: session.user.name || '', before: null, after: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

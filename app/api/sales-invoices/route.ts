@@ -24,7 +24,10 @@ export async function GET() {
   try {
     const { records } = await readSheetAsObjects<any>(SHEET);
     const { records: customers } = await readSheetAsObjects<any>('customer_list');
+    const { records: invoiceItems } = await readSheetAsObjects<any>(ITEM_SHEET);
+    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
     const customerMap = new Map(customers.map((c) => [c.customer_id, c.customer_name]));
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
 
     const invoices = records
       .map((r) => ({
@@ -40,6 +43,16 @@ export async function GET() {
         status: r.status,
         owner: r.owner,
         creation: r.creation,
+        items: invoiceItems
+          .filter((i) => i.si_id === r.si_id)
+          .map((i) => ({
+            item_code: i.item_code,
+            item_name: itemMasterMap.get(i.item_code)?.item_name || i.item_code,
+            uom: itemMasterMap.get(i.item_code)?.unit || '-',
+            qty: parseFloat(i.qty) || 0,
+            rate: parseFloat(i.rate) || 0,
+            amount: parseFloat(i.amount) || 0,
+          })),
       }))
       .reverse();
 

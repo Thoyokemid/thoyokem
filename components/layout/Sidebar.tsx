@@ -64,11 +64,11 @@ function SidebarInner({ permissions }: SidebarProps) {
       href: '/dashboard/hr',
       enabled: permissions.attendance || permissions.leave || permissions.staff,
       subItems: [
-        { name: 'Attendance Data', href: '/dashboard/attendance?tab=data', enabled: permissions.attendance },
-        { name: 'Attendance Report', href: '/dashboard/attendance?tab=report', enabled: permissions.attendance },
-        { name: 'Attendance Recap', href: '/dashboard/attendance?tab=recap', enabled: permissions.attendance },
-        { name: 'Leave', href: '/dashboard/leave', enabled: permissions.leave },
-        { name: 'Staff', href: '/dashboard/staff', enabled: permissions.staff },
+        { name: 'Attendance Data', href: '/dashboard/hr/attendance?tab=data', enabled: permissions.attendance },
+        { name: 'Attendance Report', href: '/dashboard/hr/attendance?tab=report', enabled: permissions.attendance },
+        { name: 'Attendance Recap', href: '/dashboard/hr/attendance?tab=recap', enabled: permissions.attendance },
+        { name: 'Leave', href: '/dashboard/hr/leave', enabled: permissions.leave },
+        { name: 'Staff', href: '/dashboard/hr/staff', enabled: permissions.staff },
       ],
     },
     {

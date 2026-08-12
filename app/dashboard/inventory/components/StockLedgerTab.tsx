@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Loading from '@/components/ui/Loading';
 import { ListRow, StatusBadge } from '@/components/ui/ListView';
@@ -8,7 +9,26 @@ import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, export
 import { StockLedgerEntry, Item, Warehouse } from '@/types';
 import { Search, ArrowLeftRight } from 'lucide-react';
 
+// Maps a ledger entry's source voucher to its detail page, when one exists.
+// Purchase Receipt and correction entries have no dedicated detail page, so those stay non-clickable.
+function voucherRoute(voucherType: string, voucherId: string): string | null {
+  if (voucherType === 'Delivery Note' || voucherType === 'Delivery Note Cancellation') {
+    return `/dashboard/delivery-order/delivery-note/${encodeURIComponent(voucherId)}`;
+  }
+  if (voucherType === 'Stock Entry') {
+    return `/dashboard/inventory/stock-entry/${encodeURIComponent(voucherId)}`;
+  }
+  if (voucherType === 'Sales Order Cancellation') {
+    return `/dashboard/sales-order/sales-order/${encodeURIComponent(voucherId)}`;
+  }
+  if (voucherType === 'Purchase Order Cancellation') {
+    return `/dashboard/purchasing/purchase-order/${encodeURIComponent(voucherId)}`;
+  }
+  return null;
+}
+
 export default function StockLedgerTab() {
+  const router = useRouter();
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -129,6 +149,10 @@ export default function StockLedgerTab() {
           filtered.map((r) => (
             <ListRow
               key={r.entry_id}
+              onClick={(() => {
+                const route = voucherRoute(r.voucher_type, r.voucher_id);
+                return route ? () => router.push(route) : undefined;
+              })()}
               avatar={
                 <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                   <ArrowLeftRight size={14} />
