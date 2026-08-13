@@ -39,6 +39,7 @@ export default function StaffPage() {
   const router = useRouter();
   const [staff, setStaff] = useState<StaffList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,11 +61,14 @@ export default function StaffPage() {
   }, [session]);
 
   const fetchData = async () => {
+    setLoadError(false);
     try {
       const staffRes = await fetch("/api/staff");
       if (staffRes.ok) setStaff(await staffRes.json());
+      else setLoadError(true);
     } catch (error) {
       console.error("Error fetching staff:", error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -252,6 +256,11 @@ export default function StaffPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Loading size="lg" />
+          </div>
+        ) : loadError ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-sm text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
+            <button onClick={fetchData} className="text-xs text-primary hover:underline">Coba lagi</button>
           </div>
         ) : filteredStaff.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-gray-500">No staff found</p>

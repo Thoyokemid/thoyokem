@@ -66,6 +66,7 @@ export default function LeavePage() {
   const [leaves, setLeaves] = useState<LeaveAttendance[]>([]);
   const [staff, setStaff] = useState<StaffList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLeave, setEditingLeave] = useState<LeaveAttendance | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -98,6 +99,7 @@ export default function LeavePage() {
   }, [session]);
 
   const fetchData = async () => {
+    setLoadError(false);
     try {
       const [leavesRes, staffRes] = await Promise.all([
         fetch("/api/leave"),
@@ -105,9 +107,11 @@ export default function LeavePage() {
       ]);
 
       if (leavesRes.ok) setLeaves(await leavesRes.json());
+      else setLoadError(true);
       if (staffRes.ok) setStaff(await staffRes.json());
     } catch (error) {
       console.error("Error fetching data:", error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -410,6 +414,11 @@ export default function LeavePage() {
           <div className="flex flex-col items-center justify-center py-12">
             <Loading size="lg" />
             <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Loading leave data...</p>
+          </div>
+        ) : loadError ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-sm text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
+            <button onClick={fetchData} className="text-xs text-primary hover:underline">Coba lagi</button>
           </div>
         ) : paginatedLeaves.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-gray-500">No leave records found</p>

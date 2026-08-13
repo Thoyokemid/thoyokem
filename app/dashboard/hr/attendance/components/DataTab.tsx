@@ -59,6 +59,7 @@ export default function DataTab() {
   const [data, setData] = useState<AttendanceImport[]>([]);
   const [filteredData, setFilteredData] = useState<AttendanceImport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [page, setPage] = useState(1);
@@ -93,15 +94,19 @@ export default function DataTab() {
   }, [searchTerm, selectedDate, data]);
 
   const fetchData = async () => {
+    setLoadError(false);
     try {
       const response = await fetch('/api/attendance');
       if (response.ok) {
         const result = await response.json();
         setData(result);
         setFilteredData(result);
+      } else {
+        setLoadError(true);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +199,14 @@ export default function DataTab() {
       {viewMode === 'list' ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
           {paginatedData.length === 0 ? (
-            <p className="px-3 py-10 text-center text-sm text-gray-500">No data available</p>
+            loadError ? (
+              <div className="px-3 py-10 text-center">
+                <p className="text-sm text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
+                <button onClick={fetchData} className="text-xs text-primary hover:underline">Coba lagi</button>
+              </div>
+            ) : (
+              <p className="px-3 py-10 text-center text-sm text-gray-500">No data available</p>
+            )
           ) : (
             paginatedData.map((row, i) => (
               <ListRow
@@ -241,8 +253,15 @@ export default function DataTab() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-3 py-10 text-center text-sm text-gray-500">
-                    No data available
+                  <td colSpan={columns.length} className="px-3 py-10 text-center text-sm">
+                    {loadError ? (
+                      <>
+                        <p className="text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
+                        <button onClick={fetchData} className="text-xs text-primary hover:underline">Coba lagi</button>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">No data available</span>
+                    )}
                   </td>
                 </tr>
               ) : (

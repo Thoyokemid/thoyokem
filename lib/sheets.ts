@@ -1,8 +1,18 @@
-import { google } from 'googleapis';
+import { google, sheets_v4 } from 'googleapis';
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
+// Reused across requests on the same warm serverless instance — building a fresh
+// GoogleAuth (and re-fetching an OAuth token from Google) on every single sheet
+// call was adding avoidable latency and occasional transient failures under load,
+// which surfaced in the UI as pages randomly showing "no data" that was actually
+// just a swallowed fetch error. Auth libraries handle their own token refresh
+// internally, so a long-lived client is safe to reuse.
+let cachedSheetsClient: sheets_v4.Sheets | null = null;
+
 export async function getGoogleSheetsClient() {
+  if (cachedSheetsClient) return cachedSheetsClient;
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -11,21 +21,40 @@ export async function getGoogleSheetsClient() {
     scopes: SCOPES,
   });
 
-  const sheets = google.sheets({ version: 'v4', auth });
-  return sheets;
+  cachedSheetsClient = google.sheets({ version: 'v4', auth });
+  return cachedSheetsClient;
+}
+
+// Retries a transient Google API failure (network blip, momentary rate limit) once
+// after a short delay before giving up. Non-transient errors (bad range, auth
+// misconfig) still throw immediately — no point retrying those.
+async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const status = error?.code || error?.response?.status;
+    const isTransient = status === 429 || status === 500 || status === 503 || !status;
+    if (retries > 0 && isTransient) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return withRetry(fn, retries - 1);
+    }
+    throw error;
+  }
 }
 
 export async function readSheet(sheetName: string, range?: string) {
   try {
-    const sheets = await getGoogleSheetsClient();
-    const fullRange = range ? `${sheetName}!${range}` : sheetName;
-    
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: fullRange,
-    });
+    return await withRetry(async () => {
+      const sheets = await getGoogleSheetsClient();
+      const fullRange = range ? `${sheetName}!${range}` : sheetName;
 
-    return response.data.values || [];
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: fullRange,
+      });
+
+      return response.data.values || [];
+    });
   } catch (error) {
     console.error('Error reading sheet:', error);
     throw error;
