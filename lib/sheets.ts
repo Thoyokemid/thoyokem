@@ -25,40 +25,83 @@ export async function getGoogleSheetsClient() {
   return cachedSheetsClient;
 }
 
-// Retries a transient Google API failure (network blip, momentary rate limit) once
-// after a short delay before giving up. Non-transient errors (bad range, auth
-// misconfig) still throw immediately — no point retrying those.
-async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+// Retries a transient Google API failure (network blip, momentary rate limit)
+// with increasing backoff before giving up. Non-transient errors (bad range,
+// auth misconfig) still throw immediately — no point retrying those. 429s get
+// longer backoff since those are almost always the Sheets API's own per-minute
+// read quota, which needs real time to clear, not a quick retry.
+async function withRetry<T>(fn: () => Promise<T>, attempt = 0): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
     const status = error?.code || error?.response?.status;
-    const isTransient = status === 429 || status === 500 || status === 503 || !status;
-    if (retries > 0 && isTransient) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      return withRetry(fn, retries - 1);
+    const isQuota = status === 429;
+    const isTransient = isQuota || status === 500 || status === 503 || !status;
+    const maxAttempts = 2;
+    if (attempt < maxAttempts && isTransient) {
+      const delay = isQuota ? 800 * (attempt + 1) : 400;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return withRetry(fn, attempt + 1);
     }
     throw error;
   }
 }
 
-export async function readSheet(sheetName: string, range?: string) {
-  try {
-    return await withRetry(async () => {
-      const sheets = await getGoogleSheetsClient();
-      const fullRange = range ? `${sheetName}!${range}` : sheetName;
+// Short-lived read cache + in-flight de-duplication, keyed by "sheetName::range".
+// The app fires several near-simultaneous reads of the *same* sheet per page view
+// (e.g. a detail page's main fetch + its Activity Log + its Comments box all read
+// `users` independently within the same second) — without this, rapid navigation
+// multiplies those into enough parallel Google Sheets reads to trip Google's own
+// per-minute read quota, which showed up in the UI as pages randomly going blank.
+// TTL is short enough that no page ever shows meaningfully stale data.
+const READ_CACHE_TTL_MS = 4000;
+const readCache = new Map<string, { data: any[][]; expiresAt: number }>();
+const inFlightReads = new Map<string, Promise<any[][]>>();
 
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: fullRange,
-      });
+function cacheKey(sheetName: string, range?: string) {
+  return `${sheetName}::${range || ''}`;
+}
 
-      return response.data.values || [];
-    });
-  } catch (error) {
-    console.error('Error reading sheet:', error);
-    throw error;
+/** Call after any write/append/delete so the next read isn't served stale cached data. */
+function invalidateSheetCache(sheetName: string) {
+  for (const key of readCache.keys()) {
+    if (key.startsWith(`${sheetName}::`)) readCache.delete(key);
   }
+}
+
+export async function readSheet(sheetName: string, range?: string) {
+  const key = cacheKey(sheetName, range);
+  const cached = readCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  const inFlight = inFlightReads.get(key);
+  if (inFlight) return inFlight;
+
+  const promise = (async () => {
+    try {
+      const data = await withRetry(async () => {
+        const sheets = await getGoogleSheetsClient();
+        const fullRange = range ? `${sheetName}!${range}` : sheetName;
+
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: process.env.GOOGLE_SHEET_ID,
+          range: fullRange,
+        });
+
+        return response.data.values || [];
+      });
+      readCache.set(key, { data, expiresAt: Date.now() + READ_CACHE_TTL_MS });
+      return data;
+    } catch (error) {
+      console.error('Error reading sheet:', error);
+      throw error;
+    } finally {
+      inFlightReads.delete(key);
+    }
+  })();
+
+  inFlightReads.set(key, promise);
+  return promise;
 }
 
 export async function writeSheet(sheetName: string, range: string, values: any[][]) {
@@ -74,6 +117,7 @@ export async function writeSheet(sheetName: string, range: string, values: any[]
       },
     });
 
+    invalidateSheetCache(sheetName);
     return true;
   } catch (error) {
     console.error('Error writing to sheet:', error);
@@ -94,6 +138,7 @@ export async function appendSheet(sheetName: string, values: any[][]) {
       },
     });
 
+    invalidateSheetCache(sheetName);
     return true;
   } catch (error) {
     console.error('Error appending to sheet:', error);
@@ -135,6 +180,7 @@ export async function clearAndWriteSheet(sheetName: string, values: any[][]) {
       },
     });
 
+    invalidateSheetCache(sheetName);
     return true;
   } catch (error) {
     console.error('Error clearing and writing sheet:', error);
@@ -257,6 +303,7 @@ export async function deleteRow(sheetName: string, rowIndex: number) {
       },
     });
 
+    invalidateSheetCache(sheetName);
     return true;
   } catch (error) {
     console.error('Error deleting row:', error);
