@@ -1,6 +1,5 @@
-import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
-
-const SHEET = 'activity_log';
+import { prisma } from '@/lib/db';
+import { generateId } from '@/lib/id';
 
 export type LogAction = 'Created' | 'Updated' | 'Deleted' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled' | 'Amended' | 'Received' | 'Delivered' | 'Paid';
 
@@ -81,41 +80,40 @@ export async function logActivity(params: {
     const changes = diffObjects(params.before ?? null, params.after);
     if (params.action === 'Updated' && changes.length === 0) return;
 
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const logId = String(records.length + 1);
-    const row = objectToRow(headers, {
-      log_id: logId,
-      doctype: params.doctype,
-      document_id: params.documentId,
-      action: params.action,
-      changed_by: params.changedBy,
-      timestamp: new Date().toISOString(),
-      changes: JSON.stringify(changes),
+    await prisma.activityLog.create({
+      data: {
+        logId: generateId(),
+        doctype: params.doctype,
+        documentId: params.documentId,
+        action: params.action,
+        changedBy: params.changedBy,
+        timestamp: new Date().toISOString(),
+        changes: JSON.stringify(changes),
+      },
     });
-    await appendSheet(SHEET, [row]);
   } catch (error) {
     console.error('Failed to write activity log:', error);
   }
 }
 
 export async function getActivityLog(doctype: string, documentId: string): Promise<ActivityLogEntry[]> {
-  const { records } = await readSheetAsObjects<any>(SHEET);
-  return records
-    .filter((r) => r.doctype === doctype && r.document_id === documentId)
-    .map((r) => {
-      let changes: FieldChange[] = [];
-      try {
-        changes = JSON.parse(r.changes || '[]');
-      } catch {}
-      return {
-        log_id: r.log_id,
-        doctype: r.doctype,
-        document_id: r.document_id,
-        action: r.action,
-        changed_by: r.changed_by,
-        timestamp: r.timestamp,
-        changes,
-      };
-    })
-    .sort((a, b) => Number(b.log_id) - Number(a.log_id));
+  const records = await prisma.activityLog.findMany({
+    where: { doctype, documentId },
+    orderBy: { timestamp: 'desc' },
+  });
+  return records.map((r) => {
+    let changes: FieldChange[] = [];
+    try {
+      changes = JSON.parse(r.changes || '[]');
+    } catch {}
+    return {
+      log_id: r.logId,
+      doctype: r.doctype,
+      document_id: r.documentId,
+      action: r.action as LogAction,
+      changed_by: r.changedBy,
+      timestamp: r.timestamp,
+      changes,
+    };
+  });
 }

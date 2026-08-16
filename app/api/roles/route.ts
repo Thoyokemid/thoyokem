@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, appendSheet, writeSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { generateId } from '@/lib/id';
 import { Role } from '@/types';
-
-const SHEET = 'roles';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
 
 // Only users with setting permission may manage roles.
 async function requireSettingAccess() {
@@ -28,22 +23,22 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.role.findMany();
     const roles: Role[] = records.map((r) => ({
-      role_id: r.role_id || '',
-      role_name: r.role_name || '',
-      dashboard: toBool(r.dashboard),
-      attendance: toBool(r.attendance),
-      leave: toBool(r.leave),
-      registration_request: toBool(r.registration_request),
-      setting: toBool(r.setting),
-      staff: toBool(r.staff),
-      inventory: toBool(r.inventory),
-      purchasing: toBool(r.purchasing),
-      sales_order: toBool(r.sales_order),
-      delivery_order: toBool(r.delivery_order),
-      can_approve: toBool(r.can_approve),
-      is_super_admin: toBool(r.is_super_admin),
+      role_id: r.roleId,
+      role_name: r.roleName,
+      dashboard: r.dashboard,
+      attendance: r.attendance,
+      leave: r.leave,
+      registration_request: r.registrationRequest,
+      setting: r.setting,
+      staff: r.staff,
+      inventory: r.inventory,
+      purchasing: r.purchasing,
+      sales_order: r.salesOrder,
+      delivery_order: r.deliveryOrder,
+      can_approve: r.canApprove,
+      is_super_admin: r.isSuperAdmin,
     }));
 
     return NextResponse.json(roles);
@@ -59,31 +54,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = String(records.length + 1);
+    const newId = generateId();
 
-    const newRole = objectToRow(headers, {
-      role_id: newId,
-      role_name: data.role_name || '',
-      dashboard: data.dashboard ? 'TRUE' : 'FALSE',
-      attendance: data.attendance ? 'TRUE' : 'FALSE',
-      leave: data.leave ? 'TRUE' : 'FALSE',
-      registration_request: data.registration_request ? 'TRUE' : 'FALSE',
-      setting: data.setting ? 'TRUE' : 'FALSE',
-      staff: data.staff ? 'TRUE' : 'FALSE',
-      inventory: data.inventory ? 'TRUE' : 'FALSE',
-      purchasing: data.purchasing ? 'TRUE' : 'FALSE',
-      sales_order: data.sales_order ? 'TRUE' : 'FALSE',
-      delivery_order: data.delivery_order ? 'TRUE' : 'FALSE',
-      can_approve: data.can_approve ? 'TRUE' : 'FALSE',
-      is_super_admin: data.is_super_admin ? 'TRUE' : 'FALSE',
+    const created = await prisma.role.create({
+      data: {
+        roleId: newId,
+        roleName: data.role_name || '',
+        dashboard: !!data.dashboard,
+        attendance: !!data.attendance,
+        leave: !!data.leave,
+        registrationRequest: !!data.registration_request,
+        setting: !!data.setting,
+        staff: !!data.staff,
+        inventory: !!data.inventory,
+        purchasing: !!data.purchasing,
+        salesOrder: !!data.sales_order,
+        deliveryOrder: !!data.delivery_order,
+        canApprove: !!data.can_approve,
+        isSuperAdmin: !!data.is_super_admin,
+      },
     });
 
-    await appendSheet(SHEET, [newRole]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRole[i]));
-    await logActivity({ doctype: 'Role', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Role', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, role_id: newId });
   } catch (error) {
@@ -100,31 +92,31 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { role_id, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'role_id', role_id);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.role.findUnique({ where: { roleId: role_id } });
+    if (!current) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const boolFields = ['dashboard', 'attendance', 'leave', 'registration_request', 'setting', 'staff', 'inventory', 'purchasing', 'sales_order', 'delivery_order', 'can_approve', 'is_super_admin'];
-    const merged = { ...currentObj };
-    if (updates.role_name !== undefined) merged.role_name = updates.role_name;
-    boolFields.forEach((f) => {
-      if (updates[f] !== undefined) merged[f] = updates[f] ? 'TRUE' : 'FALSE';
+    const updated = await prisma.role.update({
+      where: { roleId: role_id },
+      data: {
+        roleName: updates.role_name !== undefined ? updates.role_name : current.roleName,
+        dashboard: updates.dashboard !== undefined ? !!updates.dashboard : current.dashboard,
+        attendance: updates.attendance !== undefined ? !!updates.attendance : current.attendance,
+        leave: updates.leave !== undefined ? !!updates.leave : current.leave,
+        registrationRequest: updates.registration_request !== undefined ? !!updates.registration_request : current.registrationRequest,
+        setting: updates.setting !== undefined ? !!updates.setting : current.setting,
+        staff: updates.staff !== undefined ? !!updates.staff : current.staff,
+        inventory: updates.inventory !== undefined ? !!updates.inventory : current.inventory,
+        purchasing: updates.purchasing !== undefined ? !!updates.purchasing : current.purchasing,
+        salesOrder: updates.sales_order !== undefined ? !!updates.sales_order : current.salesOrder,
+        deliveryOrder: updates.delivery_order !== undefined ? !!updates.delivery_order : current.deliveryOrder,
+        canApprove: updates.can_approve !== undefined ? !!updates.can_approve : current.canApprove,
+        isSuperAdmin: updates.is_super_admin !== undefined ? !!updates.is_super_admin : current.isSuperAdmin,
+      },
     });
 
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Role', documentId: role_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Role', documentId: role_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -146,24 +138,20 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Prevent deleting a role that's still assigned to a user.
-    const { records: users } = await readSheetAsObjects<any>('users');
-    const inUse = users.some((u) => String(u.role_id) === String(roleId));
-    if (inUse) {
+    const inUseCount = await prisma.user.count({ where: { roleId } });
+    if (inUseCount > 0) {
       return NextResponse.json(
         { error: 'Role masih dipakai oleh user lain, tidak bisa dihapus' },
         { status: 400 }
       );
     }
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'role_id', roleId);
-
-    if (dataRowIndex === -1) {
+    const existing = await prisma.role.findUnique({ where: { roleId } });
+    if (!existing) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 });
     }
 
-    await deleteRow(SHEET, dataRowIndex + 1);
+    await prisma.role.delete({ where: { roleId } });
     await logActivity({ doctype: 'Role', documentId: roleId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { role_id: roleId } });
 
     return NextResponse.json({ success: true });

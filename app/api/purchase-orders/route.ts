@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { getNextDocId, getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
-
-const SHEET = 'purchase_order';
-const ITEM_SHEET = 'purchase_order_item';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -23,43 +20,38 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records: orders } = await readSheetAsObjects<any>(SHEET);
-    const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
-    const { records: suppliers } = await readSheetAsObjects<any>('supplier_list');
-    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
+    const orders = await prisma.purchaseOrder.findMany({
+      include: { items: true },
+      orderBy: { creation: 'desc' },
+    });
+    const suppliers = await prisma.supplier.findMany({ select: { supplierId: true, supplierName: true } });
+    const supplierMap = new Map(suppliers.map((s) => [s.supplierId, s.supplierName]));
 
-    const supplierMap = new Map(suppliers.map((s) => [s.supplier_id, s.supplier_name]));
-    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
-
-    const result = orders
-      .map((po) => ({
-        po_id: po.po_id,
-        supplier_id: po.supplier_id,
-        supplier_name: supplierMap.get(po.supplier_id) || po.supplier_id,
-        order_date: po.order_date,
-        expected_date: po.expected_date,
-        status: po.status,
-        approval_status: po.approval_status || 'Pending',
-        approved_by: po.approved_by || '',
-        total_amount: parseFloat(po.total_amount) || 0,
-        owner: po.owner,
-        creation: po.creation,
-        amended_from: po.amended_from || '',
-        items: items
-          .filter((i) => i.po_id === po.po_id)
-          .map((i) => ({
-            po_id: i.po_id,
-            item_code: i.item_code,
-            item_name: i.item_name || itemMasterMap.get(i.item_code)?.item_name || i.item_code,
-            uom: i.uom || itemMasterMap.get(i.item_code)?.unit || '-',
-            qty: parseFloat(i.qty) || 0,
-            rate: parseFloat(i.rate) || 0,
-            amount: parseFloat(i.amount) || 0,
-            received_qty: parseFloat(i.received_qty) || 0,
-            warehouse_id: i.warehouse_id,
-          })),
-      }))
-      .reverse();
+    const result = orders.map((po) => ({
+      po_id: po.poId,
+      supplier_id: po.supplierId,
+      supplier_name: supplierMap.get(po.supplierId) || po.supplierId,
+      order_date: po.orderDate,
+      expected_date: po.expectedDate || '',
+      status: po.status,
+      approval_status: po.approvalStatus || 'Pending',
+      approved_by: po.approvedBy || '',
+      total_amount: Number(po.totalAmount),
+      owner: po.owner,
+      creation: po.creation,
+      amended_from: po.amendedFrom || '',
+      items: po.items.map((i) => ({
+        po_id: i.poId,
+        item_code: i.itemCode,
+        item_name: i.itemName,
+        uom: i.uom,
+        qty: Number(i.qty),
+        rate: Number(i.rate),
+        amount: Number(i.amount),
+        received_qty: Number(i.receivedQty),
+        warehouse_id: i.warehouseId,
+      })),
+    }));
 
     return NextResponse.json(result);
   } catch (error) {
@@ -82,41 +74,37 @@ export async function POST(request: NextRequest) {
 
     const poId = await getNextDocId('PO');
     const now = new Date().toISOString();
-    const totalAmount = items.reduce((sum: number, i: any) => sum + (i.qty * i.rate), 0);
-    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
-    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
+    const totalAmount = items.reduce((sum: number, i: any) => sum + i.qty * i.rate, 0);
+    const itemMaster = await prisma.item.findMany();
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.itemCode, i]));
 
-    const { headers: poHeaders } = await readSheetAsObjects<any>(SHEET);
-    const poRow = objectToRow(poHeaders, {
-      po_id: poId,
-      supplier_id,
-      order_date: now.slice(0, 10),
-      expected_date: expected_date || '',
-      status: 'Draft',
-      total_amount: totalAmount,
-      approval_status: 'Pending',
-      owner: guard.session?.user.name || '',
-      creation: now,
-      modified_by: guard.session?.user.name || '',
-      modified: now,
+    await prisma.purchaseOrder.create({
+      data: {
+        poId,
+        supplierId: supplier_id,
+        orderDate: now.slice(0, 10),
+        expectedDate: expected_date || null,
+        status: 'Draft',
+        totalAmount,
+        approvalStatus: 'Pending',
+        owner: guard.session?.user.name || '',
+        creation: now,
+        modifiedBy: guard.session?.user.name || '',
+        modified: now,
+        items: {
+          create: items.map((i: any) => ({
+            itemCode: i.item_code,
+            itemName: itemMasterMap.get(i.item_code)?.itemName || i.item_code,
+            uom: itemMasterMap.get(i.item_code)?.unit || '',
+            qty: i.qty,
+            rate: i.rate,
+            amount: i.qty * i.rate,
+            receivedQty: 0,
+            warehouseId: i.warehouse_id,
+          })),
+        },
+      },
     });
-    await appendSheet(SHEET, [poRow]);
-
-    const { headers: itemHeaders } = await readSheetAsObjects<any>(ITEM_SHEET);
-    const itemRows = items.map((i: any) =>
-      objectToRow(itemHeaders, {
-        po_id: poId,
-        item_code: i.item_code,
-        item_name: itemMasterMap.get(i.item_code)?.item_name || i.item_code,
-        uom: itemMasterMap.get(i.item_code)?.unit || '',
-        qty: i.qty,
-        rate: i.rate,
-        amount: i.qty * i.rate,
-        received_qty: 0,
-        warehouse_id: i.warehouse_id,
-      })
-    );
-    await appendSheet(ITEM_SHEET, itemRows);
 
     await logActivity({
       doctype: 'Purchase Order',
@@ -134,7 +122,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH performs a status-transition action: submit | receive | cancel
+// PATCH performs a status-transition action: submit | receive | cancel | amend | approve | reject
 export async function PATCH(request: NextRequest) {
   const guard = await requireAccess();
   if (guard.error) return guard.error;
@@ -145,113 +133,91 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'po_id dan action wajib diisi' }, { status: 400 });
     }
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'po_id', po_id);
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
-
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-    const originalObj = { ...currentObj };
+    const current = await prisma.purchaseOrder.findUnique({ where: { poId: po_id } });
+    if (!current) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
+    const original = { ...current };
 
     const now = new Date().toISOString();
     let logAction: any = 'Updated';
+    const updateData: Record<string, any> = {};
 
     if (action === 'submit') {
-      if (currentObj.status !== 'Draft') {
+      if (current.status !== 'Draft') {
         return NextResponse.json({ error: 'Hanya PO berstatus Draft yang bisa di-submit' }, { status: 400 });
       }
-      currentObj.status = 'Submitted';
+      updateData.status = 'Submitted';
       logAction = 'Submitted';
     } else if (action === 'cancel') {
-      if (currentObj.status === 'Cancelled') {
+      if (current.status === 'Cancelled') {
         return NextResponse.json({ error: 'PO sudah dibatalkan' }, { status: 400 });
       }
 
-      if (currentObj.status === 'Received') {
-        const { records: invoices } = await readSheetAsObjects<any>('purchase_invoice');
-        const hasInvoice = invoices.some((inv) => inv.po_id === po_id);
-        if (hasInvoice) {
+      if (current.status === 'Received') {
+        const invoiceCount = await prisma.purchaseInvoice.count({ where: { poId: po_id } });
+        if (invoiceCount > 0) {
           return NextResponse.json({ error: 'Batalkan/hapus Purchase Invoice yang terkait PO ini dulu sebelum membatalkan PO' }, { status: 400 });
         }
 
         // Reverse the stock impact of the receipt.
-        const { records: poItems } = await readSheetAsObjects<any>(ITEM_SHEET);
-        const items = poItems.filter((i) => i.po_id === po_id);
-        for (const item of items) {
-          const receivedQty = parseFloat(item.received_qty) || 0;
+        const poItems = await prisma.purchaseOrderItem.findMany({ where: { poId: po_id } });
+        for (const item of poItems) {
+          const receivedQty = Number(item.receivedQty);
           if (receivedQty <= 0) continue;
           await appendStockLedgerEntry({
-            itemCode: item.item_code,
-            warehouseId: item.warehouse_id,
+            itemCode: item.itemCode,
+            warehouseId: item.warehouseId,
             voucherType: 'Purchase Order Cancellation',
             voucherId: po_id,
             actualQty: -receivedQty,
-            valuationRate: parseFloat(item.rate) || 0,
+            valuationRate: Number(item.rate),
             postingDate: now.slice(0, 10),
           });
         }
 
         // Mark linked purchase receipts as cancelled too (cosmetic, for traceability).
-        const prRows = await readSheet('purchase_receipt');
-        const prHeaders = (prRows[0] || []).map((h: any) => String(h ?? '').trim());
-        const prPoCol = prHeaders.indexOf('po_id');
-        const prStatusCol = prHeaders.indexOf('status');
-        for (let i = 1; i < prRows.length; i++) {
-          if (prRows[i][prPoCol] === po_id) prRows[i][prStatusCol] = 'Cancelled';
-        }
-        if (prRows.length > 1) {
-          const lastCol = String.fromCharCode(65 + prHeaders.length - 1);
-          await writeSheet('purchase_receipt', `A2:${lastCol}${prRows.length}`, prRows.slice(1));
-        }
+        await prisma.purchaseReceipt.updateMany({ where: { poId: po_id }, data: { status: 'Cancelled' } });
       }
 
-      currentObj.status = 'Cancelled';
+      updateData.status = 'Cancelled';
       logAction = 'Cancelled';
     } else if (action === 'amend') {
-      if (currentObj.status !== 'Cancelled') {
+      if (current.status !== 'Cancelled') {
         return NextResponse.json({ error: 'Hanya PO yang sudah dibatalkan yang bisa di-amend' }, { status: 400 });
       }
 
-      const { records: allPos } = await readSheetAsObjects<any>(SHEET);
-      const newPoId = getAmendedDocId(po_id, allPos.map((p) => p.po_id));
+      const allPoIds = (await prisma.purchaseOrder.findMany({ select: { poId: true } })).map((p) => p.poId);
+      const newPoId = getAmendedDocId(po_id, allPoIds);
 
-      const { records: poItems, headers: poItemHeaders } = await readSheetAsObjects<any>(ITEM_SHEET);
-      const items = poItems.filter((i) => i.po_id === po_id);
+      const poItems = await prisma.purchaseOrderItem.findMany({ where: { poId: po_id } });
 
-      const { headers: poHeaders } = await readSheetAsObjects<any>(SHEET);
-      const newPoRow = objectToRow(poHeaders, {
-        po_id: newPoId,
-        supplier_id: currentObj.supplier_id,
-        order_date: now.slice(0, 10),
-        expected_date: currentObj.expected_date || '',
-        status: 'Draft',
-        total_amount: currentObj.total_amount,
-        approval_status: 'Pending',
-        owner: guard.session?.user.name || '',
-        creation: now,
-        modified_by: guard.session?.user.name || '',
-        modified: now,
-        amended_from: po_id,
+      await prisma.purchaseOrder.create({
+        data: {
+          poId: newPoId,
+          supplierId: current.supplierId,
+          orderDate: now.slice(0, 10),
+          expectedDate: current.expectedDate,
+          status: 'Draft',
+          totalAmount: current.totalAmount,
+          approvalStatus: 'Pending',
+          owner: guard.session?.user.name || '',
+          creation: now,
+          modifiedBy: guard.session?.user.name || '',
+          modified: now,
+          amendedFrom: po_id,
+          items: {
+            create: poItems.map((i) => ({
+              itemCode: i.itemCode,
+              itemName: i.itemName,
+              uom: i.uom,
+              qty: i.qty,
+              rate: i.rate,
+              amount: i.amount,
+              receivedQty: 0,
+              warehouseId: i.warehouseId,
+            })),
+          },
+        },
       });
-      await appendSheet(SHEET, [newPoRow]);
-
-      const newItemRows = items.map((i) =>
-        objectToRow(poItemHeaders, {
-          po_id: newPoId,
-          item_code: i.item_code,
-          item_name: i.item_name || i.item_code,
-          uom: i.uom || '',
-          qty: i.qty,
-          rate: i.rate,
-          amount: i.amount,
-          received_qty: 0,
-          warehouse_id: i.warehouse_id,
-        })
-      );
-      await appendSheet(ITEM_SHEET, newItemRows);
 
       await logActivity({
         doctype: 'Purchase Order',
@@ -267,95 +233,83 @@ export async function PATCH(request: NextRequest) {
       if (!guard.session?.user.permissions.can_approve) {
         return NextResponse.json({ error: 'Kamu tidak punya izin approve' }, { status: 403 });
       }
-      if (currentObj.status !== 'Submitted') {
+      if (current.status !== 'Submitted') {
         return NextResponse.json({ error: 'PO harus berstatus Submitted sebelum di-approve/reject' }, { status: 400 });
       }
-      currentObj.approval_status = action === 'approve' ? 'Approved' : 'Rejected';
-      currentObj.approved_by = guard.session?.user.name || '';
-      currentObj.approved_at = now;
+      updateData.approvalStatus = action === 'approve' ? 'Approved' : 'Rejected';
+      updateData.approvedBy = guard.session?.user.name || '';
+      updateData.approvedAt = now;
       logAction = action === 'approve' ? 'Approved' : 'Rejected';
     } else if (action === 'receive') {
-      if (currentObj.status !== 'Submitted') {
+      if (current.status !== 'Submitted') {
         return NextResponse.json({ error: 'PO harus berstatus Submitted sebelum diterima' }, { status: 400 });
       }
-      if (currentObj.approval_status !== 'Approved') {
+      if (current.approvalStatus !== 'Approved') {
         return NextResponse.json({ error: 'PO harus di-approve dulu sebelum barang diterima' }, { status: 400 });
       }
 
       // Full receipt: bring in the full ordered qty for every line item.
-      const { records: items } = await readSheetAsObjects<any>(ITEM_SHEET);
-      const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
-      const poItems = items.filter((i) => i.po_id === po_id);
+      const poItems = await prisma.purchaseOrderItem.findMany({ where: { poId: po_id } });
+      const itemMaster = await prisma.item.findMany();
 
       const prId = await getNextDocId('PR');
-      const { headers: prHeaders } = await readSheetAsObjects<any>('purchase_receipt');
-      const prRow = objectToRow(prHeaders, {
-        pr_id: prId,
-        po_id,
-        supplier_id: currentObj.supplier_id,
-        posting_date: now.slice(0, 10),
-        status: 'Submitted',
-        approval_status: 'Approved',
-        owner: guard.session?.user.name || '',
-        creation: now,
+      await prisma.purchaseReceipt.create({
+        data: {
+          prId,
+          poId: po_id,
+          supplierId: current.supplierId,
+          postingDate: now.slice(0, 10),
+          status: 'Submitted',
+          approvalStatus: 'Approved',
+          owner: guard.session?.user.name || '',
+          creation: now,
+        },
       });
-      await appendSheet('purchase_receipt', [prRow]);
 
-      const { headers: prItemHeaders } = await readSheetAsObjects<any>('purchase_receipt_item');
-      const prItemRows = poItems.map((i) =>
-        objectToRow(prItemHeaders, {
-          pr_id: prId,
-          po_id,
-          item_code: i.item_code,
-          received_qty: i.qty,
-          warehouse_id: i.warehouse_id,
+      await prisma.purchaseReceiptItem.createMany({
+        data: poItems.map((i) => ({
+          prId,
+          poId: po_id,
+          itemCode: i.itemCode,
+          receivedQty: i.qty,
+          warehouseId: i.warehouseId,
           rate: i.rate,
-        })
-      );
-      await appendSheet('purchase_receipt_item', prItemRows);
+        })),
+      });
 
       for (const item of poItems) {
-        const master = itemMaster.find((m) => m.item_code === item.item_code);
-        const valuationRate = parseFloat(item.rate) || (master ? parseFloat(master.purchase_price) : 0) || 0;
+        const master = itemMaster.find((m) => m.itemCode === item.itemCode);
+        const valuationRate = Number(item.rate) || (master ? Number(master.purchasePrice) : 0) || 0;
         await appendStockLedgerEntry({
-          itemCode: item.item_code,
-          warehouseId: item.warehouse_id,
+          itemCode: item.itemCode,
+          warehouseId: item.warehouseId,
           voucherType: 'Purchase Receipt',
           voucherId: prId,
-          actualQty: parseFloat(item.qty) || 0,
+          actualQty: Number(item.qty),
           valuationRate,
           postingDate: now.slice(0, 10),
         });
       }
 
       // Mark all PO item lines as fully received.
-      const poItemRows = await readSheet(ITEM_SHEET);
-      const poItemHeaders = (poItemRows[0] || []).map((h: any) => String(h ?? '').trim());
-      const poCol = poItemHeaders.indexOf('po_id');
-      const qtyCol = poItemHeaders.indexOf('qty');
-      const receivedCol = poItemHeaders.indexOf('received_qty');
-      for (let i = 1; i < poItemRows.length; i++) {
-        if (poItemRows[i][poCol] === po_id) {
-          poItemRows[i][receivedCol] = poItemRows[i][qtyCol];
-        }
-      }
-      const lastItemCol = String.fromCharCode(65 + poItemHeaders.length - 1);
-      await writeSheet(ITEM_SHEET, `A2:${lastItemCol}${poItemRows.length}`, poItemRows.slice(1));
+      await prisma.$transaction(
+        poItems.map((i) =>
+          prisma.purchaseOrderItem.update({ where: { id: i.id }, data: { receivedQty: i.qty } })
+        )
+      );
 
-      currentObj.status = 'Received';
+      updateData.status = 'Received';
       logAction = 'Received';
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    currentObj.modified_by = guard.session?.user.name || '';
-    currentObj.modified = now;
+    updateData.modifiedBy = guard.session?.user.name || '';
+    updateData.modified = now;
 
-    const newRow = objectToRow(headers, currentObj);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+    const updated = await prisma.purchaseOrder.update({ where: { poId: po_id }, data: updateData });
 
-    await logActivity({ doctype: 'Purchase Order', documentId: po_id, action: logAction, changedBy: guard.session?.user.name || '', before: originalObj, after: currentObj });
+    await logActivity({ doctype: 'Purchase Order', documentId: po_id, action: logAction, changedBy: guard.session?.user.name || '', before: original, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {

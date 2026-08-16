@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Customer } from '@/types';
-
-const SHEET = 'customer_list';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -25,17 +19,17 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.customer.findMany();
     const customers: Customer[] = records.map((r) => ({
-      customer_id: r.customer_id || '',
-      customer_name: r.customer_name || '',
+      customer_id: r.customerId,
+      customer_name: r.customerName,
       contact: r.contact || '',
       phone: r.phone || '',
       email: r.email || '',
       address: r.address || '',
-      payment_terms: r.payment_terms || '',
-      credit_limit: parseFloat(r.credit_limit) || 0,
-      is_active: r.is_active === '' ? true : toBool(r.is_active),
+      payment_terms: r.paymentTerms || '',
+      credit_limit: Number(r.creditLimit),
+      is_active: r.isActive,
     }));
     return NextResponse.json(customers);
   } catch (error) {
@@ -50,30 +44,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = data.customer_id || `CUST-${String(records.length + 1).padStart(3, '0')}`;
+    const count = await prisma.customer.count();
+    const newId = data.customer_id || `CUST-${String(count + 1).padStart(3, '0')}`;
 
-    if (records.some((r) => r.customer_id === newId)) {
+    const existing = await prisma.customer.findUnique({ where: { customerId: newId } });
+    if (existing) {
       return NextResponse.json({ error: 'Customer ID sudah dipakai' }, { status: 400 });
     }
 
-    const newRow = objectToRow(headers, {
-      customer_id: newId,
-      customer_name: data.customer_name || '',
-      contact: data.contact || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      address: data.address || '',
-      payment_terms: data.payment_terms || '',
-      credit_limit: data.credit_limit ?? 0,
-      is_active: 'TRUE',
+    const created = await prisma.customer.create({
+      data: {
+        customerId: newId,
+        customerName: data.customer_name || '',
+        contact: data.contact || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        address: data.address || '',
+        paymentTerms: data.payment_terms || '',
+        creditLimit: data.credit_limit ?? 0,
+        isActive: true,
+      },
     });
 
-    await appendSheet(SHEET, [newRow]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRow[i]));
-    await logActivity({ doctype: 'Customer', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Customer', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, customer_id: newId });
   } catch (error) {
@@ -90,27 +83,24 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { customer_id, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'customer_id', customer_id);
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+    const current = await prisma.customer.findUnique({ where: { customerId: customer_id } });
+    if (!current) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj };
-    ['customer_name', 'contact', 'phone', 'email', 'address', 'payment_terms', 'credit_limit'].forEach((f) => {
-      if (updates[f] !== undefined) merged[f] = updates[f];
+    const updated = await prisma.customer.update({
+      where: { customerId: customer_id },
+      data: {
+        customerName: updates.customer_name ?? current.customerName,
+        contact: updates.contact ?? current.contact,
+        phone: updates.phone ?? current.phone,
+        email: updates.email ?? current.email,
+        address: updates.address ?? current.address,
+        paymentTerms: updates.payment_terms ?? current.paymentTerms,
+        creditLimit: updates.credit_limit ?? current.creditLimit,
+        isActive: updates.is_active !== undefined ? !!updates.is_active : current.isActive,
+      },
     });
-    if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';
 
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Customer', documentId: customer_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Customer', documentId: customer_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -128,12 +118,10 @@ export async function DELETE(request: NextRequest) {
     const customerId = searchParams.get('customer_id');
     if (!customerId) return NextResponse.json({ error: 'customer_id required' }, { status: 400 });
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'customer_id', customerId);
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+    const existing = await prisma.customer.findUnique({ where: { customerId } });
+    if (!existing) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
 
-    await deleteRow(SHEET, dataRowIndex + 1);
+    await prisma.customer.delete({ where: { customerId } });
     await logActivity({ doctype: 'Customer', documentId: customerId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { customer_id: customerId } });
     return NextResponse.json({ success: true });
   } catch (error) {

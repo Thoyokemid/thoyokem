@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { generateId } from '@/lib/id';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
-
-const SHEET = 'registration';
 
 // Role a newly-approved user gets by default. Admin can change it later
 // from Settings → User Access. "2" = Viewer (dashboard-only) in the seed roles.
@@ -20,16 +19,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.registration.findMany();
 
     const registrations: Registration[] = records.map((r) => ({
-      id: r.id || '',
-      name: r.name || '',
-      email: r.email || '',
-      password: r.password || '',
-      status: (r.status || 'pending') as 'pending' | 'approved' | 'rejected',
-      created_at: r.created_at || '',
-      update_at: r.update_at || '',
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      password: r.password,
+      status: r.status as 'pending' | 'approved' | 'rejected',
+      created_at: r.createdAt,
+      update_at: r.updateAt,
     }));
 
     return NextResponse.json(registrations);
@@ -47,23 +46,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email tidak valid' }, { status: 400 });
     }
 
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = String(records.length + 1);
-
+    const newId = generateId();
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const now = new Date().toISOString();
 
-    const newRegistration = objectToRow(headers, {
-      id: newId,
-      name: data.name || '',
-      email: data.email || '',
-      password: hashedPassword,
-      status: 'pending',
-      created_at: now,
-      update_at: now,
+    await prisma.registration.create({
+      data: {
+        id: newId,
+        name: data.name || '',
+        email: data.email || '',
+        password: hashedPassword,
+        status: 'pending',
+        createdAt: now,
+        updateAt: now,
+      },
     });
-
-    await appendSheet(SHEET, [newRegistration]);
 
     await logActivity({ doctype: 'Registration', documentId: newId, action: 'Created', changedBy: data.name || data.email || '', before: null, after: { name: data.name, email: data.email, status: 'pending' } });
 
@@ -88,55 +85,44 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'id', id);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.registration.findUnique({ where: { id } });
+    if (!current) {
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
     const now = new Date().toISOString();
 
-    // If approved, add to users sheet with a safe default role.
+    // If approved, add to users table with a safe default role.
     if (status === 'approved') {
-      const { headers: userHeaders, records: userRecords } = await readSheetAsObjects<any>('users');
-      const newUserId = String(userRecords.length + 1);
+      const newUserId = generateId();
 
-      const newUser = objectToRow(userHeaders, {
-        id: newUserId,
-        name: currentObj.name,
-        username: currentObj.email,
-        password: currentObj.password, // already hashed
-        role: 'staff',
-        role_id: DEFAULT_ROLE_ID,
-        last_active: '',
+      const newUser = await prisma.user.create({
+        data: {
+          id: newUserId,
+          name: current.name,
+          username: current.email,
+          password: current.password, // already hashed
+          role: 'staff',
+          roleId: DEFAULT_ROLE_ID,
+          lastActive: null,
+        },
       });
 
-      await appendSheet('users', [newUser]);
-
-      const newUserObj: Record<string, any> = {};
-      userHeaders.forEach((h, i) => (newUserObj[h] = newUser[i]));
-      await logActivity({ doctype: 'User', documentId: newUserId, action: 'Created', changedBy: session.user.name || '', before: null, after: newUserObj });
+      await logActivity({ doctype: 'User', documentId: newUserId, action: 'Created', changedBy: session.user.name || '', before: null, after: newUser });
     }
 
-    const merged = { ...currentObj, status, update_at: now };
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+    const updated = await prisma.registration.update({
+      where: { id },
+      data: { status, updateAt: now },
+    });
 
     await logActivity({
       doctype: 'Registration',
       documentId: id,
       action: status === 'approved' ? 'Approved' : 'Rejected',
       changedBy: session.user.name || '',
-      before: currentObj,
-      after: merged,
+      before: current,
+      after: updated,
     });
 
     return NextResponse.json({ success: true });

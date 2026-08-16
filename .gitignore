@@ -43,3 +43,5 @@ next-env.d.ts
 ERPNext_Database_Schema.xlsx
 /docs
 ERP_Schema_Import.xlsx
+
+/lib/generated/prisma

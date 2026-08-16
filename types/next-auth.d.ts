@@ -43,6 +43,7 @@ declare module 'next-auth' {
         can_approve: boolean;
       };
       isSuperAdmin: boolean;
+      sessionInvalid?: boolean;
     };
   }
 }
@@ -66,5 +67,9 @@ declare module 'next-auth/jwt' {
       can_approve: boolean;
     };
     isSuperAdmin: boolean;
+    // Set when the underlying `users` row for this token's id can no longer be
+    // found (e.g. deleted, or its id was rewritten by a data migration) — lets
+    // the app cleanly force a re-login instead of crashing on undefined data.
+    sessionInvalid?: boolean;
   }
 }

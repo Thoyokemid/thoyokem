@@ -1,25 +1,20 @@
-import { readSheet, appendSheet, readSheetAsObjects, objectToRow } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { StockLedgerEntry, StockBalance, Item } from '@/types';
-
-const LEDGER_SHEET = 'stock_ledger_entry';
 
 /**
  * Get the current qty on hand for an item in a warehouse, based on the most
  * recent stock_ledger_entry row for that item+warehouse combination.
  */
 export async function getCurrentStockQty(itemCode: string, warehouseId: string): Promise<number> {
-  const { records } = await readSheetAsObjects<any>(LEDGER_SHEET);
-  const relevant = records.filter(
-    (r) => r.item_code === itemCode && r.warehouse_id === warehouseId
-  );
-  if (relevant.length === 0) return 0;
-
-  relevant.sort((a, b) => Number(a.entry_id) - Number(b.entry_id));
-  return parseFloat(relevant[relevant.length - 1].qty_after_transaction) || 0;
+  const latest = await prisma.stockLedgerEntry.findFirst({
+    where: { itemCode, warehouseId },
+    orderBy: { entryId: 'desc' },
+  });
+  return latest ? Number(latest.qtyAfterTransaction) : 0;
 }
 
 /**
- * Append a new stock_ledger_entry row. Computes qty_after_transaction from
+ * Insert a new stock_ledger_entry row. Computes qty_after_transaction from
  * the current balance + actual_qty (positive = in, negative = out).
  * This is the ONLY way stock_ledger_entry should be written — never edit
  * existing rows, it's an append-only audit trail.
@@ -33,25 +28,22 @@ export async function appendStockLedgerEntry(params: {
   valuationRate: number;
   postingDate: string;
 }): Promise<void> {
-  const { headers, records } = await readSheetAsObjects<any>(LEDGER_SHEET);
   const currentQty = await getCurrentStockQty(params.itemCode, params.warehouseId);
   const qtyAfter = currentQty + params.actualQty;
-  const newId = String(records.length + 1);
 
-  const row = objectToRow(headers, {
-    entry_id: newId,
-    posting_date: params.postingDate,
-    item_code: params.itemCode,
-    warehouse_id: params.warehouseId,
-    voucher_type: params.voucherType,
-    voucher_id: params.voucherId,
-    actual_qty: params.actualQty,
-    valuation_rate: params.valuationRate,
-    qty_after_transaction: qtyAfter,
-    stock_value: qtyAfter * params.valuationRate,
+  await prisma.stockLedgerEntry.create({
+    data: {
+      postingDate: params.postingDate,
+      itemCode: params.itemCode,
+      warehouseId: params.warehouseId,
+      voucherType: params.voucherType,
+      voucherId: params.voucherId,
+      actualQty: params.actualQty,
+      valuationRate: params.valuationRate,
+      qtyAfterTransaction: qtyAfter,
+      stockValue: qtyAfter * params.valuationRate,
+    },
   });
-
-  await appendSheet(LEDGER_SHEET, [row]);
 }
 
 /**

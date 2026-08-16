@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { clearAndWriteSheet, readSheetAsObjects, objectToRow } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { AttendanceImport } from '@/types';
-
-const SHEET = 'attendance_import';
 
 export async function GET() {
   try {
@@ -18,19 +16,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.attendanceImport.findMany();
 
     const attendance: AttendanceImport[] = records.map((r) => ({
-      cloud_id: r.cloud_id || '',
-      id: r.id || '',
-      employee_name: r.employee_name || '',
-      attendance_date: r.attendance_date || '',
-      jam_set: r.jam_set || '',
-      jam_absensi: r.jam_absensi || '',
-      verifikasi: r.verifikasi || '',
-      tipe_absensi: r.tipe_absensi || '',
-      designation: r.designation || '',
-      branch: r.branch || '',
+      cloud_id: r.cloudId,
+      id: r.sourceId,
+      employee_name: r.employeeName,
+      attendance_date: r.attendanceDate,
+      jam_set: r.jamSet,
+      jam_absensi: r.jamAbsensi,
+      verifikasi: r.verifikasi,
+      tipe_absensi: r.tipeAbsensi,
+      designation: r.designation,
+      branch: r.branch,
       remarks: r.remarks || '',
     }));
 
@@ -56,37 +54,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Dates in the new import
-    const incomingDates = new Set<string>(
-      data.map((item: AttendanceImport) => item.attendance_date).filter(Boolean)
+    const incomingDates = Array.from(
+      new Set<string>(data.map((item: AttendanceImport) => item.attendance_date).filter(Boolean))
     );
 
-    // Read existing data
-    const { headers, records: existingData } = await readSheetAsObjects<AttendanceImport>(SHEET);
+    const [deleted] = await prisma.$transaction([
+      prisma.attendanceImport.deleteMany({ where: { attendanceDate: { in: incomingDates } } }),
+      prisma.attendanceImport.createMany({
+        data: data.map((item: AttendanceImport) => ({
+          cloudId: item.cloud_id || '',
+          sourceId: item.id || '',
+          employeeName: item.employee_name || '',
+          attendanceDate: item.attendance_date || '',
+          jamSet: item.jam_set || '',
+          jamAbsensi: item.jam_absensi || '',
+          verifikasi: item.verifikasi || '',
+          tipeAbsensi: item.tipe_absensi || '',
+          designation: item.designation || '',
+          branch: item.branch || '',
+          remarks: item.remarks || null,
+        })),
+      }),
+    ]);
 
-    // Keep existing rows whose dates are NOT in the incoming data
-    const preserved = (existingData as any[]).filter(
-      (item) => !incomingDates.has(item.attendance_date)
-    );
-
-    // Merge: preserved old data + new data
-    const merged = [...preserved, ...data];
-
-    // Sort by attendance_date then employee_name for cleanliness
-    merged.sort((a, b) => {
-      const dateCmp = a.attendance_date.localeCompare(b.attendance_date);
-      return dateCmp !== 0 ? dateCmp : a.employee_name.localeCompare(b.employee_name);
-    });
-
-    const values = merged.map((item: AttendanceImport) => objectToRow(headers, item));
-
-    await clearAndWriteSheet(SHEET, values);
+    const total = await prisma.attendanceImport.count();
 
     return NextResponse.json({
       success: true,
       count: data.length,
-      preserved: preserved.length,
-      total: merged.length,
-      dates_replaced: Array.from(incomingDates).sort(),
+      preserved: deleted.count >= 0 ? total - data.length : 0,
+      total,
+      dates_replaced: incomingDates.sort(),
     });
   } catch (error) {
     console.error('Error importing attendance:', error);

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
+import { generateId } from '@/lib/id';
 import { StockEntry } from '@/types';
-
-const SHEET = 'stock_entry';
 
 async function requireInventoryAccess() {
   const session = await getServerSession(authOptions);
@@ -22,21 +21,21 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.stockEntry.findMany({ orderBy: { creation: 'desc' } });
     const entries: StockEntry[] = records.map((r) => ({
-      entry_id: r.entry_id || '',
-      entry_type: r.entry_type || '',
-      item_code: r.item_code || '',
-      source_warehouse: r.source_warehouse || '',
-      target_warehouse: r.target_warehouse || '',
-      qty: parseFloat(r.qty) || 0,
-      date: r.date || '',
+      entry_id: r.entryId,
+      entry_type: r.entryType as StockEntry['entry_type'],
+      item_code: r.itemCode,
+      source_warehouse: r.sourceWarehouse || '',
+      target_warehouse: r.targetWarehouse || '',
+      qty: Number(r.qty),
+      date: r.date,
       remarks: r.remarks || '',
-      status: r.status || '',
-      owner: r.owner || '',
-      creation: r.creation || '',
+      status: r.status,
+      owner: r.owner,
+      creation: r.creation,
     }));
-    return NextResponse.json(entries.reverse());
+    return NextResponse.json(entries);
   } catch (error) {
     console.error('Error fetching stock entries:', error);
     return NextResponse.json({ error: 'Failed to fetch stock entries' }, { status: 500 });
@@ -68,36 +67,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up item's valuation rate for stock value calculation.
-    const { records: items } = await readSheetAsObjects<any>('item_list');
-    const item = items.find((i) => i.item_code === item_code);
-    let valuationRate = item ? parseFloat(item.purchase_price) || 0 : 0;
+    const items = await prisma.item.findMany();
+    const item = items.find((i) => i.itemCode === item_code);
+    let valuationRate = item ? Number(item.purchasePrice) : 0;
 
     // Manufacture: consume BOM components first (need their cost to value the finished item).
     let bomComponents: { component_item_code: string; qty: number; valuationRate: number }[] = [];
     if (entry_type === 'Manufacture') {
-      const { records: boms } = await readSheetAsObjects<any>('bom');
-      const bom = boms.find((b) => b.item_code === item_code && (b.is_active === '' || b.is_active === 'TRUE' || b.is_active === true));
+      const bom = await prisma.bom.findFirst({ where: { itemCode: item_code, isActive: true }, include: { components: true } });
       if (!bom) {
         return NextResponse.json({ error: `Belum ada BOM aktif untuk item ${item_code}` }, { status: 400 });
       }
-      const bomQty = parseFloat(bom.qty) || 1;
-      const { records: bomItems } = await readSheetAsObjects<any>('bom_item');
-      const lines = bomItems.filter((c) => c.bom_id === bom.bom_id);
+      const bomQty = Number(bom.qty) || 1;
 
-      for (const line of lines) {
-        const requiredQty = (parseFloat(line.qty) || 0) * (qty / bomQty);
-        const available = await getCurrentStockQty(line.component_item_code, source_warehouse);
+      for (const line of bom.components) {
+        const requiredQty = Number(line.qty) * (qty / bomQty);
+        const available = await getCurrentStockQty(line.componentItemCode, source_warehouse);
         if (available < requiredQty) {
           return NextResponse.json(
-            { error: `Stok komponen ${line.component_item_code} tidak cukup di ${source_warehouse} (tersedia ${available}, butuh ${requiredQty})` },
+            { error: `Stok komponen ${line.componentItemCode} tidak cukup di ${source_warehouse} (tersedia ${available}, butuh ${requiredQty})` },
             { status: 400 }
           );
         }
-        const compItem = items.find((i) => i.item_code === line.component_item_code);
+        const compItem = items.find((i) => i.itemCode === line.componentItemCode);
         bomComponents.push({
-          component_item_code: line.component_item_code,
+          component_item_code: line.componentItemCode,
           qty: requiredQty,
-          valuationRate: compItem ? parseFloat(compItem.purchase_price) || 0 : 0,
+          valuationRate: compItem ? Number(compItem.purchasePrice) : 0,
         });
       }
 
@@ -105,25 +101,25 @@ export async function POST(request: NextRequest) {
       valuationRate = qty > 0 ? totalComponentCost / qty : 0;
     }
 
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = String(records.length + 1);
+    const newId = generateId();
     const now = new Date().toISOString();
     const postingDate = data.date || now.slice(0, 10);
 
-    const newRow = objectToRow(headers, {
-      entry_id: newId,
-      entry_type,
-      item_code,
-      source_warehouse: source_warehouse || '',
-      target_warehouse: target_warehouse || '',
-      qty,
-      date: postingDate,
-      remarks: remarks || '',
-      status: 'Submitted',
-      owner: guard.session?.user.name || '',
-      creation: now,
+    const created = await prisma.stockEntry.create({
+      data: {
+        entryId: newId,
+        entryType: entry_type,
+        itemCode: item_code,
+        sourceWarehouse: source_warehouse || null,
+        targetWarehouse: target_warehouse || null,
+        qty,
+        date: postingDate,
+        remarks: remarks || null,
+        status: 'Submitted',
+        owner: guard.session?.user.name || '',
+        creation: now,
+      },
     });
-    await appendSheet(SHEET, [newRow]);
 
     // Write to the stock ledger — the source of truth for stock balance.
     if (entry_type === 'Material Receipt') {
@@ -188,9 +184,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRow[i]));
-    await logActivity({ doctype: 'Stock Entry', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Stock Entry', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, entry_id: newId });
   } catch (error) {

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { requiredDoctypePerms } from '@/lib/activityLog';
-
-const SHEET = 'comments';
+import { generateId } from '@/lib/id';
 
 function requireDoctypeAccess(perms: any, doctype: string) {
   const map = requiredDoctypePerms(perms);
@@ -26,19 +25,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
-    const comments = records
-      .filter((r) => r.doctype === doctype && r.document_id === documentId)
-      .map((r) => ({
-        comment_id: r.comment_id,
-        doctype: r.doctype,
-        document_id: r.document_id,
-        author: r.author,
-        text: r.text,
-        mentions: r.mentions ? r.mentions.split(',').filter(Boolean) : [],
-        timestamp: r.timestamp,
-      }))
-      .sort((a, b) => Number(b.comment_id) - Number(a.comment_id));
+    const records = await prisma.comment.findMany({
+      where: { doctype, documentId },
+      orderBy: { timestamp: 'asc' },
+    });
+    const comments = records.map((r) => ({
+      comment_id: r.commentId,
+      doctype: r.doctype,
+      document_id: r.documentId,
+      author: r.author,
+      text: r.text,
+      mentions: r.mentions ? r.mentions.split(',').filter(Boolean) : [],
+      timestamp: r.timestamp,
+    }));
     return NextResponse.json(comments);
   } catch (error) {
     console.error('Error fetching comments:', error);
@@ -60,27 +59,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract @Mentioned Names — matches "@" followed by words/spaces up to the next "@" or line end,
-    // then keeps only names that exist in the users sheet, longest match first so "@Faiz Ramdhan"
+    // then keeps only names that exist in the users table, longest match first so "@Faiz Ramdhan"
     // doesn't get shadowed by a shorter "@Faiz" also being a valid user.
-    const { records: users } = await readSheetAsObjects<any>('users');
+    const users = await prisma.user.findMany({ select: { name: true } });
     const userNames = users.map((u) => u.name).filter(Boolean).sort((a, b) => b.length - a.length);
     const mentioned = new Set<string>();
     for (const name of userNames) {
       if (text.includes(`@${name}`)) mentioned.add(name);
     }
 
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = String(records.length + 1);
-    const row = objectToRow(headers, {
-      comment_id: newId,
-      doctype,
-      document_id: documentId,
-      author: session.user.name || '',
-      text: text.trim(),
-      mentions: Array.from(mentioned).join(','),
-      timestamp: new Date().toISOString(),
+    const newId = generateId();
+    await prisma.comment.create({
+      data: {
+        commentId: newId,
+        doctype,
+        documentId,
+        author: session.user.name || '',
+        text: text.trim(),
+        mentions: Array.from(mentioned).join(','),
+        timestamp: new Date().toISOString(),
+      },
     });
-    await appendSheet(SHEET, [row]);
 
     return NextResponse.json({ success: true, comment_id: newId });
   } catch (error) {

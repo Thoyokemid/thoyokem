@@ -2,14 +2,26 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
+import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Warehouse } from '@/types';
-import { Plus, Edit, Trash2, Warehouse as WarehouseIcon, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Warehouse as WarehouseIcon, Search, Upload } from 'lucide-react';
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: 'warehouse_id', label: 'Warehouse ID (kosongkan untuk auto)', example: '' },
+  { key: 'warehouse_name', label: 'Nama Warehouse', example: 'Gudang Utama', required: true },
+  { key: 'location', label: 'Kota', example: 'Jakarta Selatan' },
+  { key: 'pic', label: 'PIC', example: 'Budi' },
+  { key: 'phone', label: 'Telepon', example: '08123456789' },
+  { key: 'address', label: 'Alamat', example: 'Jl. Contoh No. 1' },
+  { key: 'postal_code', label: 'Kode Pos', example: '12345' },
+];
 
 const REPORT_COLUMNS: ReportColumn<Warehouse>[] = [
   { key: 'warehouse_id', header: 'Warehouse ID' },
@@ -125,9 +137,12 @@ function CityPicker({ value, onChange }: { value: string; onChange: (v: string) 
 
 export default function WarehousesTab() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isSuperAdmin = !!session?.user.isSuperAdmin;
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_warehouses_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_warehouses_cols', DEFAULT_VISIBLE);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const { data: warehouses = [], isLoading } = useQuery({
     queryKey: ['warehouses'],
     queryFn: async () => {
@@ -214,6 +229,12 @@ export default function WarehousesTab() {
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(warehouses, REPORT_COLUMNS, 'warehouses', 'Warehouses')}
           />
+          {isSuperAdmin && (
+            <Button variant="secondary" onClick={() => setIsImportOpen(true)}>
+              <Upload size={14} className="mr-1.5" />
+              Import
+            </Button>
+          )}
           <Button onClick={openNew}>
             <Plus size={14} className="mr-1.5" />
             Add Warehouse
@@ -303,6 +324,18 @@ export default function WarehousesTab() {
           </div>
         </form>
       </Modal>
+
+      {isSuperAdmin && (
+        <BulkImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          title="Import Warehouse"
+          columns={IMPORT_COLUMNS}
+          apiEndpoint="/api/warehouses/import"
+          templateFilename="template_warehouse"
+          onImported={() => queryClient.invalidateQueries({ queryKey: ['warehouses'] })}
+        />
+      )}
     </ListViewLayout>
   );
 }

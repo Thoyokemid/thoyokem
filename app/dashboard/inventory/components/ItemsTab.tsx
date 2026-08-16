@@ -2,15 +2,32 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
+import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Item } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
-import { Plus, Edit, Trash2, Search, Package, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, RefreshCw, Upload } from 'lucide-react';
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: 'item_code', label: 'Item Code (kosongkan untuk auto)', example: '' },
+  { key: 'item_name', label: 'Nama Item', example: 'Contoh Item', required: true },
+  { key: 'item_group', label: 'Group (Liquid/Non-Liquid)', example: 'Non-Liquid' },
+  { key: 'unit', label: 'Unit (PCS/KG/G/L/M)', example: 'PCS' },
+  { key: 'purchase_price', label: 'Harga Beli', example: '10000' },
+  { key: 'selling_price', label: 'Harga Jual', example: '15000' },
+  { key: 'reorder_level', label: 'Reorder Level', example: '10' },
+  { key: 'valuation_method', label: 'Valuation Method (Average/FIFO)', example: 'Average' },
+  { key: 'opening_qty', label: 'Opening Qty', example: '0' },
+  { key: 'opening_valuation_rate', label: 'Opening Valuation Rate', example: '0' },
+  { key: 'currency', label: 'Currency (IDR/USD)', example: 'IDR' },
+  { key: 'item_type', label: 'Item Type (Trading/Regular)', example: 'Regular' },
+];
 
 const ITEM_GROUPS = ['Liquid', 'Non-Liquid'];
 const ITEM_UNITS = ['PCS', 'KG', 'G', 'L', 'M'];
@@ -58,9 +75,12 @@ function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: num
 
 export default function ItemsTab() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isSuperAdmin = !!session?.user.isSuperAdmin;
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_items_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_items_cols', DEFAULT_VISIBLE);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['items'],
     queryFn: async () => {
@@ -190,10 +210,18 @@ export default function ItemsTab() {
   return (
     <ListViewLayout
       primaryAction={
-        <Button onClick={openNew}>
-          <Plus size={14} className="mr-1.5" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <Button variant="secondary" onClick={() => setIsImportOpen(true)}>
+              <Upload size={14} className="mr-1.5" />
+              Import
+            </Button>
+          )}
+          <Button onClick={openNew}>
+            <Plus size={14} className="mr-1.5" />
+            Add Item
+          </Button>
+        </div>
       }
       toolbar={
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -358,6 +386,18 @@ export default function ItemsTab() {
           </div>
         </form>
       </Modal>
+
+      {isSuperAdmin && (
+        <BulkImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          title="Import Item"
+          columns={IMPORT_COLUMNS}
+          apiEndpoint="/api/items/import"
+          templateFilename="template_item"
+          onImported={() => queryClient.invalidateQueries({ queryKey: ['items'] })}
+        />
+      )}
     </ListViewLayout>
   );
 }

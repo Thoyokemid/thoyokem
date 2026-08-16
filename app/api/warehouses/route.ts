@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Warehouse } from '@/types';
-
-const SHEET = 'warehouse_list';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
 
 function generateWarehouseId(): string {
   let id = '';
@@ -31,16 +25,16 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.warehouse.findMany();
     const warehouses: Warehouse[] = records.map((r) => ({
-      warehouse_id: r.warehouse_id || '',
-      warehouse_name: r.warehouse_name || '',
-      location: r.location || '',
-      is_active: r.is_active === '' ? true : toBool(r.is_active),
+      warehouse_id: r.warehouseId,
+      warehouse_name: r.warehouseName,
+      location: r.location,
+      is_active: r.isActive,
       pic: r.pic || '',
       phone: r.phone || '',
       address: r.address || '',
-      postal_code: r.postal_code || '',
+      postal_code: r.postalCode || '',
     }));
     return NextResponse.json(warehouses);
   } catch (error) {
@@ -55,28 +49,26 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const existingIds = new Set(records.map((r) => r.warehouse_id));
 
     let newId = generateWarehouseId();
-    while (existingIds.has(newId)) newId = generateWarehouseId();
+    while (await prisma.warehouse.findUnique({ where: { warehouseId: newId } })) {
+      newId = generateWarehouseId();
+    }
 
-    const newRow = objectToRow(headers, {
-      warehouse_id: newId,
-      warehouse_name: data.warehouse_name || '',
-      location: data.location || '',
-      is_active: 'TRUE',
-      pic: data.pic || '',
-      phone: data.phone || '',
-      address: data.address || '',
-      postal_code: data.postal_code || '',
+    const created = await prisma.warehouse.create({
+      data: {
+        warehouseId: newId,
+        warehouseName: data.warehouse_name || '',
+        location: data.location || '',
+        isActive: true,
+        pic: data.pic || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        postalCode: data.postal_code || '',
+      },
     });
 
-    await appendSheet(SHEET, [newRow]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRow[i]));
-    await logActivity({ doctype: 'Warehouse', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Warehouse', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, warehouse_id: newId });
   } catch (error) {
@@ -93,31 +85,23 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { warehouse_id, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'warehouse_id', warehouse_id);
+    const current = await prisma.warehouse.findUnique({ where: { warehouseId: warehouse_id } });
+    if (!current) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
 
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
+    const updated = await prisma.warehouse.update({
+      where: { warehouseId: warehouse_id },
+      data: {
+        warehouseName: updates.warehouse_name ?? current.warehouseName,
+        location: updates.location ?? current.location,
+        pic: updates.pic ?? current.pic,
+        phone: updates.phone ?? current.phone,
+        address: updates.address ?? current.address,
+        postalCode: updates.postal_code ?? current.postalCode,
+        isActive: updates.is_active !== undefined ? !!updates.is_active : current.isActive,
+      },
+    });
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj };
-    if (updates.warehouse_name !== undefined) merged.warehouse_name = updates.warehouse_name;
-    if (updates.location !== undefined) merged.location = updates.location;
-    if (updates.pic !== undefined) merged.pic = updates.pic;
-    if (updates.phone !== undefined) merged.phone = updates.phone;
-    if (updates.address !== undefined) merged.address = updates.address;
-    if (updates.postal_code !== undefined) merged.postal_code = updates.postal_code;
-    if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';
-
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Warehouse', documentId: warehouse_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Warehouse', documentId: warehouse_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -135,13 +119,10 @@ export async function DELETE(request: NextRequest) {
     const warehouseId = searchParams.get('warehouse_id');
     if (!warehouseId) return NextResponse.json({ error: 'warehouse_id required' }, { status: 400 });
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'warehouse_id', warehouseId);
+    const existing = await prisma.warehouse.findUnique({ where: { warehouseId } });
+    if (!existing) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
 
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
-
-    await deleteRow(SHEET, dataRowIndex + 1);
+    await prisma.warehouse.delete({ where: { warehouseId } });
     await logActivity({ doctype: 'Warehouse', documentId: warehouseId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { warehouse_id: warehouseId } });
     return NextResponse.json({ success: true });
   } catch (error) {

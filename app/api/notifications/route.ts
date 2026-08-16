@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheetAsObjects } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 
 interface NotificationItem {
   doctype: string;
@@ -24,34 +24,30 @@ export async function GET() {
 
     if (perms.can_approve) {
       jobs.push(
-        readSheetAsObjects<any>('purchase_order').then(({ records }) => {
+        prisma.purchaseOrder.findMany({ where: { status: 'Submitted', approvalStatus: 'Pending' } }).then((records) => {
           for (const po of records) {
-            if (po.status === 'Submitted' && (po.approval_status || 'Pending') === 'Pending') {
-              items.push({
-                doctype: 'Purchase Order',
-                id: po.po_id,
-                label: po.po_id,
-                subtitle: 'Menunggu approval PO',
-                href: `/dashboard/purchasing/purchase-order/${encodeURIComponent(po.po_id)}`,
-                action: 'Approve',
-              });
-            }
+            items.push({
+              doctype: 'Purchase Order',
+              id: po.poId,
+              label: po.poId,
+              subtitle: 'Menunggu approval PO',
+              href: `/dashboard/purchasing/purchase-order/${encodeURIComponent(po.poId)}`,
+              action: 'Approve',
+            });
           }
         })
       );
       jobs.push(
-        readSheetAsObjects<any>('sales_order').then(({ records }) => {
+        prisma.salesOrder.findMany({ where: { status: 'Confirmed', approvalStatus: 'Pending' } }).then((records) => {
           for (const so of records) {
-            if (so.status === 'Confirmed' && (so.approval_status || 'Pending') === 'Pending') {
-              items.push({
-                doctype: 'Sales Order',
-                id: so.so_id,
-                label: so.so_id,
-                subtitle: 'Menunggu approval SO',
-                href: `/dashboard/sales-order/sales-order/${encodeURIComponent(so.so_id)}`,
-                action: 'Approve',
-              });
-            }
+            items.push({
+              doctype: 'Sales Order',
+              id: so.soId,
+              label: so.soId,
+              subtitle: 'Menunggu approval SO',
+              href: `/dashboard/sales-order/sales-order/${encodeURIComponent(so.soId)}`,
+              action: 'Approve',
+            });
           }
         })
       );
@@ -59,7 +55,7 @@ export async function GET() {
 
     if (perms.delivery_order || perms.sales_order) {
       jobs.push(
-        readSheetAsObjects<any>('delivery_note').then(({ records }) => {
+        prisma.deliveryNote.findMany({ where: { status: { in: ['Unallocated', 'Pick Confirmed', 'Packing Completed'] } } }).then((records) => {
           const stageAction: Record<string, string> = {
             Unallocated: 'Confirm Pick',
             'Pick Confirmed': 'Complete Packing',
@@ -70,10 +66,10 @@ export async function GET() {
             if (action) {
               items.push({
                 doctype: 'Delivery Note',
-                id: dn.dn_id,
-                label: dn.dn_id,
+                id: dn.dnId,
+                label: dn.dnId,
                 subtitle: `Perlu ${action} — status: ${dn.status}`,
-                href: `/dashboard/delivery-order/delivery-note/${encodeURIComponent(dn.dn_id)}`,
+                href: `/dashboard/delivery-order/delivery-note/${encodeURIComponent(dn.dnId)}`,
                 action,
               });
             }
@@ -84,18 +80,16 @@ export async function GET() {
 
     if (perms.registration_request) {
       jobs.push(
-        readSheetAsObjects<any>('registration').then(({ records }) => {
+        prisma.registration.findMany({ where: { status: 'pending' } }).then((records) => {
           for (const r of records) {
-            if ((r.status || 'pending') === 'pending') {
-              items.push({
-                doctype: 'Registration',
-                id: r.id,
-                label: r.name || r.email,
-                subtitle: 'Menunggu approval registrasi',
-                href: `/dashboard/registration/${encodeURIComponent(r.id)}`,
-                action: 'Approve',
-              });
-            }
+            items.push({
+              doctype: 'Registration',
+              id: r.id,
+              label: r.name || r.email,
+              subtitle: 'Menunggu approval registrasi',
+              href: `/dashboard/registration/${encodeURIComponent(r.id)}`,
+              action: 'Approve',
+            });
           }
         })
       );

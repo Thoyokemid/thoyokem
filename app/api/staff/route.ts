@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { generateId } from '@/lib/id';
 import { StaffList } from '@/types';
-
-const SHEET = 'staff_list';
 
 export async function GET() {
   try {
@@ -18,14 +17,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.staffList.findMany();
 
     const staff: StaffList[] = records.map((r) => ({
-      employee_id: r.employee_id || '',
-      user_id: r.user_id || '',
-      employee_name: r.employee_name || '',
-      date_of_birth: r.date_of_birth || '',
-      leave_allocation: r.leave_allocation ? parseInt(r.leave_allocation) : 12,
+      employee_id: r.employeeId,
+      user_id: r.userId,
+      employee_name: r.employeeName,
+      date_of_birth: r.dateOfBirth || '',
+      leave_allocation: r.leaveAllocation ?? 12,
     }));
 
     return NextResponse.json(staff);
@@ -44,22 +43,19 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = String(records.length + 1);
+    const newId = generateId();
 
-    const newStaff = objectToRow(headers, {
-      employee_id: newId,
-      user_id: data.user_id || '',
-      employee_name: data.employee_name || '',
-      date_of_birth: data.date_of_birth || '',
-      leave_allocation: data.leave_allocation ?? 12,
+    const created = await prisma.staffList.create({
+      data: {
+        employeeId: newId,
+        userId: data.user_id || '',
+        employeeName: data.employee_name || '',
+        dateOfBirth: data.date_of_birth || null,
+        leaveAllocation: data.leave_allocation ?? 12,
+      },
     });
 
-    await appendSheet(SHEET, [newStaff]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newStaff[i]));
-    await logActivity({ doctype: 'Staff', documentId: newId, action: 'Created', changedBy: session.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Staff', documentId: newId, action: 'Created', changedBy: session.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
@@ -79,33 +75,22 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { employee_id, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'employee_id', employee_id);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.staffList.findUnique({ where: { employeeId: employee_id } });
+    if (!current) {
       return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1; // absolute index in `rows` (0 = header row)
-    const currentRow = rows[sheetRowIndex] || [];
+    const updated = await prisma.staffList.update({
+      where: { employeeId: employee_id },
+      data: {
+        userId: updates.user_id ?? current.userId,
+        employeeName: updates.employee_name ?? current.employeeName,
+        dateOfBirth: updates.date_of_birth ?? current.dateOfBirth,
+        leaveAllocation: updates.leave_allocation ?? current.leaveAllocation,
+      },
+    });
 
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = {
-      ...currentObj,
-      user_id: updates.user_id ?? currentObj.user_id,
-      employee_name: updates.employee_name ?? currentObj.employee_name,
-      date_of_birth: updates.date_of_birth ?? currentObj.date_of_birth,
-      leave_allocation: updates.leave_allocation ?? currentObj.leave_allocation,
-    };
-
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1); // A, B, C...
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Staff', documentId: employee_id, action: 'Updated', changedBy: session.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Staff', documentId: employee_id, action: 'Updated', changedBy: session.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -129,15 +114,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID required' }, { status: 400 });
     }
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'employee_id', id);
-
-    if (dataRowIndex === -1) {
+    const existing = await prisma.staffList.findUnique({ where: { employeeId: id } });
+    if (!existing) {
       return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
     }
 
-    await deleteRow(SHEET, dataRowIndex + 1); // +1 to skip header row
+    await prisma.staffList.delete({ where: { employeeId: id } });
 
     await logActivity({ doctype: 'Staff', documentId: id, action: 'Deleted', changedBy: session.user.name || '', before: null, after: { employee_id: id } });
 

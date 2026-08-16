@@ -1,26 +1,15 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { readSheetAsObjects, readSheet, writeSheet, findRowIndexByField } from '@/lib/sheets';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
+import { prisma } from '@/lib/db';
 
 // ── Utility: update last_active column ──
 export async function updateLastActive(userId: string) {
   try {
-    const rows = await readSheet('users');
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'id', userId);
-    if (dataRowIndex === -1) return;
-
-    const colIndex = headers.indexOf('last_active');
-    if (colIndex === -1) return;
-
-    const now = new Date().toISOString();
-    const colLetter = String.fromCharCode(65 + colIndex);
-    await writeSheet('users', `${colLetter}${dataRowIndex + 2}`, [[now]]);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastActive: new Date().toISOString() },
+    });
   } catch (error) {
     // Non-blocking: log but don't throw
     console.error('Failed to update last_active:', error);
@@ -29,15 +18,13 @@ export async function updateLastActive(userId: string) {
 
 // ── Utility: is this role flagged as Super Admin? ──
 export async function isSuperAdminRole(roleId: string): Promise<boolean> {
-  const { records } = await readSheetAsObjects<any>('roles');
-  const role = records.find((r) => String(r.role_id) === String(roleId));
-  return !!role && toBool(role.is_super_admin);
+  const role = await prisma.role.findUnique({ where: { roleId } });
+  return !!role && role.isSuperAdmin;
 }
 
 // ── Utility: look up a role's permission set by role_id ──
 export async function getRolePermissions(roleId: string) {
-  const { records } = await readSheetAsObjects<any>('roles');
-  const role = records.find((r) => String(r.role_id) === String(roleId));
+  const role = await prisma.role.findUnique({ where: { roleId } });
 
   const noAccess = {
     dashboard: false,
@@ -60,22 +47,22 @@ export async function getRolePermissions(roleId: string) {
 
   // Super Admin bypasses every individual flag — always full access,
   // including to modules added after this role was created.
-  if (toBool(role.is_super_admin)) {
+  if (role.isSuperAdmin) {
     return Object.fromEntries(Object.keys(noAccess).map((k) => [k, true])) as typeof noAccess;
   }
 
   return {
-    dashboard: toBool(role.dashboard),
-    attendance: toBool(role.attendance),
-    leave: toBool(role.leave),
-    registration_request: toBool(role.registration_request),
-    setting: toBool(role.setting),
-    staff: toBool(role.staff),
-    inventory: toBool(role.inventory),
-    purchasing: toBool(role.purchasing),
-    sales_order: toBool(role.sales_order),
-    delivery_order: toBool(role.delivery_order),
-    can_approve: toBool(role.can_approve),
+    dashboard: role.dashboard,
+    attendance: role.attendance,
+    leave: role.leave,
+    registration_request: role.registrationRequest,
+    setting: role.setting,
+    staff: role.staff,
+    inventory: role.inventory,
+    purchasing: role.purchasing,
+    sales_order: role.salesOrder,
+    delivery_order: role.deliveryOrder,
+    can_approve: role.canApprove,
   };
 }
 
@@ -93,8 +80,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const { records: users } = await readSheetAsObjects<any>('users');
-          const user = users.find((u) => u.username === credentials.username);
+          const user = await prisma.user.findUnique({ where: { username: credentials.username } });
 
           if (!user) {
             throw new Error('Invalid username or password');
@@ -108,15 +94,15 @@ export const authOptions: NextAuthOptions = {
 
           updateLastActive(user.id);
 
-          const permissions = await getRolePermissions(user.role_id);
-          const isSuperAdmin = await isSuperAdminRole(user.role_id);
+          const permissions = await getRolePermissions(user.roleId);
+          const isSuperAdmin = await isSuperAdminRole(user.roleId);
 
           return {
             id: user.id,
             name: user.name,
             email: user.username,
             role: user.role,
-            role_id: user.role_id,
+            role_id: user.roleId,
             permissions,
             isSuperAdmin,
           };
@@ -135,7 +121,43 @@ export const authOptions: NextAuthOptions = {
         token.role_id = (user as any).role_id;
         token.permissions = user.permissions;
         token.isSuperAdmin = (user as any).isSuperAdmin;
+        token.sessionInvalid = false;
+        return token;
       }
+
+      // Re-checked on every session access (not just at sign-in), so a user
+      // row that gets deleted or has its id rewritten (e.g. by a data
+      // migration) doesn't leave a stale, half-broken session lying around —
+      // the app cleanly forces a re-login instead of crashing on undefined
+      // permissions/role data.
+      if (token.id) {
+        try {
+          const stillExists = await prisma.user.findUnique({ where: { id: token.id as string } });
+
+          if (!stillExists) {
+            token.sessionInvalid = true;
+            token.permissions = {
+              dashboard: false, attendance: false, leave: false, registration_request: false,
+              setting: false, staff: false, inventory: false, purchasing: false,
+              sales_order: false, delivery_order: false, can_approve: false,
+            };
+            token.isSuperAdmin = false;
+            return token;
+          }
+
+          // Keep role/permissions fresh in case they changed since sign-in.
+          token.role = stillExists.role;
+          token.role_id = stillExists.roleId;
+          token.permissions = await getRolePermissions(stillExists.roleId);
+          token.isSuperAdmin = await isSuperAdminRole(stillExists.roleId);
+          token.sessionInvalid = false;
+        } catch (error) {
+          // Transient DB error — keep the existing token rather than
+          // logging everyone out over a momentary read failure.
+          console.error('Session revalidation failed:', error);
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -145,6 +167,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role_id = token.role_id as string;
         session.user.permissions = token.permissions as any;
         session.user.isSuperAdmin = token.isSuperAdmin as boolean;
+        session.user.sessionInvalid = token.sessionInvalid as boolean;
       }
       return session;
     },

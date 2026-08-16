@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 
 const DEFAULTS: Record<string, string> = {
   jam_masuk: '08:00',
@@ -17,16 +17,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let rows: string[][] = [];
-    try {
-      rows = await readSheet('settings');
-    } catch {
-      // "settings" tab doesn't exist yet in the Google Sheet — fall back to defaults
-    }
-
+    const rows = await prisma.setting.findMany();
     const values: Record<string, string> = { ...DEFAULTS };
-    rows.slice(1).forEach((row) => {
-      if (row[0]) values[row[0]] = row[1] ?? '';
+    rows.forEach((row) => {
+      values[row.key] = row.value;
     });
 
     return NextResponse.json(values);
@@ -48,32 +42,15 @@ export async function PUT(request: NextRequest) {
 
     const data = await request.json();
 
-    let existingRows: string[][] = [];
-    try {
-      existingRows = await readSheet('settings');
-    } catch {
-      // "settings" tab doesn't exist yet — nothing to merge with.
-    }
-    const existing: Record<string, string> = {};
-    existingRows.slice(1).forEach((row) => {
-      if (row[0]) existing[row[0]] = row[1] ?? '';
-    });
-
-    const merged = { ...DEFAULTS, ...existing, ...data };
-    const entries = Object.entries(merged);
-
-    try {
-      await writeSheet('settings', `A1:B${entries.length + 1}`, [
-        ['key', 'value'],
-        ...entries,
-      ]);
-    } catch (error) {
-      console.error('Error writing settings (does the "settings" tab exist?):', error);
-      return NextResponse.json(
-        { error: 'Failed to save settings. Make sure a "settings" tab exists in the Google Sheet.' },
-        { status: 500 }
-      );
-    }
+    await Promise.all(
+      Object.entries(data).map(([key, value]) =>
+        prisma.setting.upsert({
+          where: { key },
+          update: { value: String(value) },
+          create: { key, value: String(value) },
+        })
+      )
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

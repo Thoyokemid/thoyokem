@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
-
-const SHEET = 'users';
 
 interface UserWithRole {
   id: string;
@@ -23,15 +21,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.user.findMany();
 
     const usersData: UserWithRole[] = records.map((r) => ({
-      id: r.id || '',
-      name: r.name || '',
-      username: r.username || '',
-      role: r.role || '',
-      role_id: r.role_id || '',
-      last_active: r.last_active || '',
+      id: r.id,
+      name: r.name,
+      username: r.username,
+      role: r.role,
+      role_id: r.roleId,
+      last_active: r.lastActive || '',
     }));
 
     return NextResponse.json(usersData);
@@ -56,30 +54,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'id and role_id are required' }, { status: 400 });
     }
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'id', id);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.user.findUnique({ where: { id } });
+    if (!current) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj, role_id: String(role_id) };
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+    await prisma.user.update({ where: { id }, data: { roleId: String(role_id) } });
 
     await logActivity({
       doctype: 'User',
-      documentId: currentObj.username || id,
+      documentId: current.username || id,
       action: 'Updated',
       changedBy: session.user.name || '',
-      before: { role_id: currentObj.role_id },
+      before: { role_id: current.roleId },
       after: { role_id: String(role_id) },
     });
 

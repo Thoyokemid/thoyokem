@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheetAsObjects, appendSheet, objectToRow } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { getNextDocId } from '@/lib/numbering';
 import { logActivity } from '@/lib/activityLog';
-
-const SHEET = 'sales_invoice';
-const ITEM_SHEET = 'sales_invoice_item';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -22,39 +19,37 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
-    const { records: customers } = await readSheetAsObjects<any>('customer_list');
-    const { records: invoiceItems } = await readSheetAsObjects<any>(ITEM_SHEET);
-    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
-    const customerMap = new Map(customers.map((c) => [c.customer_id, c.customer_name]));
-    const itemMasterMap = new Map(itemMaster.map((i) => [i.item_code, i]));
+    const records = await prisma.salesInvoice.findMany({
+      include: { items: true },
+      orderBy: { creation: 'desc' },
+    });
+    const customers = await prisma.customer.findMany({ select: { customerId: true, customerName: true } });
+    const itemMaster = await prisma.item.findMany({ select: { itemCode: true, itemName: true, unit: true } });
+    const customerMap = new Map(customers.map((c) => [c.customerId, c.customerName]));
+    const itemMasterMap = new Map(itemMaster.map((i) => [i.itemCode, i]));
 
-    const invoices = records
-      .map((r) => ({
-        si_id: r.si_id,
-        so_id: r.so_id,
-        dn_id: r.dn_id,
-        customer_id: r.customer_id,
-        customer_name: customerMap.get(r.customer_id) || r.customer_id,
-        posting_date: r.posting_date,
-        due_date: r.due_date,
-        grand_total: parseFloat(r.grand_total) || 0,
-        outstanding_amount: parseFloat(r.outstanding_amount) || 0,
-        status: r.status,
-        owner: r.owner,
-        creation: r.creation,
-        items: invoiceItems
-          .filter((i) => i.si_id === r.si_id)
-          .map((i) => ({
-            item_code: i.item_code,
-            item_name: itemMasterMap.get(i.item_code)?.item_name || i.item_code,
-            uom: itemMasterMap.get(i.item_code)?.unit || '-',
-            qty: parseFloat(i.qty) || 0,
-            rate: parseFloat(i.rate) || 0,
-            amount: parseFloat(i.amount) || 0,
-          })),
-      }))
-      .reverse();
+    const invoices = records.map((r) => ({
+      si_id: r.siId,
+      so_id: r.soId,
+      dn_id: r.dnId,
+      customer_id: r.customerId,
+      customer_name: customerMap.get(r.customerId) || r.customerId,
+      posting_date: r.postingDate,
+      due_date: r.dueDate,
+      grand_total: Number(r.grandTotal),
+      outstanding_amount: Number(r.outstandingAmount),
+      status: r.status,
+      owner: r.owner,
+      creation: r.creation,
+      items: r.items.map((i) => ({
+        item_code: i.itemCode,
+        item_name: itemMasterMap.get(i.itemCode)?.itemName || i.itemCode,
+        uom: itemMasterMap.get(i.itemCode)?.unit || '-',
+        qty: Number(i.qty),
+        rate: Number(i.rate),
+        amount: Number(i.amount),
+      })),
+    }));
 
     return NextResponse.json(invoices);
   } catch (error) {
@@ -72,48 +67,40 @@ export async function POST(request: NextRequest) {
     const { so_id, due_date } = await request.json();
     if (!so_id) return NextResponse.json({ error: 'so_id wajib diisi' }, { status: 400 });
 
-    const { records: orders } = await readSheetAsObjects<any>('sales_order');
-    const so = orders.find((o) => o.so_id === so_id);
+    const so = await prisma.salesOrder.findUnique({ where: { soId: so_id } });
     if (!so) return NextResponse.json({ error: 'Sales order not found' }, { status: 404 });
 
-    const { records: soItems } = await readSheetAsObjects<any>('sales_order_item');
-    const lines = soItems.filter((i) => i.so_id === so_id);
-
-    const { records: deliveries } = await readSheetAsObjects<any>('delivery_note');
-    const delivery = deliveries.find((d) => d.so_id === so_id);
+    const lines = await prisma.salesOrderItem.findMany({ where: { soId: so_id } });
+    const delivery = await prisma.deliveryNote.findFirst({ where: { soId: so_id } });
 
     const siId = await getNextDocId('SI');
     const now = new Date().toISOString();
-    const grandTotal = parseFloat(so.total_amount) || 0;
+    const grandTotal = Number(so.totalAmount);
 
-    const { headers: siHeaders } = await readSheetAsObjects<any>(SHEET);
-    const siRow = objectToRow(siHeaders, {
-      si_id: siId,
-      so_id,
-      dn_id: delivery?.dn_id || '',
-      customer_id: so.customer_id,
-      posting_date: now.slice(0, 10),
-      due_date: due_date || '',
-      grand_total: grandTotal,
-      outstanding_amount: grandTotal,
-      status: 'Submitted',
-      approval_status: 'Approved',
-      owner: guard.session?.user.name || '',
-      creation: now,
+    await prisma.salesInvoice.create({
+      data: {
+        siId,
+        soId: so_id,
+        dnId: delivery?.dnId || null,
+        customerId: so.customerId,
+        postingDate: now.slice(0, 10),
+        dueDate: due_date || null,
+        grandTotal,
+        outstandingAmount: grandTotal,
+        status: 'Submitted',
+        approvalStatus: 'Approved',
+        owner: guard.session?.user.name || '',
+        creation: now,
+        items: {
+          create: lines.map((i) => ({
+            itemCode: i.itemCode,
+            qty: i.qty,
+            rate: i.rate,
+            amount: i.amount,
+          })),
+        },
+      },
     });
-    await appendSheet(SHEET, [siRow]);
-
-    const { headers: siItemHeaders } = await readSheetAsObjects<any>(ITEM_SHEET);
-    const siItemRows = lines.map((i) =>
-      objectToRow(siItemHeaders, {
-        si_id: siId,
-        item_code: i.item_code,
-        qty: i.qty,
-        rate: i.rate,
-        amount: i.amount,
-      })
-    );
-    if (siItemRows.length > 0) await appendSheet(ITEM_SHEET, siItemRows);
 
     await logActivity({
       doctype: 'Sales Invoice',

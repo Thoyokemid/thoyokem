@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheetAsObjects } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 
@@ -26,11 +26,11 @@ async function requireSuperAdmin() {
 }
 
 async function buildLedgerIndex() {
-  const { records: ledger } = await readSheetAsObjects<any>('stock_ledger_entry');
+  const ledger = await prisma.stockLedgerEntry.findMany();
   const index = new Map<string, number>();
   for (const e of ledger) {
-    const key = `${e.voucher_type}::${e.voucher_id}::${e.item_code}::${e.warehouse_id}`;
-    index.set(key, (index.get(key) || 0) + (parseFloat(e.actual_qty) || 0));
+    const key = `${e.voucherType}::${e.voucherId}::${e.itemCode}::${e.warehouseId}`;
+    index.set(key, (index.get(key) || 0) + Number(e.actualQty));
   }
   return index;
 }
@@ -40,37 +40,36 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const [ledgerIndex, itemMasterData, dnData, dnItemData, prData, prItemData, seData] = await Promise.all([
+    const [ledgerIndex, itemMasterData, dnData, dnItemData, prItemData, seData] = await Promise.all([
       buildLedgerIndex(),
-      readSheetAsObjects<any>('item_list'),
-      readSheetAsObjects<any>('delivery_note'),
-      readSheetAsObjects<any>('delivery_note_item'),
-      readSheetAsObjects<any>('purchase_receipt'),
-      readSheetAsObjects<any>('purchase_receipt_item'),
-      readSheetAsObjects<any>('stock_entry'),
+      prisma.item.findMany(),
+      prisma.deliveryNote.findMany(),
+      prisma.deliveryNoteItem.findMany(),
+      prisma.purchaseReceiptItem.findMany(),
+      prisma.stockEntry.findMany(),
     ]);
 
-    const itemMasterMap = new Map(itemMasterData.records.map((i) => [i.item_code, i]));
-    const itemName = (code: string, snapshot?: string) => snapshot || itemMasterMap.get(code)?.item_name || code;
+    const itemMasterMap = new Map(itemMasterData.map((i) => [i.itemCode, i]));
+    const itemName = (code: string, snapshot?: string) => snapshot || itemMasterMap.get(code)?.itemName || code;
 
     const discrepancies: Discrepancy[] = [];
 
     // ── Delivery Note: expect -delivered_qty per line, but ONLY once a DN has
     // gone through Good Issue — earlier-stage DNs haven't touched stock yet. ──
-    const dnStatusMap = new Map(dnData.records.map((d) => [d.dn_id, d.status]));
-    for (const line of dnItemData.records) {
-      if (dnStatusMap.get(line.dn_id) !== 'Good Issued') continue;
-      const expected = -(parseFloat(line.delivered_qty) || 0);
+    const dnStatusMap = new Map(dnData.map((d) => [d.dnId, d.status]));
+    for (const line of dnItemData) {
+      if (dnStatusMap.get(line.dnId) !== 'Good Issued') continue;
+      const expected = -Number(line.deliveredQty);
       if (expected === 0) continue;
-      const key = `Delivery Note::${line.dn_id}::${line.item_code}::${line.warehouse_id}`;
+      const key = `Delivery Note::${line.dnId}::${line.itemCode}::${line.warehouseId}`;
       const actual = ledgerIndex.get(key) || 0;
       if (actual !== expected) {
         discrepancies.push({
           source: 'Delivery Note',
-          doc_id: line.dn_id,
-          item_code: line.item_code,
-          item_name: itemName(line.item_code, line.item_name),
-          warehouse_id: line.warehouse_id,
+          doc_id: line.dnId,
+          item_code: line.itemCode,
+          item_name: itemName(line.itemCode, line.itemName),
+          warehouse_id: line.warehouseId,
           expected_qty: expected,
           actual_qty: actual,
           missing_qty: expected - actual,
@@ -79,18 +78,18 @@ export async function GET() {
     }
 
     // ── Purchase Receipt: expect +received_qty per line ──
-    for (const line of prItemData.records) {
-      const expected = parseFloat(line.received_qty) || 0;
+    for (const line of prItemData) {
+      const expected = Number(line.receivedQty);
       if (expected === 0) continue;
-      const key = `Purchase Receipt::${line.pr_id}::${line.item_code}::${line.warehouse_id}`;
+      const key = `Purchase Receipt::${line.prId}::${line.itemCode}::${line.warehouseId}`;
       const actual = ledgerIndex.get(key) || 0;
       if (actual !== expected) {
         discrepancies.push({
           source: 'Purchase Receipt',
-          doc_id: line.pr_id,
-          item_code: line.item_code,
-          item_name: itemName(line.item_code),
-          warehouse_id: line.warehouse_id,
+          doc_id: line.prId,
+          item_code: line.itemCode,
+          item_name: itemName(line.itemCode),
+          warehouse_id: line.warehouseId,
           expected_qty: expected,
           actual_qty: actual,
           missing_qty: expected - actual,
@@ -101,31 +100,31 @@ export async function GET() {
     // ── Stock Entry: Receipt / Issue / Transfer have fully predictable legs.
     // Manufacture is skipped — its expected legs depend on the BOM at the time
     // of entry, which may have changed since, so we can't safely recompute it.
-    for (const entry of seData.records) {
-      const qty = parseFloat(entry.qty) || 0;
+    for (const entry of seData) {
+      const qty = Number(entry.qty);
       if (qty === 0) continue;
-      const legs: { warehouse: string; expected: number }[] = [];
-      if (entry.entry_type === 'Material Receipt') {
-        legs.push({ warehouse: entry.target_warehouse, expected: qty });
-      } else if (entry.entry_type === 'Material Issue') {
-        legs.push({ warehouse: entry.source_warehouse, expected: -qty });
-      } else if (entry.entry_type === 'Material Transfer') {
-        legs.push({ warehouse: entry.source_warehouse, expected: -qty });
-        legs.push({ warehouse: entry.target_warehouse, expected: qty });
+      const legs: { warehouse: string | null; expected: number }[] = [];
+      if (entry.entryType === 'Material Receipt') {
+        legs.push({ warehouse: entry.targetWarehouse, expected: qty });
+      } else if (entry.entryType === 'Material Issue') {
+        legs.push({ warehouse: entry.sourceWarehouse, expected: -qty });
+      } else if (entry.entryType === 'Material Transfer') {
+        legs.push({ warehouse: entry.sourceWarehouse, expected: -qty });
+        legs.push({ warehouse: entry.targetWarehouse, expected: qty });
       } else {
         continue;
       }
 
       for (const leg of legs) {
         if (!leg.warehouse) continue;
-        const key = `Stock Entry::${entry.entry_id}::${entry.item_code}::${leg.warehouse}`;
+        const key = `Stock Entry::${entry.entryId}::${entry.itemCode}::${leg.warehouse}`;
         const actual = ledgerIndex.get(key) || 0;
         if (actual !== leg.expected) {
           discrepancies.push({
             source: 'Stock Entry',
-            doc_id: entry.entry_id,
-            item_code: entry.item_code,
-            item_name: itemName(entry.item_code),
+            doc_id: entry.entryId,
+            item_code: entry.itemCode,
+            item_name: itemName(entry.itemCode),
             warehouse_id: leg.warehouse,
             expected_qty: leg.expected,
             actual_qty: actual,
@@ -154,9 +153,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Data koreksi tidak lengkap' }, { status: 400 });
     }
 
-    const { records: itemMaster } = await readSheetAsObjects<any>('item_list');
-    const master = itemMaster.find((i) => i.item_code === item_code);
-    const valuationRate = parseFloat(master?.purchase_price) || 0;
+    const master = await prisma.item.findUnique({ where: { itemCode: item_code } });
+    const valuationRate = master ? Number(master.purchasePrice) : 0;
     const postingDate = new Date().toISOString().slice(0, 10);
 
     await appendStockLedgerEntry({

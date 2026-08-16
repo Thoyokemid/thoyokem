@@ -1,0 +1,26 @@
+name: Keep Supabase Alive
+
+# Supabase's free tier pauses a project after 7 days with zero database
+# activity. This pings a lightweight health-check endpoint (a real DB query,
+# not just an HTTP 200) daily — well inside the 7-day window, and simpler
+# than trying to schedule an exact "every 5 days" cron (cron's day-of-month
+# step syntax doesn't actually mean "every N days from today", it means
+# specific days of the calendar month, which can leave gaps over 7 days
+# across month boundaries).
+on:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC daily (~10:00 WIB)
+  workflow_dispatch: {} # allows a manual "Run workflow" click to test it
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health check endpoint
+        run: |
+          response=$(curl -s -o /tmp/body.json -w "%{http_code}" "${{ secrets.APP_URL }}/api/health")
+          cat /tmp/body.json
+          if [ "$response" != "200" ]; then
+            echo "Health check failed with status $response"
+            exit 1
+          fi

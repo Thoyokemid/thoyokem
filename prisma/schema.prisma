@@ -1,0 +1,509 @@
+// Prisma schema mirroring the current Google Sheets structure 1:1 (same sheet
+// name -> table name via @@map, same column name -> field name via @map) so
+// the eventual data-migration script can read a sheet row and insert it
+// almost verbatim. IDs are NOT auto-generated here — every id is already
+// produced by the app itself (lib/id.ts for UUIDs, lib/numbering.ts for
+// ERPNext-style series like "PO-2026-00001"), so models declare them as
+// plain String @id with no @default.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Auth / Access Control ───────────────────────────────────────────────────
+
+model Role {
+  roleId              String  @id @map("role_id")
+  roleName            String  @map("role_name")
+  dashboard           Boolean @default(false)
+  attendance          Boolean @default(false)
+  leave               Boolean @default(false)
+  registrationRequest Boolean @default(false) @map("registration_request")
+  setting             Boolean @default(false)
+  staff               Boolean @default(false)
+  inventory           Boolean @default(false)
+  purchasing          Boolean @default(false)
+  salesOrder          Boolean @default(false) @map("sales_order")
+  deliveryOrder       Boolean @default(false) @map("delivery_order")
+  canApprove          Boolean @default(false) @map("can_approve")
+  isSuperAdmin        Boolean @default(false) @map("is_super_admin")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                    String  @id
+  name                  String
+  username              String  @unique
+  password              String
+  role                  String
+  roleId                String  @map("role_id")
+  lastActive            String? @map("last_active")
+  photoUrl              String? @map("photo_url")
+  phone                 String?
+  dateOfBirth           String? @map("date_of_birth")
+  address               String?
+  gender                String?
+  emergencyContactName  String? @map("emergency_contact_name")
+  emergencyContactPhone String? @map("emergency_contact_phone")
+  bio                   String?
+
+  roleRef Role @relation(fields: [roleId], references: [roleId])
+
+  @@map("users")
+}
+
+model Registration {
+  id        String @id
+  name      String
+  email     String
+  password  String
+  status    String @default("pending")
+  createdAt String @map("created_at")
+  updateAt  String @map("update_at")
+
+  @@map("registration")
+}
+
+// ── HR ───────────────────────────────────────────────────────────────────
+
+model StaffList {
+  employeeId      String  @id @map("employee_id")
+  // Internal HR employee code (e.g. "TY200126") — NOT a foreign key to
+  // users.id. It looked like it might be at first glance, but real data
+  // shows the two are unrelated formats; keep this a plain unique string.
+  userId          String  @unique @map("user_id")
+  employeeName    String  @map("employee_name")
+  dateOfBirth     String? @map("date_of_birth")
+  leaveAllocation Int?    @map("leave_allocation")
+
+  leaves LeaveAttendance[]
+
+  @@map("staff_list")
+}
+
+model LeaveAttendance {
+  id           String  @id
+  employee     String
+  employeeName String  @map("employee_name")
+  fromDate     String  @map("from_date")
+  toDate       String  @map("to_date")
+  leaveType    String  @map("leave_type")
+  attachment   String?
+  description  String?
+  createdAt    String  @map("created_at")
+  updateAt     String  @map("update_at")
+
+  staff StaffList? @relation(fields: [employee], references: [userId])
+
+  @@map("leave_attendance")
+}
+
+model AttendanceImport {
+  // Neither "cloud_id" (fingerprint device serial — same value for every row)
+  // nor "id" (not actually unique in the source data — a raw device log
+  // artifact, not a document id) can be a primary key. Use a synthetic one.
+  rowId          Int     @id @default(autoincrement()) @map("row_id")
+  cloudId        String  @map("cloud_id")
+  sourceId       String  @map("id")
+  employeeName   String  @map("employee_name")
+  attendanceDate String  @map("attendance_date")
+  jamSet         String  @map("jam_set")
+  jamAbsensi     String  @map("jam_absensi")
+  verifikasi     String
+  tipeAbsensi    String  @map("tipe_absensi")
+  designation    String
+  branch         String
+  remarks        String?
+
+  @@map("attendance_import")
+}
+
+// ── Inventory ────────────────────────────────────────────────────────────
+
+model Item {
+  itemCode             String  @id @map("item_code")
+  itemName             String  @map("item_name")
+  itemGroup            String  @map("item_group")
+  unit                 String
+  purchasePrice        Decimal @default(0) @map("purchase_price") @db.Decimal(18, 4)
+  sellingPrice         Decimal @default(0) @map("selling_price") @db.Decimal(18, 4)
+  reorderLevel         Decimal @default(0) @map("reorder_level") @db.Decimal(18, 4)
+  valuationMethod      String  @default("FIFO") @map("valuation_method")
+  openingQty           Decimal @default(0) @map("opening_qty") @db.Decimal(18, 4)
+  openingValuationRate Decimal @default(0) @map("opening_valuation_rate") @db.Decimal(18, 4)
+  isActive             Boolean @default(true) @map("is_active")
+  currency             String  @default("IDR")
+  itemType             String  @default("Trading") @map("item_type")
+
+  @@map("item_list")
+}
+
+model Warehouse {
+  warehouseId   String  @id @map("warehouse_id")
+  warehouseName String  @map("warehouse_name")
+  location      String
+  isActive      Boolean @default(true) @map("is_active")
+  pic           String?
+  phone         String?
+  address       String?
+  postalCode    String? @map("postal_code")
+
+  @@map("warehouse_list")
+}
+
+model Bom {
+  bomId    String  @id @map("bom_id")
+  itemCode String  @map("item_code")
+  qty      Decimal @default(1) @db.Decimal(18, 4)
+  isActive Boolean @default(true) @map("is_active")
+  owner    String
+  creation String
+
+  components BomComponent[]
+
+  @@map("bom")
+}
+
+model BomComponent {
+  id                Int     @id @default(autoincrement())
+  bomId             String  @map("bom_id")
+  componentItemCode String  @map("component_item_code")
+  qty               Decimal @db.Decimal(18, 4)
+
+  bom Bom @relation(fields: [bomId], references: [bomId])
+
+  @@map("bom_item")
+}
+
+model StockEntry {
+  entryId         String  @id @map("entry_id")
+  entryType       String  @map("entry_type")
+  itemCode        String  @map("item_code")
+  sourceWarehouse String? @map("source_warehouse")
+  targetWarehouse String? @map("target_warehouse")
+  qty             Decimal @db.Decimal(18, 4)
+  date            String
+  remarks         String?
+  status          String
+  owner           String
+  creation        String
+
+  @@map("stock_entry")
+}
+
+model StockLedgerEntry {
+  // Auto-increment, not app-generated — this table is an append-only audit
+  // trail read back in insertion order (getCurrentStockQty/calculateStockBalance
+  // take the latest row per item+warehouse); a real serial column makes that
+  // ordering atomic under concurrent writes instead of racy read-count-then-write.
+  entryId             Int     @id @default(autoincrement()) @map("entry_id")
+  postingDate         String  @map("posting_date")
+  itemCode            String  @map("item_code")
+  warehouseId         String  @map("warehouse_id")
+  voucherType         String  @map("voucher_type")
+  voucherId           String  @map("voucher_id")
+  actualQty           Decimal @map("actual_qty") @db.Decimal(18, 4)
+  valuationRate       Decimal @map("valuation_rate") @db.Decimal(18, 4)
+  qtyAfterTransaction Decimal @map("qty_after_transaction") @db.Decimal(18, 4)
+  stockValue          Decimal @map("stock_value") @db.Decimal(18, 4)
+
+  @@map("stock_ledger_entry")
+}
+
+// ── Purchasing ───────────────────────────────────────────────────────────
+
+model Supplier {
+  supplierId   String  @id @map("supplier_id")
+  supplierName String  @map("supplier_name")
+  contact      String?
+  phone        String?
+  email        String?
+  address      String?
+  paymentTerms String? @map("payment_terms")
+  isActive     Boolean @default(true) @map("is_active")
+
+  @@map("supplier_list")
+}
+
+model PurchaseOrder {
+  poId           String  @id @map("po_id")
+  supplierId     String  @map("supplier_id")
+  orderDate      String  @map("order_date")
+  expectedDate   String? @map("expected_date")
+  status         String  @default("Draft")
+  approvalStatus String  @default("Pending") @map("approval_status")
+  approvedBy     String? @map("approved_by")
+  approvedAt     String? @map("approved_at")
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(18, 4)
+  owner          String
+  creation       String
+  modifiedBy     String? @map("modified_by")
+  modified       String?
+  amendedFrom    String? @map("amended_from")
+
+  items PurchaseOrderItem[]
+
+  @@map("purchase_order")
+}
+
+model PurchaseOrderItem {
+  id          Int     @id @default(autoincrement())
+  poId        String  @map("po_id")
+  itemCode    String  @map("item_code")
+  itemName    String  @map("item_name")
+  uom         String
+  qty         Decimal @db.Decimal(18, 4)
+  rate        Decimal @db.Decimal(18, 4)
+  amount      Decimal @db.Decimal(18, 4)
+  receivedQty Decimal @default(0) @map("received_qty") @db.Decimal(18, 4)
+  warehouseId String  @map("warehouse_id")
+
+  order PurchaseOrder @relation(fields: [poId], references: [poId])
+
+  @@map("purchase_order_item")
+}
+
+model PurchaseReceipt {
+  prId           String  @id @map("pr_id")
+  poId           String  @map("po_id")
+  supplierId     String  @map("supplier_id")
+  postingDate    String  @map("posting_date")
+  status         String
+  approvalStatus String? @map("approval_status")
+  owner          String
+  creation       String
+
+  @@map("purchase_receipt")
+}
+
+model PurchaseReceiptItem {
+  id          Int     @id @default(autoincrement())
+  prId        String  @map("pr_id")
+  poId        String  @map("po_id")
+  itemCode    String  @map("item_code")
+  receivedQty Decimal @map("received_qty") @db.Decimal(18, 4)
+  warehouseId String  @map("warehouse_id")
+  rate        Decimal @db.Decimal(18, 4)
+
+  @@map("purchase_receipt_item")
+}
+
+model PurchaseInvoice {
+  piId              String  @id @map("pi_id")
+  poId              String? @map("po_id")
+  prId              String? @map("pr_id")
+  supplierId        String  @map("supplier_id")
+  postingDate       String  @map("posting_date")
+  dueDate           String? @map("due_date")
+  grandTotal        Decimal @default(0) @map("grand_total") @db.Decimal(18, 4)
+  outstandingAmount Decimal @default(0) @map("outstanding_amount") @db.Decimal(18, 4)
+  status            String  @default("Draft")
+  approvalStatus    String? @map("approval_status")
+  owner             String
+  creation          String
+
+  items PurchaseInvoiceItem[]
+
+  @@map("purchase_invoice")
+}
+
+model PurchaseInvoiceItem {
+  id       Int     @id @default(autoincrement())
+  piId     String  @map("pi_id")
+  itemCode String  @map("item_code")
+  qty      Decimal @db.Decimal(18, 4)
+  rate     Decimal @db.Decimal(18, 4)
+  amount   Decimal @db.Decimal(18, 4)
+
+  invoice PurchaseInvoice @relation(fields: [piId], references: [piId])
+
+  @@map("purchase_invoice_item")
+}
+
+// ── Sales ────────────────────────────────────────────────────────────────
+
+model Customer {
+  customerId   String  @id @map("customer_id")
+  customerName String  @map("customer_name")
+  contact      String?
+  phone        String?
+  email        String?
+  address      String?
+  paymentTerms String? @map("payment_terms")
+  creditLimit  Decimal @default(0) @map("credit_limit") @db.Decimal(18, 4)
+  isActive     Boolean @default(true) @map("is_active")
+
+  @@map("customer_list")
+}
+
+model SalesOrder {
+  soId           String  @id @map("so_id")
+  customerId     String  @map("customer_id")
+  orderDate      String  @map("order_date")
+  deliveryDate   String? @map("delivery_date")
+  status         String  @default("Draft")
+  approvalStatus String  @default("Pending") @map("approval_status")
+  approvedBy     String? @map("approved_by")
+  approvedAt     String? @map("approved_at")
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(18, 4)
+  owner          String
+  creation       String
+  modifiedBy     String? @map("modified_by")
+  modified       String?
+  amendedFrom    String? @map("amended_from")
+
+  items SalesOrderItem[]
+
+  @@map("sales_order")
+}
+
+model SalesOrderItem {
+  id           Int     @id @default(autoincrement())
+  soId         String  @map("so_id")
+  itemCode     String  @map("item_code")
+  itemName     String  @map("item_name")
+  uom          String
+  qty          Decimal @db.Decimal(18, 4)
+  rate         Decimal @db.Decimal(18, 4)
+  amount       Decimal @db.Decimal(18, 4)
+  deliveredQty Decimal @default(0) @map("delivered_qty") @db.Decimal(18, 4)
+  warehouseId  String  @map("warehouse_id")
+
+  order SalesOrder @relation(fields: [soId], references: [soId])
+
+  @@map("sales_order_item")
+}
+
+model DeliveryNote {
+  dnId           String  @id @map("dn_id")
+  soId           String  @map("so_id")
+  customerId     String  @map("customer_id")
+  postingDate    String  @map("posting_date")
+  status         String  @default("Unallocated")
+  approvalStatus String? @map("approval_status")
+  owner          String
+  creation       String
+  amendedFrom    String? @map("amended_from")
+
+  items DeliveryNoteItem[]
+
+  @@map("delivery_note")
+}
+
+model DeliveryNoteItem {
+  id           Int     @id @default(autoincrement())
+  dnId         String  @map("dn_id")
+  soId         String  @map("so_id")
+  itemCode     String  @map("item_code")
+  itemName     String  @map("item_name")
+  uom          String
+  deliveredQty Decimal @map("delivered_qty") @db.Decimal(18, 4)
+  warehouseId  String  @map("warehouse_id")
+  rate         Decimal @db.Decimal(18, 4)
+
+  note DeliveryNote @relation(fields: [dnId], references: [dnId])
+
+  @@map("delivery_note_item")
+}
+
+model SalesInvoice {
+  siId              String  @id @map("si_id")
+  soId              String? @map("so_id")
+  dnId              String? @map("dn_id")
+  customerId        String  @map("customer_id")
+  postingDate       String  @map("posting_date")
+  dueDate           String? @map("due_date")
+  grandTotal        Decimal @default(0) @map("grand_total") @db.Decimal(18, 4)
+  outstandingAmount Decimal @default(0) @map("outstanding_amount") @db.Decimal(18, 4)
+  status            String  @default("Draft")
+  approvalStatus    String? @map("approval_status")
+  owner             String
+  creation          String
+
+  items SalesInvoiceItem[]
+
+  @@map("sales_invoice")
+}
+
+model SalesInvoiceItem {
+  id       Int     @id @default(autoincrement())
+  siId     String  @map("si_id")
+  itemCode String  @map("item_code")
+  qty      Decimal @db.Decimal(18, 4)
+  rate     Decimal @db.Decimal(18, 4)
+  amount   Decimal @db.Decimal(18, 4)
+
+  invoice SalesInvoice @relation(fields: [siId], references: [siId])
+
+  @@map("sales_invoice_item")
+}
+
+// ── Payments ─────────────────────────────────────────────────────────────
+
+model PaymentEntry {
+  paymentId     String  @id @map("payment_id")
+  paymentType   String  @map("payment_type")
+  partyType     String  @map("party_type")
+  partyId       String  @map("party_id")
+  referenceType String  @map("reference_type")
+  referenceId   String  @map("reference_id")
+  paidAmount    Decimal @map("paid_amount") @db.Decimal(18, 4)
+  postingDate   String  @map("posting_date")
+  modeOfPayment String? @map("mode_of_payment")
+  status        String
+  owner         String
+  creation      String
+
+  @@map("payment_entry")
+}
+
+// ── Cross-cutting: Activity Log, Comments, Numbering ────────────────────
+
+model ActivityLog {
+  logId      String @id @map("log_id")
+  doctype    String
+  documentId String @map("document_id")
+  action     String
+  changedBy  String @map("changed_by")
+  timestamp  String
+  changes    String @default("[]") // JSON-encoded FieldChange[]
+
+  @@index([doctype, documentId])
+  @@map("activity_log")
+}
+
+model Comment {
+  commentId  String  @id @map("comment_id")
+  doctype    String
+  documentId String  @map("document_id")
+  author     String
+  text       String
+  mentions   String? // comma-joined names
+  timestamp  String
+
+  @@index([doctype, documentId])
+  @@map("comments")
+}
+
+model NumberingSeries {
+  seriesName    String @id @map("series_name")
+  prefix        String
+  currentNumber Int    @default(0) @map("current_number")
+
+  @@map("numbering_series")
+}
+
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}

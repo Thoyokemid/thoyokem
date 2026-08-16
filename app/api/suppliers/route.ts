@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Supplier } from '@/types';
-
-const SHEET = 'supplier_list';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -25,16 +19,16 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.supplier.findMany();
     const suppliers: Supplier[] = records.map((r) => ({
-      supplier_id: r.supplier_id || '',
-      supplier_name: r.supplier_name || '',
+      supplier_id: r.supplierId,
+      supplier_name: r.supplierName,
       contact: r.contact || '',
       phone: r.phone || '',
       email: r.email || '',
       address: r.address || '',
-      payment_terms: r.payment_terms || '',
-      is_active: r.is_active === '' ? true : toBool(r.is_active),
+      payment_terms: r.paymentTerms || '',
+      is_active: r.isActive,
     }));
     return NextResponse.json(suppliers);
   } catch (error) {
@@ -49,29 +43,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
-    const newId = data.supplier_id || `SUP-${String(records.length + 1).padStart(3, '0')}`;
+    const count = await prisma.supplier.count();
+    const newId = data.supplier_id || `SUP-${String(count + 1).padStart(3, '0')}`;
 
-    if (records.some((r) => r.supplier_id === newId)) {
+    const existing = await prisma.supplier.findUnique({ where: { supplierId: newId } });
+    if (existing) {
       return NextResponse.json({ error: 'Supplier ID sudah dipakai' }, { status: 400 });
     }
 
-    const newRow = objectToRow(headers, {
-      supplier_id: newId,
-      supplier_name: data.supplier_name || '',
-      contact: data.contact || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      address: data.address || '',
-      payment_terms: data.payment_terms || '',
-      is_active: 'TRUE',
+    const created = await prisma.supplier.create({
+      data: {
+        supplierId: newId,
+        supplierName: data.supplier_name || '',
+        contact: data.contact || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        address: data.address || '',
+        paymentTerms: data.payment_terms || '',
+        isActive: true,
+      },
     });
 
-    await appendSheet(SHEET, [newRow]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRow[i]));
-    await logActivity({ doctype: 'Supplier', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Supplier', documentId: newId, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, supplier_id: newId });
   } catch (error) {
@@ -88,27 +81,23 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { supplier_id, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'supplier_id', supplier_id);
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+    const current = await prisma.supplier.findUnique({ where: { supplierId: supplier_id } });
+    if (!current) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj };
-    ['supplier_name', 'contact', 'phone', 'email', 'address', 'payment_terms'].forEach((f) => {
-      if (updates[f] !== undefined) merged[f] = updates[f];
+    const updated = await prisma.supplier.update({
+      where: { supplierId: supplier_id },
+      data: {
+        supplierName: updates.supplier_name ?? current.supplierName,
+        contact: updates.contact ?? current.contact,
+        phone: updates.phone ?? current.phone,
+        email: updates.email ?? current.email,
+        address: updates.address ?? current.address,
+        paymentTerms: updates.payment_terms ?? current.paymentTerms,
+        isActive: updates.is_active !== undefined ? !!updates.is_active : current.isActive,
+      },
     });
-    if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';
 
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Supplier', documentId: supplier_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Supplier', documentId: supplier_id, action: 'Updated', changedBy: guard.session?.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -126,12 +115,10 @@ export async function DELETE(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id');
     if (!supplierId) return NextResponse.json({ error: 'supplier_id required' }, { status: 400 });
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'supplier_id', supplierId);
-    if (dataRowIndex === -1) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+    const existing = await prisma.supplier.findUnique({ where: { supplierId } });
+    if (!existing) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
 
-    await deleteRow(SHEET, dataRowIndex + 1);
+    await prisma.supplier.delete({ where: { supplierId } });
     await logActivity({ doctype: 'Supplier', documentId: supplierId, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { supplier_id: supplierId } });
     return NextResponse.json({ success: true });
   } catch (error) {

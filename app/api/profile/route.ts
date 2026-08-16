@@ -2,23 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
-
-const SHEET = 'users';
-
-// Fields a user is allowed to self-edit. Role/permission fields are excluded
-// on purpose — those stay admin-only via /api/users.
-const EDITABLE_FIELDS = [
-  'name',
-  'photo_url',
-  'phone',
-  'date_of_birth',
-  'address',
-  'gender',
-  'emergency_contact_name',
-  'emergency_contact_phone',
-  'bio',
-];
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -27,8 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { records } = await readSheetAsObjects<any>(SHEET);
-    const user = records.find((u) => String(u.id) === String(session.user.id));
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -51,39 +34,39 @@ export async function PUT(request: NextRequest) {
 
     const data = await request.json();
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'id', session.user.id);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!current) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj };
-    EDITABLE_FIELDS.forEach((field) => {
-      if (data[field] !== undefined) merged[field] = data[field];
-    });
-
+    let newPassword: string | undefined;
     // Optional password change — requires current password to be correct.
     if (data.new_password) {
       if (!data.current_password) {
         return NextResponse.json({ error: 'Password saat ini wajib diisi' }, { status: 400 });
       }
-      const valid = await bcrypt.compare(data.current_password, currentObj.password);
+      const valid = await bcrypt.compare(data.current_password, current.password);
       if (!valid) {
         return NextResponse.json({ error: 'Password saat ini salah' }, { status: 400 });
       }
-      merged.password = await bcrypt.hash(data.new_password, 10);
+      newPassword = await bcrypt.hash(data.new_password, 10);
     }
 
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        name: data.name !== undefined ? data.name : current.name,
+        photoUrl: data.photo_url !== undefined ? data.photo_url : current.photoUrl,
+        phone: data.phone !== undefined ? data.phone : current.phone,
+        dateOfBirth: data.date_of_birth !== undefined ? data.date_of_birth : current.dateOfBirth,
+        address: data.address !== undefined ? data.address : current.address,
+        gender: data.gender !== undefined ? data.gender : current.gender,
+        emergencyContactName: data.emergency_contact_name !== undefined ? data.emergency_contact_name : current.emergencyContactName,
+        emergencyContactPhone: data.emergency_contact_phone !== undefined ? data.emergency_contact_phone : current.emergencyContactPhone,
+        bio: data.bio !== undefined ? data.bio : current.bio,
+        ...(newPassword ? { password: newPassword } : {}),
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

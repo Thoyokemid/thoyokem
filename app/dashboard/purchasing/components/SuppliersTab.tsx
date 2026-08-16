@@ -2,13 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
+import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Supplier } from '@/types';
-import { Plus, Edit, Trash2, Truck } from 'lucide-react';
+import { Plus, Edit, Trash2, Truck, Upload } from 'lucide-react';
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: 'supplier_id', label: 'Supplier ID (kosongkan untuk auto)', example: '' },
+  { key: 'supplier_name', label: 'Nama Supplier', example: 'PT Supplier Jaya', required: true },
+  { key: 'contact', label: 'Contact Person', example: 'Budi' },
+  { key: 'phone', label: 'Telepon', example: '08123456789' },
+  { key: 'email', label: 'Email', example: 'budi@supplier.com' },
+  { key: 'address', label: 'Alamat', example: 'Jl. Contoh No. 1' },
+  { key: 'payment_terms', label: 'Payment Terms', example: 'Net 30' },
+];
 
 const REPORT_COLUMNS: ReportColumn<Supplier>[] = [
   { key: 'supplier_id', header: 'Supplier ID' },
@@ -24,8 +36,11 @@ const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function SuppliersTab() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [viewMode, setViewMode] = useViewMode('purchasing_suppliers_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('purchasing_suppliers_cols', DEFAULT_VISIBLE);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -110,6 +125,9 @@ export default function SuppliersTab() {
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(suppliers, REPORT_COLUMNS, 'suppliers', 'Suppliers')}
           />
+          {isSuperAdmin && (
+            <Button variant="secondary" onClick={() => setIsImportOpen(true)}><Upload size={14} className="mr-1.5" />Import</Button>
+          )}
           <Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Supplier</Button>
         </div>
       }
@@ -179,6 +197,18 @@ export default function SuppliersTab() {
           </div>
         </form>
       </Modal>
+
+      {isSuperAdmin && (
+        <BulkImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          title="Import Supplier"
+          columns={IMPORT_COLUMNS}
+          apiEndpoint="/api/suppliers/import"
+          templateFilename="template_supplier"
+          onImported={fetchSuppliers}
+        />
+      )}
     </ListViewLayout>
   );
 }

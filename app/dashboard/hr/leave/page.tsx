@@ -76,8 +76,8 @@ export default function LeavePage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-  const [sortField, setSortField] = useState<SortField>('employee_name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const [viewMode, setViewMode] = useState<ViewMode>('list');

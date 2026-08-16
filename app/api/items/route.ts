@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { readSheet, writeSheet, appendSheet, deleteRow, readSheetAsObjects, objectToRow, findRowIndexByField } from '@/lib/sheets';
+import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Item } from '@/types';
-
-const SHEET = 'item_list';
-
-function toBool(v: any) {
-  return v === 'TRUE' || v === true;
-}
 
 async function requireInventoryAccess() {
   const session = await getServerSession(authOptions);
@@ -25,21 +19,21 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const { records } = await readSheetAsObjects<any>(SHEET);
+    const records = await prisma.item.findMany();
     const items: Item[] = records.map((r) => ({
-      item_code: r.item_code || '',
-      item_name: r.item_name || '',
-      item_group: r.item_group || '',
-      unit: r.unit || '',
-      purchase_price: parseFloat(r.purchase_price) || 0,
-      selling_price: parseFloat(r.selling_price) || 0,
-      reorder_level: parseFloat(r.reorder_level) || 0,
-      valuation_method: (r.valuation_method || 'Average') as 'FIFO' | 'Average',
-      opening_qty: parseFloat(r.opening_qty) || 0,
-      opening_valuation_rate: parseFloat(r.opening_valuation_rate) || 0,
-      is_active: r.is_active === '' ? true : toBool(r.is_active),
-      currency: (r.currency || 'IDR') as 'IDR' | 'USD',
-      item_type: (r.item_type || 'Regular') as 'Trading' | 'Regular',
+      item_code: r.itemCode,
+      item_name: r.itemName,
+      item_group: r.itemGroup,
+      unit: r.unit,
+      purchase_price: Number(r.purchasePrice),
+      selling_price: Number(r.sellingPrice),
+      reorder_level: Number(r.reorderLevel),
+      valuation_method: r.valuationMethod as 'FIFO' | 'Average',
+      opening_qty: Number(r.openingQty),
+      opening_valuation_rate: Number(r.openingValuationRate),
+      is_active: r.isActive,
+      currency: r.currency as 'IDR' | 'USD',
+      item_type: r.itemType as 'Trading' | 'Regular',
     }));
     return NextResponse.json(items);
   } catch (error) {
@@ -54,33 +48,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    const { headers, records } = await readSheetAsObjects<any>(SHEET);
 
-    if (records.some((r) => r.item_code === data.item_code)) {
+    const existing = await prisma.item.findUnique({ where: { itemCode: data.item_code } });
+    if (existing) {
       return NextResponse.json({ error: 'Item code sudah dipakai' }, { status: 400 });
     }
 
-    const newRow = objectToRow(headers, {
-      item_code: data.item_code || '',
-      item_name: data.item_name || '',
-      item_group: data.item_group || '',
-      unit: data.unit || '',
-      purchase_price: data.purchase_price ?? 0,
-      selling_price: data.selling_price ?? 0,
-      reorder_level: data.reorder_level ?? 0,
-      valuation_method: data.valuation_method || 'Average',
-      opening_qty: data.opening_qty ?? 0,
-      opening_valuation_rate: data.opening_valuation_rate ?? 0,
-      is_active: 'TRUE',
-      currency: data.currency || 'IDR',
-      item_type: data.item_type || 'Regular',
+    const created = await prisma.item.create({
+      data: {
+        itemCode: data.item_code || '',
+        itemName: data.item_name || '',
+        itemGroup: data.item_group || '',
+        unit: data.unit || '',
+        purchasePrice: data.purchase_price ?? 0,
+        sellingPrice: data.selling_price ?? 0,
+        reorderLevel: data.reorder_level ?? 0,
+        valuationMethod: data.valuation_method || 'Average',
+        openingQty: data.opening_qty ?? 0,
+        openingValuationRate: data.opening_valuation_rate ?? 0,
+        isActive: true,
+        currency: data.currency || 'IDR',
+        itemType: data.item_type || 'Regular',
+      },
     });
 
-    await appendSheet(SHEET, [newRow]);
-
-    const newObj: Record<string, any> = {};
-    headers.forEach((h, i) => (newObj[h] = newRow[i]));
-    await logActivity({ doctype: 'Item', documentId: data.item_code, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: newObj });
+    await logActivity({ doctype: 'Item', documentId: data.item_code, action: 'Created', changedBy: guard.session?.user.name || '', before: null, after: created });
 
     return NextResponse.json({ success: true, item_code: data.item_code });
   } catch (error) {
@@ -97,30 +89,28 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { item_code, ...updates } = data;
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'item_code', item_code);
-
-    if (dataRowIndex === -1) {
+    const current = await prisma.item.findUnique({ where: { itemCode: item_code } });
+    if (!current) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    const sheetRowIndex = dataRowIndex + 1;
-    const currentRow = rows[sheetRowIndex] || [];
-    const currentObj: Record<string, any> = {};
-    headers.forEach((h, i) => (currentObj[h] = currentRow[i] ?? ''));
-
-    const merged = { ...currentObj };
-    ['item_name', 'item_group', 'unit', 'purchase_price', 'selling_price', 'reorder_level', 'valuation_method', 'reorder_level', 'currency', 'item_type'].forEach((f) => {
-      if (updates[f] !== undefined) merged[f] = updates[f];
+    const updated = await prisma.item.update({
+      where: { itemCode: item_code },
+      data: {
+        itemName: updates.item_name ?? current.itemName,
+        itemGroup: updates.item_group ?? current.itemGroup,
+        unit: updates.unit ?? current.unit,
+        purchasePrice: updates.purchase_price ?? current.purchasePrice,
+        sellingPrice: updates.selling_price ?? current.sellingPrice,
+        reorderLevel: updates.reorder_level ?? current.reorderLevel,
+        valuationMethod: updates.valuation_method ?? current.valuationMethod,
+        currency: updates.currency ?? current.currency,
+        itemType: updates.item_type ?? current.itemType,
+        isActive: updates.is_active !== undefined ? !!updates.is_active : current.isActive,
+      },
     });
-    if (updates.is_active !== undefined) merged.is_active = updates.is_active ? 'TRUE' : 'FALSE';
 
-    const newRow = objectToRow(headers, merged);
-    const lastCol = String.fromCharCode(65 + headers.length - 1);
-    await writeSheet(SHEET, `A${sheetRowIndex + 1}:${lastCol}${sheetRowIndex + 1}`, [newRow]);
-
-    await logActivity({ doctype: 'Item', documentId: item_code, action: 'Updated', changedBy: guard.session?.user.name || '', before: currentObj, after: merged });
+    await logActivity({ doctype: 'Item', documentId: item_code, action: 'Updated', changedBy: guard.session?.user.name || '', before: current, after: updated });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -138,15 +128,12 @@ export async function DELETE(request: NextRequest) {
     const itemCode = searchParams.get('item_code');
     if (!itemCode) return NextResponse.json({ error: 'item_code required' }, { status: 400 });
 
-    const rows = await readSheet(SHEET);
-    const headers = (rows[0] || []).map((h: any) => String(h ?? '').trim());
-    const dataRowIndex = findRowIndexByField(headers, rows, 'item_code', itemCode);
-
-    if (dataRowIndex === -1) {
+    const existing = await prisma.item.findUnique({ where: { itemCode } });
+    if (!existing) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    await deleteRow(SHEET, dataRowIndex + 1);
+    await prisma.item.delete({ where: { itemCode } });
     await logActivity({ doctype: 'Item', documentId: itemCode, action: 'Deleted', changedBy: guard.session?.user.name || '', before: null, after: { item_code: itemCode } });
     return NextResponse.json({ success: true });
   } catch (error) {

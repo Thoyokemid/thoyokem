@@ -2,13 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
+import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Customer } from '@/types';
-import { Plus, Edit, Trash2, User } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: 'customer_id', label: 'Customer ID (kosongkan untuk auto)', example: '' },
+  { key: 'customer_name', label: 'Nama Customer', example: 'PT Contoh Jaya', required: true },
+  { key: 'contact', label: 'Contact Person', example: 'Budi' },
+  { key: 'phone', label: 'Telepon', example: '08123456789' },
+  { key: 'email', label: 'Email', example: 'budi@contoh.com' },
+  { key: 'address', label: 'Alamat', example: 'Jl. Contoh No. 1' },
+  { key: 'payment_terms', label: 'Payment Terms', example: 'Net 30' },
+  { key: 'credit_limit', label: 'Credit Limit', example: '0' },
+];
 
 const REPORT_COLUMNS: ReportColumn<Customer>[] = [
   { key: 'customer_id', header: 'Customer ID' },
@@ -25,8 +38,11 @@ const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function CustomersTab() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [viewMode, setViewMode] = useViewMode('sales_customers_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('sales_customers_cols', DEFAULT_VISIBLE);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,6 +128,9 @@ export default function CustomersTab() {
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(customers, REPORT_COLUMNS, 'customers', 'Customers')}
           />
+          {isSuperAdmin && (
+            <Button variant="secondary" onClick={() => setIsImportOpen(true)}><Upload size={14} className="mr-1.5" />Import</Button>
+          )}
           <Button onClick={openNew}><Plus size={14} className="mr-1.5" />Add Customer</Button>
         </div>
       }
@@ -187,6 +206,18 @@ export default function CustomersTab() {
           </div>
         </form>
       </Modal>
+
+      {isSuperAdmin && (
+        <BulkImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          title="Import Customer"
+          columns={IMPORT_COLUMNS}
+          apiEndpoint="/api/customers/import"
+          templateFilename="template_customer"
+          onImported={fetchCustomers}
+        />
+      )}
     </ListViewLayout>
   );
 }
