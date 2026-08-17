@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
     const updated = await prisma.role.update({
       where: { roleId: role_id },
       data: {
-        roleName: updates.role_name !== undefined ? updates.role_name : current.roleName,
+        roleName: updates.role_name != null ? updates.role_name : current.roleName,
         dashboard: updates.dashboard !== undefined ? !!updates.dashboard : current.dashboard,
         attendance: updates.attendance !== undefined ? !!updates.attendance : current.attendance,
         leave: updates.leave !== undefined ? !!updates.leave : current.leave,

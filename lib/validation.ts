@@ -63,26 +63,26 @@ export const attachmentUploadSchema = z.object({
 // ── Master data: Customer ───────────────────────────────────────────────
 
 export const customerCreateSchema = z.object({
-  customer_id: z.string().optional(),
-  customer_name: z.string().optional(),
-  contact: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
-  credit_limit: z.coerce.number().optional(),
+  customer_id: z.string().optional().nullable(),
+  customer_name: z.string().optional().nullable(),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
+  credit_limit: z.coerce.number().optional().nullable(),
 });
 
 export const customerUpdateSchema = z.object({
   customer_id: z.string().min(1, 'customer_id wajib diisi'),
-  customer_name: z.string().optional(),
-  contact: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
-  credit_limit: z.coerce.number().optional(),
-  is_active: z.boolean().optional(),
+  customer_name: z.string().optional().nullable(),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
+  credit_limit: z.coerce.number().optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
 });
 
 const importRowsSchema = <T extends z.ZodTypeAny>(rowSchema: T) =>
@@ -97,49 +97,49 @@ export const bulkRowsSchema = z.object({
 
 export const customerImportSchema = importRowsSchema(
   z.object({
-    customer_id: z.string().optional(),
+    customer_id: z.string().optional().nullable(),
     customer_name: z.string().min(1, 'customer_name wajib diisi'),
-    contact: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().optional(),
-    address: z.string().optional(),
-    payment_terms: z.string().optional(),
-    credit_limit: z.coerce.number().optional(),
+    contact: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    email: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    payment_terms: z.string().optional().nullable(),
+    credit_limit: z.coerce.number().optional().nullable(),
   })
 );
 
 // ── Master data: Supplier ───────────────────────────────────────────────
 
 export const supplierCreateSchema = z.object({
-  supplier_id: z.string().optional(),
-  supplier_name: z.string().optional(),
-  contact: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
+  supplier_id: z.string().optional().nullable(),
+  supplier_name: z.string().optional().nullable(),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
 });
 
 export const supplierUpdateSchema = z.object({
   supplier_id: z.string().min(1, 'supplier_id wajib diisi'),
-  supplier_name: z.string().optional(),
-  contact: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
-  is_active: z.boolean().optional(),
+  supplier_name: z.string().optional().nullable(),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
 });
 
 export const supplierImportSchema = importRowsSchema(
   z.object({
-    supplier_id: z.string().optional(),
+    supplier_id: z.string().optional().nullable(),
     supplier_name: z.string().min(1, 'supplier_name wajib diisi'),
-    contact: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().optional(),
-    address: z.string().optional(),
-    payment_terms: z.string().optional(),
+    contact: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    email: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    payment_terms: z.string().optional().nullable(),
   })
 );
 
@@ -147,116 +147,116 @@ export const supplierImportSchema = importRowsSchema(
 
 export const itemCreateSchema = z.object({
   item_code: z.string().min(1, 'item_code wajib diisi'),
-  item_name: z.string().optional(),
-  item_group: z.string().optional(),
-  unit: z.string().optional(),
-  purchase_price: z.coerce.number().optional(),
-  selling_price: z.coerce.number().optional(),
-  reorder_level: z.coerce.number().optional(),
-  valuation_method: z.enum(['FIFO', 'Average']).optional(),
-  opening_qty: z.coerce.number().optional(),
-  opening_valuation_rate: z.coerce.number().optional(),
-  currency: z.enum(['IDR', 'USD']).optional(),
-  item_type: z.enum(['Trading', 'Regular']).optional(),
+  item_name: z.string().optional().nullable(),
+  item_group: z.string().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  purchase_price: z.coerce.number().optional().nullable(),
+  selling_price: z.coerce.number().optional().nullable(),
+  reorder_level: z.coerce.number().optional().nullable(),
+  valuation_method: z.enum(['FIFO', 'Average']).optional().nullable(),
+  opening_qty: z.coerce.number().optional().nullable(),
+  opening_valuation_rate: z.coerce.number().optional().nullable(),
+  currency: z.enum(['IDR', 'USD']).optional().nullable(),
+  item_type: z.enum(['Trading', 'Regular']).optional().nullable(),
 });
 
 export const itemUpdateSchema = z.object({
   item_code: z.string().min(1, 'item_code wajib diisi'),
-  item_name: z.string().optional(),
-  item_group: z.string().optional(),
-  unit: z.string().optional(),
-  purchase_price: z.coerce.number().optional(),
-  selling_price: z.coerce.number().optional(),
-  reorder_level: z.coerce.number().optional(),
-  valuation_method: z.enum(['FIFO', 'Average']).optional(),
-  currency: z.enum(['IDR', 'USD']).optional(),
-  item_type: z.enum(['Trading', 'Regular']).optional(),
-  is_active: z.boolean().optional(),
+  item_name: z.string().optional().nullable(),
+  item_group: z.string().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  purchase_price: z.coerce.number().optional().nullable(),
+  selling_price: z.coerce.number().optional().nullable(),
+  reorder_level: z.coerce.number().optional().nullable(),
+  valuation_method: z.enum(['FIFO', 'Average']).optional().nullable(),
+  currency: z.enum(['IDR', 'USD']).optional().nullable(),
+  item_type: z.enum(['Trading', 'Regular']).optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
 });
 
 export const itemImportSchema = importRowsSchema(
   z.object({
     item_name: z.string().min(1, 'item_name wajib diisi'),
-    item_code: z.string().optional(),
-    item_group: z.enum(['Liquid', 'Non-Liquid']).optional(),
-    unit: z.string().optional(),
-    purchase_price: z.coerce.number().optional(),
-    selling_price: z.coerce.number().optional(),
-    reorder_level: z.coerce.number().optional(),
-    opening_qty: z.coerce.number().optional(),
-    opening_valuation_rate: z.coerce.number().optional(),
-    valuation_method: z.enum(['FIFO', 'Average']).optional(),
-    currency: z.enum(['USD', 'IDR']).optional(),
-    item_type: z.enum(['Trading', 'Regular']).optional(),
+    item_code: z.string().optional().nullable(),
+    item_group: z.enum(['Liquid', 'Non-Liquid']).optional().nullable(),
+    unit: z.string().optional().nullable(),
+    purchase_price: z.coerce.number().optional().nullable(),
+    selling_price: z.coerce.number().optional().nullable(),
+    reorder_level: z.coerce.number().optional().nullable(),
+    opening_qty: z.coerce.number().optional().nullable(),
+    opening_valuation_rate: z.coerce.number().optional().nullable(),
+    valuation_method: z.enum(['FIFO', 'Average']).optional().nullable(),
+    currency: z.enum(['USD', 'IDR']).optional().nullable(),
+    item_type: z.enum(['Trading', 'Regular']).optional().nullable(),
   })
 );
 
 // ── Master data: Warehouse ──────────────────────────────────────────────
 
 export const warehouseCreateSchema = z.object({
-  warehouse_name: z.string().optional(),
-  location: z.string().optional(),
-  pic: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  postal_code: z.string().optional(),
+  warehouse_name: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  pic: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  postal_code: z.string().optional().nullable(),
 });
 
 export const warehouseUpdateSchema = z.object({
   warehouse_id: z.string().min(1, 'warehouse_id wajib diisi'),
-  warehouse_name: z.string().optional(),
-  location: z.string().optional(),
-  pic: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  postal_code: z.string().optional(),
-  is_active: z.boolean().optional(),
+  warehouse_name: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  pic: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  postal_code: z.string().optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
 });
 
 export const warehouseImportSchema = importRowsSchema(
   z.object({
     warehouse_name: z.string().min(1, 'warehouse_name wajib diisi'),
-    warehouse_id: z.string().optional(),
-    location: z.string().optional(),
-    pic: z.string().optional(),
-    phone: z.string().optional(),
-    address: z.string().optional(),
-    postal_code: z.string().optional(),
+    warehouse_id: z.string().optional().nullable(),
+    location: z.string().optional().nullable(),
+    pic: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    postal_code: z.string().optional().nullable(),
   })
 );
 
 // ── HR: Staff / Leave ───────────────────────────────────────────────────
 
 export const staffCreateSchema = z.object({
-  user_id: z.string().optional(),
-  employee_name: z.string().optional(),
+  user_id: z.string().optional().nullable(),
+  employee_name: z.string().optional().nullable(),
   date_of_birth: z.string().optional().nullable(),
-  leave_allocation: z.coerce.number().optional(),
+  leave_allocation: z.coerce.number().optional().nullable(),
 });
 
 export const staffUpdateSchema = z.object({
   employee_id: z.string().min(1, 'employee_id wajib diisi'),
-  user_id: z.string().optional(),
-  employee_name: z.string().optional(),
+  user_id: z.string().optional().nullable(),
+  employee_name: z.string().optional().nullable(),
   date_of_birth: z.string().optional().nullable(),
-  leave_allocation: z.coerce.number().optional(),
+  leave_allocation: z.coerce.number().optional().nullable(),
 });
 
 export const leaveCreateSchema = z.object({
-  employee: z.string().optional(),
-  employee_name: z.string().optional(),
-  from_date: z.string().optional(),
-  to_date: z.string().optional(),
-  leave_type: z.string().optional(),
+  employee: z.string().optional().nullable(),
+  employee_name: z.string().optional().nullable(),
+  from_date: z.string().optional().nullable(),
+  to_date: z.string().optional().nullable(),
+  leave_type: z.string().optional().nullable(),
   attachment: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
 });
 
 export const leaveUpdateSchema = z.object({
   id: z.string().min(1, 'id wajib diisi'),
-  from_date: z.string().optional(),
-  to_date: z.string().optional(),
-  leave_type: z.string().optional(),
+  from_date: z.string().optional().nullable(),
+  to_date: z.string().optional().nullable(),
+  leave_type: z.string().optional().nullable(),
   attachment: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
 });
@@ -264,28 +264,28 @@ export const leaveUpdateSchema = z.object({
 // ── Access control: Roles / Users ───────────────────────────────────────
 
 const permissionFlags = {
-  dashboard: z.boolean().optional(),
-  attendance: z.boolean().optional(),
-  leave: z.boolean().optional(),
-  registration_request: z.boolean().optional(),
-  setting: z.boolean().optional(),
-  staff: z.boolean().optional(),
-  inventory: z.boolean().optional(),
-  purchasing: z.boolean().optional(),
-  sales_order: z.boolean().optional(),
-  delivery_order: z.boolean().optional(),
-  can_approve: z.boolean().optional(),
-  is_super_admin: z.boolean().optional(),
+  dashboard: z.boolean().optional().nullable(),
+  attendance: z.boolean().optional().nullable(),
+  leave: z.boolean().optional().nullable(),
+  registration_request: z.boolean().optional().nullable(),
+  setting: z.boolean().optional().nullable(),
+  staff: z.boolean().optional().nullable(),
+  inventory: z.boolean().optional().nullable(),
+  purchasing: z.boolean().optional().nullable(),
+  sales_order: z.boolean().optional().nullable(),
+  delivery_order: z.boolean().optional().nullable(),
+  can_approve: z.boolean().optional().nullable(),
+  is_super_admin: z.boolean().optional().nullable(),
 };
 
 export const roleCreateSchema = z.object({
-  role_name: z.string().optional(),
+  role_name: z.string().optional().nullable(),
   ...permissionFlags,
 });
 
 export const roleUpdateSchema = z.object({
   role_id: z.string().min(1, 'role_id wajib diisi'),
-  role_name: z.string().optional(),
+  role_name: z.string().optional().nullable(),
   ...permissionFlags,
 });
 
@@ -298,7 +298,7 @@ export const userUpdateSchema = z.object({
 
 export const bomCreateSchema = z.object({
   item_code: z.string().min(1, 'item_code wajib diisi'),
-  qty: z.coerce.number().positive().optional(),
+  qty: z.coerce.number().positive().optional().nullable(),
   components: z
     .array(
       z.object({
@@ -326,7 +326,7 @@ export const paymentCreateSchema = z.object({
   reference_type: z.enum(['Sales Invoice', 'Purchase Invoice']),
   reference_id: z.string().min(1, 'reference_id wajib diisi'),
   paid_amount: z.coerce.number().positive('paid_amount harus lebih dari 0'),
-  mode_of_payment: z.string().optional(),
+  mode_of_payment: z.string().optional().nullable(),
 });
 
 export const purchaseInvoiceCreateSchema = z.object({
@@ -343,17 +343,17 @@ export const salesInvoiceCreateSchema = z.object({
 
 export const profileUpdateSchema = z
   .object({
-    name: z.string().optional(),
-    photo_url: z.string().optional(),
-    phone: z.string().optional(),
-    date_of_birth: z.string().optional(),
-    address: z.string().optional(),
-    gender: z.string().optional(),
-    emergency_contact_name: z.string().optional(),
-    emergency_contact_phone: z.string().optional(),
-    bio: z.string().optional(),
-    current_password: z.string().optional(),
-    new_password: z.string().optional(),
+    name: z.string().optional().nullable(),
+    photo_url: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    date_of_birth: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    gender: z.string().optional().nullable(),
+    emergency_contact_name: z.string().optional().nullable(),
+    emergency_contact_phone: z.string().optional().nullable(),
+    bio: z.string().optional().nullable(),
+    current_password: z.string().optional().nullable(),
+    new_password: z.string().optional().nullable(),
   })
   .refine((data) => !data.new_password || !!data.current_password, {
     message: 'current_password wajib diisi untuk mengganti password',
@@ -367,11 +367,11 @@ export const settingsUpdateSchema = z.record(z.string(), z.string());
 export const stockEntryCreateSchema = z.object({
   entry_type: z.enum(['Material Receipt', 'Material Issue', 'Material Transfer', 'Manufacture']),
   item_code: z.string().min(1, 'item_code wajib diisi'),
-  source_warehouse: z.string().optional(),
-  target_warehouse: z.string().optional(),
+  source_warehouse: z.string().optional().nullable(),
+  target_warehouse: z.string().optional().nullable(),
   qty: z.coerce.number().positive('qty harus lebih dari 0'),
   remarks: z.string().optional().nullable(),
-  date: z.string().optional(),
+  date: z.string().optional().nullable(),
 });
 
 export const stockReconciliationCreateSchema = z.object({
@@ -386,16 +386,16 @@ export const stockReconciliationCreateSchema = z.object({
 
 export const attendanceImportSchema = z.array(
   z.object({
-    cloud_id: z.string().optional(),
-    id: z.string().optional(),
-    employee_name: z.string().optional(),
-    attendance_date: z.string().optional(),
-    jam_set: z.string().optional(),
-    jam_absensi: z.string().optional(),
-    verifikasi: z.string().optional(),
-    tipe_absensi: z.string().optional(),
-    designation: z.string().optional(),
-    branch: z.string().optional(),
+    cloud_id: z.string().optional().nullable(),
+    id: z.string().optional().nullable(),
+    employee_name: z.string().optional().nullable(),
+    attendance_date: z.string().optional().nullable(),
+    jam_set: z.string().optional().nullable(),
+    jam_absensi: z.string().optional().nullable(),
+    verifikasi: z.string().optional().nullable(),
+    tipe_absensi: z.string().optional().nullable(),
+    designation: z.string().optional().nullable(),
+    branch: z.string().optional().nullable(),
     remarks: z.string().optional().nullable(),
   })
 );

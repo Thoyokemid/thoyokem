@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest) {
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
-        name: data.name !== undefined ? data.name : current.name,
+        name: data.name != null ? data.name : current.name,
         photoUrl: data.photo_url !== undefined ? data.photo_url : current.photoUrl,
         phone: data.phone !== undefined ? data.phone : current.phone,
         dateOfBirth: data.date_of_birth !== undefined ? data.date_of_birth : current.dateOfBirth,
