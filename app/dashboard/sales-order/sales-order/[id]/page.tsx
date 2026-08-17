@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer } from 'lucide-react';
 
 interface SalesOrderWithItems {
@@ -243,6 +244,7 @@ export default function SalesOrderDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Sales Order" documentId={so.so_id} />
+              <AttachmentSection doctype="Sales Order" documentId={so.so_id} />
             </DetailSection>
           </div>
         )}

@@ -493,6 +493,19 @@ model Comment {
   @@map("comments")
 }
 
+model Attachment {
+  attachmentId String @id @map("attachment_id")
+  doctype      String
+  documentId   String @map("document_id")
+  fileName     String @map("file_name")
+  fileUrl      String @map("file_url")
+  uploadedBy   String @map("uploaded_by")
+  timestamp    String
+
+  @@index([doctype, documentId])
+  @@map("attachments")
+}
+
 model NumberingSeries {
   seriesName    String @id @map("series_name")
   prefix        String

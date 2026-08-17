@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
 import { generateLeaveLetterPDF } from '@/utils/leaveLetter';
@@ -142,6 +143,7 @@ export default function LeaveDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Leave" documentId={leave.id} />
+              <AttachmentSection doctype="Leave" documentId={leave.id} />
             </DetailSection>
           </div>
         )}

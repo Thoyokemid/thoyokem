@@ -11,6 +11,7 @@ import Modal from '@/components/ui/Modal';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { SalesInvoice } from '@/types';
 import { AlertCircle, Wallet, Printer } from 'lucide-react';
 
@@ -188,6 +189,7 @@ export default function SalesInvoiceDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Sales Invoice" documentId={id} />
+              <AttachmentSection doctype="Sales Invoice" documentId={id} />
             </DetailSection>
           </div>
         )}

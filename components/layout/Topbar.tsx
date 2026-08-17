@@ -31,8 +31,10 @@ import {
   Mail,
   Github,
   Bell,
+  History,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
+import { getRecentlyViewed, RecentlyViewedItem } from '@/lib/recentlyViewed';
 
 function WhatsAppIcon({ size = 14 }: { size?: number }) {
   return (
@@ -118,6 +120,7 @@ export default function Topbar({ user }: TopbarProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [isDark, setIsDark] = useState(false);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
@@ -219,6 +222,7 @@ export default function Topbar({ user }: TopbarProps) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
+        setRecentlyViewed(getRecentlyViewed());
         requestAnimationFrame(() => searchInputRef.current?.focus());
       }
       if (e.key === 'Escape') setIsSearchOpen(false);
@@ -273,6 +277,15 @@ export default function Topbar({ user }: TopbarProps) {
 
   // Flatten module matches + search groups into a single navigable list
   const flatItems: FlatItem[] = useMemo(() => {
+    if (!query.trim()) {
+      return recentlyViewed.map((r) => ({
+        key: `recent:${r.href}`,
+        label: r.label,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: History,
+      }));
+    }
     const fromModules: FlatItem[] = filteredModules.map((m) => ({
       key: `module:${m.href}`,
       label: m.name,
@@ -289,7 +302,7 @@ export default function Topbar({ user }: TopbarProps) {
       }))
     );
     return [...fromModules, ...fromGroups];
-  }, [filteredModules, searchGroups]);
+  }, [query, filteredModules, searchGroups, recentlyViewed]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -344,7 +357,7 @@ export default function Topbar({ user }: TopbarProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsSearchOpen(true)}
+          onFocus={() => { setIsSearchOpen(true); setRecentlyViewed(getRecentlyViewed()); }}
           onKeyDown={handleSearchKeyDown}
           placeholder="Cari dokumen, item, karyawan..."
           className="w-full pl-9 pr-14 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -353,9 +366,32 @@ export default function Topbar({ user }: TopbarProps) {
           ⌘K
         </span>
 
-        {isSearchOpen && query.trim().length > 0 && (
+        {isSearchOpen && (
           <div className="absolute right-0 mt-1.5 w-80 sm:w-96 max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
-            {flatItems.length === 0 ? (
+            {!query.trim() ? (
+              flatItems.length === 0 ? (
+                <p className="px-3 py-3 text-xs text-gray-400 text-center">Belum ada dokumen yang dilihat</p>
+              ) : (
+                <div className="py-1">
+                  <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Baru Dilihat</p>
+                  {flatItems.map((item, idx) => (
+                    <button
+                      key={item.key}
+                      ref={idx === activeIndex ? activeItemRef : undefined}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      onClick={() => goTo(item.href)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                        idx === activeIndex ? 'bg-primary-50 dark:bg-primary-900/20 text-primary' : 'text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      <item.icon size={15} className="flex-shrink-0" />
+                      <span className="flex-1 min-w-0 truncate">{item.label}</span>
+                      {item.subtitle && <span className="text-xs text-gray-400 flex-shrink-0">{item.subtitle}</span>}
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : flatItems.length === 0 ? (
               <p className="px-3 py-3 text-xs text-gray-400 text-center">
                 {isSearching ? 'Mencari...' : 'Tidak ada hasil'}
               </p>

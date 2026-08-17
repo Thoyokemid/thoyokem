@@ -113,9 +113,6 @@ export default function StockReconciliationPage() {
               <ShieldAlert size={22} className="text-orange-500" />
               Stock Reconciliation
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Bandingkan Delivery Note, Purchase Receipt, dan Stock Entry dengan stock ledger — cari mutasi stok yang hilang atau tidak cocok.
-            </p>
           </div>
           <Button variant="secondary" onClick={fetchData} disabled={isLoading}>
             <RefreshCw size={14} className="mr-1.5" />

@@ -209,7 +209,6 @@ export default function StaffPage() {
       <>
       <ListViewLayout
         title="Staff Management"
-        subtitle="Kelola data karyawan"
         primaryAction={
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={14} className="mr-1.5" />

@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle } from 'lucide-react';
 
 interface UserWithRole {
@@ -101,6 +102,7 @@ export default function UserDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="User" documentId={user.id} />
+              <AttachmentSection doctype="User" documentId={user.id} />
             </DetailSection>
           </div>
         )}

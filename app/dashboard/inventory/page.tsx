@@ -46,16 +46,16 @@ function InventoryPageInner() {
     );
   }
 
-  const titles: Record<string, { title: string; subtitle: string }> = {
-    overview: { title: "Inventory", subtitle: "Kelola barang, gudang, dan pergerakan stok" },
-    balance: { title: "Stock Balance", subtitle: "Ringkasan stok per item dan warehouse" },
-    ledger: { title: "Stock Ledger", subtitle: "Kartu stok — semua pergerakan masuk/keluar per transaksi" },
-    entries: { title: "Stock Entries", subtitle: "Riwayat pergerakan stok" },
-    items: { title: "Items", subtitle: "Daftar barang" },
-    bom: { title: "Product Campuran (BOM)", subtitle: "Produk hasil campuran/rakitan beberapa item" },
-    warehouses: { title: "Warehouses", subtitle: "Daftar gudang" },
+  const titles: Record<string, { title: string }> = {
+    overview: { title: "Inventory" },
+    balance: { title: "Stock Balance" },
+    ledger: { title: "Stock Ledger" },
+    entries: { title: "Stock Entries" },
+    items: { title: "Items" },
+    bom: { title: "Product Campuran (BOM)" },
+    warehouses: { title: "Warehouses" },
   };
-  const { title, subtitle } = titles[activeTab] || titles.overview;
+  const { title } = titles[activeTab] || titles.overview;
 
   return (
     <DashboardLayout
@@ -70,7 +70,6 @@ function InventoryPageInner() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         </div>
 
         <div>

@@ -41,13 +41,13 @@ function PurchasingPageInner() {
     );
   }
 
-  const titles: Record<string, { title: string; subtitle: string }> = {
-    overview: { title: "Purchasing", subtitle: "Purchase order, penerimaan barang, dan tagihan supplier" },
-    orders: { title: "Purchase Orders", subtitle: "Daftar purchase order" },
-    invoices: { title: "Invoices", subtitle: "Tagihan dari supplier" },
-    suppliers: { title: "Suppliers", subtitle: "Daftar supplier" },
+  const titles: Record<string, { title: string }> = {
+    overview: { title: "Purchasing" },
+    orders: { title: "Purchase Orders" },
+    invoices: { title: "Invoices" },
+    suppliers: { title: "Suppliers" },
   };
-  const { title, subtitle } = titles[activeTab] || titles.overview;
+  const { title } = titles[activeTab] || titles.overview;
 
   return (
     <DashboardLayout
@@ -62,7 +62,6 @@ function PurchasingPageInner() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         </div>
 
         <div>

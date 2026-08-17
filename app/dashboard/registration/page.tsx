@@ -139,7 +139,6 @@ export default function RegistrationPage() {
     >
       <ListViewLayout
         title="Registration Requests"
-        subtitle="Review and manage user registration requests"
         filterGroups={[
           {
             title: 'Status',

@@ -336,9 +336,6 @@ export default function SettingsPage() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage roles, user access, and work hours
-          </p>
         </div>
 
         <Card title="Jam Kerja">

@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer } from 'lucide-react';
 
 interface PurchaseOrderWithItems {
@@ -246,6 +247,7 @@ export default function PurchaseOrderDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Purchase Order" documentId={po.po_id} />
+              <AttachmentSection doctype="Purchase Order" documentId={po.po_id} />
             </DetailSection>
           </div>
         )}

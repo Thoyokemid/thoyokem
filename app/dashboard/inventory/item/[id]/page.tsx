@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Item, StockBalance } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { AlertCircle, Download } from 'lucide-react';
@@ -175,6 +176,7 @@ export default function ItemDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Item" documentId={item.item_code} />
+              <AttachmentSection doctype="Item" documentId={item.item_code} />
             </DetailSection>
           </div>
         )}

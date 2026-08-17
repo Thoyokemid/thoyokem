@@ -39,18 +39,17 @@ function DeliveryOrderPageInner() {
     );
   }
 
-  const titles: Record<string, { title: string; subtitle: string }> = {
-    ready: { title: "Ready to Deliver", subtitle: "Sales order yang sudah dikonfirmasi & di-approve, siap dikirim" },
-    history: { title: "Delivery History", subtitle: "Riwayat pengiriman" },
+  const titles: Record<string, { title: string }> = {
+    ready: { title: "Ready to Deliver" },
+    history: { title: "Delivery History" },
   };
-  const { title, subtitle } = titles[activeTab] || titles.ready;
+  const { title } = titles[activeTab] || titles.ready;
 
   return (
     <DashboardLayout user={layoutUser}>
       <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         </div>
 
         <div>

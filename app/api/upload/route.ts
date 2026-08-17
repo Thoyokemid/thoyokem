@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { uploadToGoogleDrive } from '@/lib/drive';
+import { uploadToSupabaseStorage } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Upload to Google Drive
-    const fileUrl = await uploadToGoogleDrive(buffer, file.name, file.type);
+    // Upload to Supabase Storage
+    const fileUrl = await uploadToSupabaseStorage(buffer, file.name, file.type);
 
     return NextResponse.json({ success: true, url: fileUrl });
   } catch (error) {

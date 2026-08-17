@@ -1,8 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { LayoutDashboard, ChevronRight } from 'lucide-react';
 import Loading from '@/components/ui/Loading';
+import { addRecentlyViewed } from '@/lib/recentlyViewed';
 
 interface DetailViewProps {
   backHref: string;
@@ -16,13 +19,30 @@ interface DetailViewProps {
   children?: React.ReactNode;
 }
 
-/** ERPNext-style single-document page: back link, title/badges, action buttons, and a body slot. */
+/** ERPNext-style single-document page: breadcrumb, title/badges, action buttons, and a body slot. */
 export function DetailView({ backHref, backLabel, title, subtitle, badges, actions, isLoading, notFound, children }: DetailViewProps) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading && !notFound && title) {
+      addRecentlyViewed({ href: pathname, label: title, subtitle: backLabel });
+    }
+  }, [isLoading, notFound, title, subtitle, pathname, backLabel]);
+
   return (
     <div className="space-y-4">
-      <Link href={backHref} className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-primary dark:text-gray-400">
-        <ArrowLeft size={14} /> {backLabel}
-      </Link>
+      <nav className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+        <Link href="/dashboard" className="flex items-center gap-1 hover:text-primary flex-shrink-0">
+          <LayoutDashboard size={12} />
+          Dashboard
+        </Link>
+        <ChevronRight size={12} className="flex-shrink-0" />
+        <Link href={backHref} className="hover:text-primary flex-shrink-0">
+          {backLabel}
+        </Link>
+        <ChevronRight size={12} className="flex-shrink-0" />
+        <span className="text-gray-700 dark:text-gray-200 font-medium truncate">{title}</span>
+      </nav>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loading size="lg" /></div>

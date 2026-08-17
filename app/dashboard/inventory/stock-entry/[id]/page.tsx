@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { StockEntry } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -114,6 +115,7 @@ export default function StockEntryDetailPage() {
           </DetailSection>
           <DetailSection title="Riwayat">
             <ActivityLogView doctype="Stock Entry" documentId={entry.entry_id} />
+            <AttachmentSection doctype="Stock Entry" documentId={entry.entry_id} />
           </DetailSection>
           </div>
         )}

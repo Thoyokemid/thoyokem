@@ -41,13 +41,13 @@ function SalesOrderPageInner() {
     );
   }
 
-  const titles: Record<string, { title: string; subtitle: string }> = {
-    overview: { title: "Sales Order", subtitle: "Pesanan penjualan dan tagihan customer" },
-    orders: { title: "Sales Orders", subtitle: "Daftar sales order" },
-    invoices: { title: "Invoices", subtitle: "Tagihan ke customer" },
-    customers: { title: "Customers", subtitle: "Daftar customer" },
+  const titles: Record<string, { title: string }> = {
+    overview: { title: "Sales Order" },
+    orders: { title: "Sales Orders" },
+    invoices: { title: "Invoices" },
+    customers: { title: "Customers" },
   };
-  const { title, subtitle } = titles[activeTab] || titles.overview;
+  const { title } = titles[activeTab] || titles.overview;
 
   return (
     <DashboardLayout
@@ -62,7 +62,6 @@ function SalesOrderPageInner() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         </div>
 
         <div>

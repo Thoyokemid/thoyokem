@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Registration } from '@/types';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
@@ -129,6 +130,7 @@ export default function RegistrationDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Registration" documentId={registration.id} />
+              <AttachmentSection doctype="Registration" documentId={registration.id} />
             </DetailSection>
           </div>
         )}

@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Bom } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -112,6 +113,7 @@ export default function BomDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="BOM" documentId={bom.bom_id} />
+              <AttachmentSection doctype="BOM" documentId={bom.bom_id} />
             </DetailSection>
           </div>
         )}

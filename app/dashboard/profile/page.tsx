@@ -136,7 +136,6 @@ export default function ProfilePage() {
       <div className="space-y-4 max-w-2xl">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Kelola informasi profil kamu</p>
         </div>
 
         {isLoading ? (

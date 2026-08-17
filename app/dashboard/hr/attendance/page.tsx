@@ -58,12 +58,12 @@ function AttendancePageInner() {
     );
   }
 
-  const titles: Record<string, { title: string; subtitle: string }> = {
-    data: { title: "Attendance Data", subtitle: "Riwayat absensi karyawan" },
-    report: { title: "Attendance Report", subtitle: "Laporan keterlambatan & overtime" },
-    recap: { title: "Attendance Recap", subtitle: "Rekap kehadiran per karyawan" },
+  const titles: Record<string, { title: string }> = {
+    data: { title: "Attendance Data" },
+    report: { title: "Attendance Report" },
+    recap: { title: "Attendance Recap" },
   };
-  const { title, subtitle } = titles[activeTab] || titles.data;
+  const { title } = titles[activeTab] || titles.data;
 
   return (
     <DashboardLayout
@@ -81,7 +81,6 @@ function AttendancePageInner() {
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
               {title}
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
           </div>
           <Button onClick={() => setIsImportModalOpen(true)} variant="outline" size="sm">
             <Upload size={14} className="mr-1.5" />

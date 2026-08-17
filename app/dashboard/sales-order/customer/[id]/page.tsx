@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Customer } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -131,6 +132,7 @@ export default function CustomerDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Customer" documentId={customer.customer_id} />
+              <AttachmentSection doctype="Customer" documentId={customer.customer_id} />
             </DetailSection>
           </div>
         )}

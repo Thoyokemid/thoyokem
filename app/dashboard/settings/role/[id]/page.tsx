@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Role } from '@/types';
 import { AlertCircle } from 'lucide-react';
 
@@ -108,6 +109,7 @@ export default function RoleDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Role" documentId={role.role_id} />
+              <AttachmentSection doctype="Role" documentId={role.role_id} />
             </DetailSection>
           </div>
         )}

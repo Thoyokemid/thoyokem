@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AttachmentSection from '@/components/ui/AttachmentSection';
 import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
 import { AlertCircle } from 'lucide-react';
@@ -133,6 +134,7 @@ export default function StaffDetailPage() {
             </DetailSection>
             <DetailSection title="Riwayat">
               <ActivityLogView doctype="Staff" documentId={staff.employee_id} />
+              <AttachmentSection doctype="Staff" documentId={staff.employee_id} />
             </DetailSection>
           </div>
         )}
