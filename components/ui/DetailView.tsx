@@ -119,25 +119,24 @@ export function DetailView({ backHref, backLabel, title, subtitle, badges, actio
             <div className="flex items-center gap-3 flex-shrink-0">
               {viewers.length > 0 && (
                 <div className="flex items-center -space-x-2">
-                  {viewers.map((v) =>
-                    v.photo_url ? (
-                      <img
-                        key={v.name}
-                        src={v.photo_url}
-                        alt={v.name}
-                        title={`${v.name} sedang melihat dokumen ini`}
-                        className="w-7 h-7 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
-                      />
-                    ) : (
-                      <span
-                        key={v.name}
-                        title={`${v.name} sedang melihat dokumen ini`}
-                        className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary text-[11px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-gray-800"
-                      >
-                        {getInitials(v.name)}
-                      </span>
-                    )
-                  )}
+                  {viewers.map((v) => (
+                    <div key={v.name} className="group relative">
+                      {v.photo_url ? (
+                        <img
+                          src={v.photo_url}
+                          alt={v.name}
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
+                        />
+                      ) : (
+                        <span className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary text-[11px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-gray-800">
+                          {getInitials(v.name)}
+                        </span>
+                      )}
+                      <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 dark:bg-gray-700 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                        {v.name} sedang melihat ini
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               {actions && <div className="flex items-center gap-2">{actions}</div>}
