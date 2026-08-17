@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 
 interface SidebarProps {
+  animateIn?: boolean;
   permissions: {
     dashboard: boolean;
     attendance: boolean;
@@ -39,7 +41,7 @@ interface SidebarProps {
   };
 }
 
-function SidebarInner({ permissions }: SidebarProps) {
+function SidebarInner({ permissions, animateIn }: SidebarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -305,13 +307,16 @@ function SidebarInner({ permissions }: SidebarProps) {
       )}
 
       {/* Desktop Sidebar */}
-      <aside
+      <motion.aside
+        initial={animateIn ? { x: -60, opacity: 0 } : false}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
         className={`hidden md:flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ${
           isCollapsed ? 'w-16' : 'w-52'
         }`}
       >
         <SidebarContent />
-      </aside>
+      </motion.aside>
 
       {/* Mobile Sidebar */}
       <aside

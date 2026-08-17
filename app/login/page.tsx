@@ -1,22 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import SplashScreen from '@/components/ui/SplashScreen';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+const REMEMBERED_USERNAME_KEY = 'remembered_username';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const remembered = localStorage.getItem(REMEMBERED_USERNAME_KEY);
+    if (remembered) {
+      setUsername(remembered);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +46,13 @@ export default function LoginPage() {
         setError(result.error);
         setIsLoading(false);
       } else {
+        if (rememberMe) localStorage.setItem(REMEMBERED_USERNAME_KEY, username);
+        else localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+
+        // Consumed once by DashboardLayout to play the sidebar/topbar/content
+        // entrance animation only right after login, not on every navigation.
+        sessionStorage.setItem('just_logged_in', '1');
+
         setShowSplash(true);
         // Keep the splash on screen for a deliberate 3-5s minimum before switching routes,
         // so the dashboard never has a chance to flash into view underneath it.
@@ -62,15 +81,22 @@ export default function LoginPage() {
         className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-xl mb-4">
-            <LogIn className="text-white" size={26} />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome Back
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Sign in to your thoyokem account
-          </p>
+          <Image
+            src="/Header-Light.png"
+            alt="Thoyokem"
+            width={2000}
+            height={800}
+            priority
+            className="block dark:hidden h-14 w-auto object-contain mx-auto"
+          />
+          <Image
+            src="/Header-Dark.png"
+            alt="Thoyokem"
+            width={2000}
+            height={800}
+            priority
+            className="hidden dark:block h-14 w-auto object-contain mx-auto"
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
@@ -126,6 +152,16 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary/40"
+            />
+            Remember me
+          </label>
 
           <Button
             type="submit"

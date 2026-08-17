@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import Modal from '@/components/ui/Modal';
@@ -56,6 +57,7 @@ const KEYBOARD_SHORTCUTS: { keys: string; description: string }[] = [
 
 interface TopbarProps {
   user: SessionUser;
+  animateIn?: boolean;
 }
 
 interface ModuleItem {
@@ -107,7 +109,7 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   Staff: Users,
 };
 
-export default function Topbar({ user }: TopbarProps) {
+export default function Topbar({ user, animateIn }: TopbarProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -384,7 +386,12 @@ export default function Topbar({ user }: TopbarProps) {
   let runningIndex = -1;
 
   return (
-    <div className="flex sticky top-0 z-20 items-center justify-end gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <motion.div
+      initial={animateIn ? { y: -40, opacity: 0 } : false}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="flex sticky top-0 z-20 items-center justify-end gap-3 pl-14 pr-3 py-2.5 md:pl-6 md:pr-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+    >
       {/* Global search */}
       <div ref={searchRef} className="relative w-48 sm:w-64 md:w-72">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
@@ -713,6 +720,6 @@ export default function Topbar({ user }: TopbarProps) {
           ))}
         </div>
       </Modal>
-    </div>
+    </motion.div>
   );
 }
