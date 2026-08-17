@@ -27,3 +27,18 @@ export async function uploadToSupabaseStorage(
   const { data } = supabaseAdmin.storage.from(STORAGE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
+
+/** Deletes a file from storage given its public URL (as returned by uploadToSupabaseStorage). */
+export async function deleteFromSupabaseStorage(fileUrl: string): Promise<void> {
+  const marker = `/object/public/${STORAGE_BUCKET}/`;
+  const idx = fileUrl.indexOf(marker);
+  if (idx === -1) return;
+  const path = decodeURIComponent(fileUrl.slice(idx + marker.length));
+
+  const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([path]);
+  if (error) {
+    // Non-fatal: the DB row is still the source of truth for what's "attached" —
+    // log so an orphaned storage object can be cleaned up manually if needed.
+    console.error('Error deleting file from Supabase Storage:', error);
+  }
+}

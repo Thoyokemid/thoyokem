@@ -1,11 +1,28 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { LayoutDashboard, ChevronRight } from 'lucide-react';
 import Loading from '@/components/ui/Loading';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
+import { supabaseBrowser } from '@/lib/supabaseClient';
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+interface Viewer {
+  name: string;
+  photo_url?: string;
+}
 
 interface DetailViewProps {
   backHref: string;
@@ -22,12 +39,53 @@ interface DetailViewProps {
 /** ERPNext-style single-document page: breadcrumb, title/badges, action buttons, and a body slot. */
 export function DetailView({ backHref, backLabel, title, subtitle, badges, actions, isLoading, notFound, children }: DetailViewProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const [viewers, setViewers] = useState<Viewer[]>([]);
 
   useEffect(() => {
     if (!isLoading && !notFound && title) {
       addRecentlyViewed({ href: pathname, label: title, subtitle: backLabel });
     }
-  }, [isLoading, notFound, title, subtitle, pathname, backLabel]);
+  }, [isLoading, notFound, title, pathname, backLabel]);
+
+  // Presence: shows who else currently has this exact document open, via
+  // Supabase Realtime Presence — no data stored, just live browser state.
+  useEffect(() => {
+    if (!session?.user || isLoading || notFound) return;
+    const selfId = session.user.id;
+    const selfName = session.user.name || 'Someone';
+    let cancelled = false;
+
+    const channel = supabaseBrowser.channel(`presence:${pathname}`, {
+      config: { presence: { key: selfId } },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState() as Record<string, Viewer[]>;
+        const others = Object.entries(state)
+          .filter(([key]) => key !== selfId)
+          .map(([, entries]) => entries[0])
+          .filter((v): v is Viewer => !!v?.name);
+        const seen = new Set<string>();
+        setViewers(others.filter((v) => (seen.has(v.name) ? false : (seen.add(v.name), true))));
+      })
+      .subscribe(async (status) => {
+        if (status !== 'SUBSCRIBED') return;
+        let photoUrl = '';
+        try {
+          const res = await fetch('/api/profile');
+          if (res.ok) photoUrl = (await res.json()).photo_url || '';
+        } catch {}
+        if (!cancelled) await channel.track({ name: selfName, photo_url: photoUrl });
+      });
+
+    return () => {
+      cancelled = true;
+      supabaseBrowser.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, pathname, isLoading, notFound]);
 
   return (
     <div className="space-y-4">
@@ -58,7 +116,32 @@ export function DetailView({ backHref, backLabel, title, subtitle, badges, actio
               </div>
               {subtitle && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>}
             </div>
-            {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {viewers.length > 0 && (
+                <div className="flex items-center -space-x-2">
+                  {viewers.map((v) =>
+                    v.photo_url ? (
+                      <img
+                        key={v.name}
+                        src={v.photo_url}
+                        alt={v.name}
+                        title={`${v.name} sedang melihat dokumen ini`}
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
+                      />
+                    ) : (
+                      <span
+                        key={v.name}
+                        title={`${v.name} sedang melihat dokumen ini`}
+                        className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary text-[11px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-gray-800"
+                      >
+                        {getInitials(v.name)}
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
+              {actions && <div className="flex items-center gap-2">{actions}</div>}
+            </div>
           </div>
           {children}
         </>

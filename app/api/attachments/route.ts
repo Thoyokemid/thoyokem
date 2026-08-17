@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { requiredDoctypePerms } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
-import { uploadToSupabaseStorage } from '@/lib/supabase';
+import { uploadToSupabaseStorage, deleteFromSupabaseStorage } from '@/lib/supabase';
 import { validate, attachmentUploadSchema } from '@/lib/validation';
 
 function requireDoctypeAccess(perms: any, doctype: string) {
@@ -113,6 +113,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.attachment.delete({ where: { attachmentId } });
+    await deleteFromSupabaseStorage(record.fileUrl);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting attachment:', error);
