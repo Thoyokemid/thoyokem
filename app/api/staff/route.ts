@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { StaffList } from '@/types';
+import { validate, staffCreateSchema, staffUpdateSchema } from '@/lib/validation';
 
 export async function GET() {
   try {
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
-    const data = await request.json();
+    const parsed = validate(staffCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const newId = generateId();
 
     const created = await prisma.staffList.create({
@@ -72,8 +75,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
-    const data = await request.json();
-    const { employee_id, ...updates } = data;
+    const parsed = validate(staffUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { employee_id, ...updates } = parsed.data;
 
     const current = await prisma.staffList.findUnique({ where: { employeeId: employee_id } });
     if (!current) {

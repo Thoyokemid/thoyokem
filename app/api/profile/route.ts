@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { validate, profileUpdateSchema } from '@/lib/validation';
 
 export async function GET() {
   try {
@@ -32,7 +33,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const data = await request.json();
+    const parsed = validate(profileUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
 
     const current = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!current) {

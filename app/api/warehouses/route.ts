@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Warehouse } from '@/types';
+import { validate, warehouseCreateSchema, warehouseUpdateSchema } from '@/lib/validation';
 
 function generateWarehouseId(): string {
   let id = '';
@@ -48,7 +49,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
+    const parsed = validate(warehouseCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
 
     let newId = generateWarehouseId();
     while (await prisma.warehouse.findUnique({ where: { warehouseId: newId } })) {
@@ -82,8 +85,9 @@ export async function PUT(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { warehouse_id, ...updates } = data;
+    const parsed = validate(warehouseUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { warehouse_id, ...updates } = parsed.data;
 
     const current = await prisma.warehouse.findUnique({ where: { warehouseId: warehouse_id } });
     if (!current) return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });

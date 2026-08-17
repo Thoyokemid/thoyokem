@@ -6,6 +6,7 @@ import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { StockEntry } from '@/types';
+import { validate, stockEntryCreateSchema } from '@/lib/validation';
 
 async function requireInventoryAccess() {
   const session = await getServerSession(authOptions);
@@ -47,12 +48,10 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { entry_type, item_code, source_warehouse, target_warehouse, qty, remarks } = data;
+    const parsed = validate(stockEntryCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { entry_type, item_code, source_warehouse, target_warehouse, qty, remarks, date } = parsed.data;
 
-    if (!item_code || !qty || qty <= 0) {
-      return NextResponse.json({ error: 'item_code dan qty (>0) wajib diisi' }, { status: 400 });
-    }
     if (entry_type === 'Material Receipt' && !target_warehouse) {
       return NextResponse.json({ error: 'target_warehouse wajib diisi untuk Material Receipt' }, { status: 400 });
     }
@@ -82,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       for (const line of bom.components) {
         const requiredQty = Number(line.qty) * (qty / bomQty);
-        const available = await getCurrentStockQty(line.componentItemCode, source_warehouse);
+        const available = await getCurrentStockQty(line.componentItemCode, source_warehouse!);
         if (available < requiredQty) {
           return NextResponse.json(
             { error: `Stok komponen ${line.componentItemCode} tidak cukup di ${source_warehouse} (tersedia ${available}, butuh ${requiredQty})` },
@@ -103,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     const newId = generateId();
     const now = new Date().toISOString();
-    const postingDate = data.date || now.slice(0, 10);
+    const postingDate = date || now.slice(0, 10);
 
     const created = await prisma.stockEntry.create({
       data: {
@@ -125,7 +124,7 @@ export async function POST(request: NextRequest) {
     if (entry_type === 'Material Receipt') {
       await appendStockLedgerEntry({
         itemCode: item_code,
-        warehouseId: target_warehouse,
+        warehouseId: target_warehouse!,
         voucherType: 'Stock Entry',
         voucherId: newId,
         actualQty: qty,
@@ -135,7 +134,7 @@ export async function POST(request: NextRequest) {
     } else if (entry_type === 'Material Issue') {
       await appendStockLedgerEntry({
         itemCode: item_code,
-        warehouseId: source_warehouse,
+        warehouseId: source_warehouse!,
         voucherType: 'Stock Entry',
         voucherId: newId,
         actualQty: -qty,
@@ -145,7 +144,7 @@ export async function POST(request: NextRequest) {
     } else if (entry_type === 'Material Transfer') {
       await appendStockLedgerEntry({
         itemCode: item_code,
-        warehouseId: source_warehouse,
+        warehouseId: source_warehouse!,
         voucherType: 'Stock Entry',
         voucherId: newId,
         actualQty: -qty,
@@ -154,7 +153,7 @@ export async function POST(request: NextRequest) {
       });
       await appendStockLedgerEntry({
         itemCode: item_code,
-        warehouseId: target_warehouse,
+        warehouseId: target_warehouse!,
         voucherType: 'Stock Entry',
         voucherId: newId,
         actualQty: qty,
@@ -165,7 +164,7 @@ export async function POST(request: NextRequest) {
       for (const comp of bomComponents) {
         await appendStockLedgerEntry({
           itemCode: comp.component_item_code,
-          warehouseId: source_warehouse,
+          warehouseId: source_warehouse!,
           voucherType: 'Stock Entry',
           voucherId: newId,
           actualQty: -comp.qty,
@@ -175,7 +174,7 @@ export async function POST(request: NextRequest) {
       }
       await appendStockLedgerEntry({
         itemCode: item_code,
-        warehouseId: target_warehouse,
+        warehouseId: target_warehouse!,
         voucherType: 'Stock Entry',
         voucherId: newId,
         actualQty: qty,

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Item } from '@/types';
+import { validate, itemCreateSchema, itemUpdateSchema } from '@/lib/validation';
 
 async function requireInventoryAccess() {
   const session = await getServerSession(authOptions);
@@ -47,7 +48,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
+    const parsed = validate(itemCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
 
     const existing = await prisma.item.findUnique({ where: { itemCode: data.item_code } });
     if (existing) {
@@ -86,8 +89,9 @@ export async function PUT(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { item_code, ...updates } = data;
+    const parsed = validate(itemUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { item_code, ...updates } = parsed.data;
 
     const current = await prisma.item.findUnique({ where: { itemCode: item_code } });
     if (!current) {

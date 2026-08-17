@@ -86,6 +86,11 @@ model StaffList {
 
   leaves LeaveAttendance[]
 
+  // Generated column (search_vector tsvector) backing full-text search —
+  // not writable via Prisma, only queried through prisma.$queryRaw in
+  // app/api/global-search/route.ts.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
   @@map("staff_list")
 }
 
@@ -142,6 +147,8 @@ model Item {
   isActive             Boolean @default(true) @map("is_active")
   currency             String  @default("IDR")
   itemType             String  @default("Trading") @map("item_type")
+
+  searchVector Unsupported("tsvector")? @map("search_vector")
 
   @@map("item_list")
 }
@@ -229,6 +236,8 @@ model Supplier {
   address      String?
   paymentTerms String? @map("payment_terms")
   isActive     Boolean @default(true) @map("is_active")
+
+  searchVector Unsupported("tsvector")? @map("search_vector")
 
   @@map("supplier_list")
 }
@@ -340,6 +349,8 @@ model Customer {
   paymentTerms String? @map("payment_terms")
   creditLimit  Decimal @default(0) @map("credit_limit") @db.Decimal(18, 4)
   isActive     Boolean @default(true) @map("is_active")
+
+  searchVector Unsupported("tsvector")? @map("search_vector")
 
   @@map("customer_list")
 }

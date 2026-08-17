@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { validate, settingsUpdateSchema } from '@/lib/validation';
 
 const DEFAULTS: Record<string, string> = {
   jam_masuk: '08:00',
@@ -40,7 +41,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: no settings access' }, { status: 403 });
     }
 
-    const data = await request.json();
+    const parsed = validate(settingsUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
 
     await Promise.all(
       Object.entries(data).map(([key, value]) =>

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { validate, bulkRowsSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -12,17 +13,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { rows } = await request.json();
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return NextResponse.json({ error: 'Tidak ada baris untuk diimport' }, { status: 400 });
-    }
+    const parsed = validate(bulkRowsSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { rows } = parsed.data;
 
     let count = await prisma.customer.count();
     const errors: { row: number; message: string }[] = [];
     let created = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
+      const r = rows[i] as any;
       const rowNum = i + 2;
 
       if (!r.customer_name) {

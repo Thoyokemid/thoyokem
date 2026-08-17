@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Customer } from '@/types';
+import { validate, customerCreateSchema, customerUpdateSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -43,7 +44,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
+    const parsed = validate(customerCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const count = await prisma.customer.count();
     const newId = data.customer_id || `CUST-${String(count + 1).padStart(3, '0')}`;
 
@@ -80,8 +83,9 @@ export async function PUT(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { customer_id, ...updates } = data;
+    const parsed = validate(customerUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { customer_id, ...updates } = parsed.data;
 
     const current = await prisma.customer.findUnique({ where: { customerId: customer_id } });
     if (!current) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });

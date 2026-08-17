@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { validate, userUpdateSchema } from '@/lib/validation';
 
 interface UserWithRole {
   id: string;
@@ -48,11 +49,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id, role_id } = await request.json();
-
-    if (!id || !role_id) {
-      return NextResponse.json({ error: 'id and role_id are required' }, { status: 400 });
-    }
+    const parsed = validate(userUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { id, role_id } = parsed.data;
 
     const current = await prisma.user.findUnique({ where: { id } });
     if (!current) {

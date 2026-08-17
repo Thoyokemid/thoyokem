@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { generateId } from '@/lib/id';
+import { validate, registrationCreateSchema } from '@/lib/validation';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
 
@@ -41,11 +42,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
-
-    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      return NextResponse.json({ error: 'Email tidak valid' }, { status: 400 });
-    }
+    const parsed = validate(registrationCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
 
     const newId = generateId();
     const hashedPassword = await bcrypt.hash(data.password, 10);

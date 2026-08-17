@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getNextDocId } from '@/lib/numbering';
 import { logActivity } from '@/lib/activityLog';
+import { validate, purchaseInvoiceCreateSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -64,8 +65,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const { po_id, due_date } = await request.json();
-    if (!po_id) return NextResponse.json({ error: 'po_id wajib diisi' }, { status: 400 });
+    const parsed = validate(purchaseInvoiceCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { po_id, due_date } = parsed.data;
 
     const po = await prisma.purchaseOrder.findUnique({ where: { poId: po_id } });
     if (!po) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });

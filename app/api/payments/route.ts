@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
+import { validate, paymentCreateSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -54,12 +55,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { payment_type, party_type, party_id, reference_type, reference_id, paid_amount, mode_of_payment } = data;
-
-    if (!reference_id || !paid_amount || paid_amount <= 0) {
-      return NextResponse.json({ error: 'reference_id dan paid_amount (>0) wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(paymentCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { payment_type, party_type, party_id, reference_type, reference_id, paid_amount, mode_of_payment } = parsed.data;
 
     const isSalesInvoice = reference_type === 'Sales Invoice';
 

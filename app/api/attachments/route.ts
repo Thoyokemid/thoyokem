@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { requiredDoctypePerms } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { uploadToSupabaseStorage } from '@/lib/supabase';
+import { validate, attachmentUploadSchema } from '@/lib/validation';
 
 function requireDoctypeAccess(perms: any, doctype: string) {
   const map = requiredDoctypePerms(perms);
@@ -52,13 +53,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const doctype = formData.get('doctype') as string;
-    const documentId = formData.get('document_id') as string;
     const file = formData.get('file') as File;
-
-    if (!doctype || !documentId || !file) {
-      return NextResponse.json({ error: 'doctype, document_id, dan file wajib diisi' }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: 'file wajib diisi' }, { status: 400 });
     }
+
+    const parsed = validate(attachmentUploadSchema, {
+      doctype: formData.get('doctype'),
+      document_id: formData.get('document_id'),
+    });
+    if (!parsed.success) return parsed.response;
+    const { doctype, document_id: documentId } = parsed.data;
+
     if (!requireDoctypeAccess(session.user.permissions, doctype)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

@@ -6,6 +6,7 @@ import { getNextDocId, getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
+import { validate, purchaseOrderCreateSchema, purchaseOrderActionSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -66,12 +67,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { supplier_id, expected_date, items } = data;
-
-    if (!supplier_id || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'supplier_id dan minimal 1 item wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(purchaseOrderCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { supplier_id, expected_date, items } = parsed.data;
 
     const poId = await getNextDocId('PO');
     const now = new Date().toISOString();
@@ -129,10 +127,9 @@ export async function PATCH(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const { po_id, action } = await request.json();
-    if (!po_id || !action) {
-      return NextResponse.json({ error: 'po_id dan action wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(purchaseOrderActionSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { po_id, action } = parsed.data;
 
     const current = await prisma.purchaseOrder.findUnique({ where: { poId: po_id } });
     if (!current) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });

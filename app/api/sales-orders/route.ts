@@ -6,6 +6,7 @@ import { getNextDocId, getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
+import { validate, salesOrderCreateSchema, salesOrderActionSchema } from '@/lib/validation';
 
 async function requireSalesAccess() {
   const session = await getServerSession(authOptions);
@@ -75,12 +76,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { customer_id, delivery_date, items } = data;
-
-    if (!customer_id || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'customer_id dan minimal 1 item wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(salesOrderCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { customer_id, delivery_date, items } = parsed.data;
 
     const soId = await getNextDocId('SO');
     const now = new Date().toISOString();
@@ -135,10 +133,9 @@ export async function POST(request: NextRequest) {
 // PATCH performs a status-transition action: submit | deliver | cancel | amend | approve | reject
 export async function PATCH(request: NextRequest) {
   try {
-    const { so_id, action } = await request.json();
-    if (!so_id || !action) {
-      return NextResponse.json({ error: 'so_id dan action wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(salesOrderActionSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { so_id, action } = parsed.data;
 
     // Permission depends on the action: delivering needs delivery_order access,
     // everything else needs sales_order access.

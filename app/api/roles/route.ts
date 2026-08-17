@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { Role } from '@/types';
+import { validate, roleCreateSchema, roleUpdateSchema } from '@/lib/validation';
 
 // Only users with setting permission may manage roles.
 async function requireSettingAccess() {
@@ -53,7 +54,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
+    const parsed = validate(roleCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const newId = generateId();
 
     const created = await prisma.role.create({
@@ -89,8 +92,9 @@ export async function PUT(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { role_id, ...updates } = data;
+    const parsed = validate(roleUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { role_id, ...updates } = parsed.data;
 
     const current = await prisma.role.findUnique({ where: { roleId: role_id } });
     if (!current) {

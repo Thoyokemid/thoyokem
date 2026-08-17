@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { AttendanceImport } from '@/types';
+import { validate, attendanceImportSchema } from '@/lib/validation';
 
 export async function GET() {
   try {
@@ -47,11 +48,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const data = await request.json();
-
-    if (!Array.isArray(data)) {
-      return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
-    }
+    const parsed = validate(attendanceImportSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data as AttendanceImport[];
 
     // Dates in the new import
     const incomingDates = Array.from(

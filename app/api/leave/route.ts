@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { LeaveAttendance } from '@/types';
+import { validate, leaveCreateSchema, leaveUpdateSchema } from '@/lib/validation';
 
 export async function GET() {
   try {
@@ -56,7 +57,9 @@ export async function POST(request: NextRequest) {
 
     updateLastActive(session.user.id);
 
-    const data = await request.json();
+    const parsed = validate(leaveCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const newId = generateId();
     const now = new Date().toISOString();
 
@@ -98,8 +101,9 @@ export async function PUT(request: NextRequest) {
 
     updateLastActive(session.user.id);
 
-    const data = await request.json();
-    const { id, ...updates } = data;
+    const parsed = validate(leaveUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { id, ...updates } = parsed.data;
 
     const current = await prisma.leaveAttendance.findUnique({ where: { id } });
     if (!current) {

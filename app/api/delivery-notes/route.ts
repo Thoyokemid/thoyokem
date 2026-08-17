@@ -6,6 +6,7 @@ import { getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
+import { validate, deliveryNoteActionSchema } from '@/lib/validation';
 
 function requireAccess(session: any) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -62,10 +63,9 @@ export async function PATCH(request: NextRequest) {
   if (err) return err;
 
   try {
-    const { dn_id, action } = await request.json();
-    if (!dn_id || !action) {
-      return NextResponse.json({ error: 'dn_id dan action wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(deliveryNoteActionSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { dn_id, action } = parsed.data;
 
     const current = await prisma.deliveryNote.findUnique({ where: { dnId: dn_id } });
     if (!current) return NextResponse.json({ error: 'Delivery note not found' }, { status: 404 });

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Supplier } from '@/types';
+import { validate, supplierCreateSchema, supplierUpdateSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
+    const parsed = validate(supplierCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const count = await prisma.supplier.count();
     const newId = data.supplier_id || `SUP-${String(count + 1).padStart(3, '0')}`;
 
@@ -78,8 +81,9 @@ export async function PUT(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { supplier_id, ...updates } = data;
+    const parsed = validate(supplierUpdateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { supplier_id, ...updates } = parsed.data;
 
     const current = await prisma.supplier.findUnique({ where: { supplierId: supplier_id } });
     if (!current) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });

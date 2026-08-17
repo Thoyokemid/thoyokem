@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { requiredDoctypePerms } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
+import { validate, commentCreateSchema } from '@/lib/validation';
 
 function requireDoctypeAccess(perms: any, doctype: string) {
   const map = requiredDoctypePerms(perms);
@@ -50,10 +51,9 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { doctype, documentId, text } = await request.json();
-    if (!doctype || !documentId || !text || !text.trim()) {
-      return NextResponse.json({ error: 'doctype, documentId, dan text wajib diisi' }, { status: 400 });
-    }
+    const parsed = validate(commentCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { doctype, documentId, text } = parsed.data;
     if (!requireDoctypeAccess(session.user.permissions, doctype)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

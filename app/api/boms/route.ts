@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getNextDocId } from '@/lib/numbering';
 import { logActivity } from '@/lib/activityLog';
+import { validate, bomCreateSchema } from '@/lib/validation';
 
 async function requireAccess() {
   const session = await getServerSession(authOptions);
@@ -54,13 +55,11 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { item_code, qty, components } = data;
+    const parsed = validate(bomCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { item_code, qty, components } = parsed.data;
 
-    if (!item_code || !Array.isArray(components) || components.length === 0) {
-      return NextResponse.json({ error: 'item_code dan minimal 1 komponen wajib diisi' }, { status: 400 });
-    }
-    if (components.some((c: any) => c.component_item_code === item_code)) {
+    if (components.some((c) => c.component_item_code === item_code)) {
       return NextResponse.json({ error: 'Komponen tidak boleh sama dengan produk campuran itu sendiri' }, { status: 400 });
     }
 

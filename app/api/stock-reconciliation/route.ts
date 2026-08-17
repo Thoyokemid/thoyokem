@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
+import { validate, stockReconciliationCreateSchema } from '@/lib/validation';
 
 interface Discrepancy {
   source: 'Delivery Note' | 'Purchase Receipt' | 'Stock Entry';
@@ -146,12 +147,9 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const data = await request.json();
-    const { source, doc_id, item_code, warehouse_id, missing_qty } = data as Discrepancy;
-
-    if (!source || !doc_id || !item_code || !warehouse_id || !missing_qty) {
-      return NextResponse.json({ error: 'Data koreksi tidak lengkap' }, { status: 400 });
-    }
+    const parsed = validate(stockReconciliationCreateSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { source, doc_id, item_code, warehouse_id, missing_qty } = parsed.data;
 
     const master = await prisma.item.findUnique({ where: { itemCode: item_code } });
     const valuationRate = master ? Number(master.purchasePrice) : 0;

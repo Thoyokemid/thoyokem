@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { validate, bulkRowsSchema } from '@/lib/validation';
 
 function generateItemCode(group: string): string {
   const prefix = `TY${group === 'Liquid' ? 'L' : 'NL'}`;
@@ -22,17 +23,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { rows } = await request.json();
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return NextResponse.json({ error: 'Tidak ada baris untuk diimport' }, { status: 400 });
-    }
+    const parsed = validate(bulkRowsSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { rows } = parsed.data;
 
     const existingCodes = new Set((await prisma.item.findMany({ select: { itemCode: true } })).map((i) => i.itemCode));
     const errors: { row: number; message: string }[] = [];
     let created = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
+      const r = rows[i] as any;
       const rowNum = i + 2; // +1 header, +1 1-indexed
 
       if (!r.item_name) {

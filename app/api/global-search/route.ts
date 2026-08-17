@@ -50,12 +50,15 @@ export async function GET(request: NextRequest) {
           })
       );
       jobs.push(
-        prisma.supplier
-          .findMany({ where: { OR: [{ supplierId: contains }, { supplierName: contains }] }, take: MAX_PER_GROUP })
-          .then((records) => {
-            const results = records.map((r) => ({ id: r.supplierId, label: r.supplierName || r.supplierId, subtitle: r.supplierId, href: `/dashboard/purchasing/supplier/${encodeURIComponent(r.supplierId)}` }));
-            if (results.length) groups.push({ type: 'Supplier', results });
-          })
+        prisma.$queryRaw<{ supplier_id: string; supplier_name: string }[]>`
+          SELECT supplier_id, supplier_name FROM supplier_list
+          WHERE search_vector @@ websearch_to_tsquery('simple', ${q})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('simple', ${q})) DESC
+          LIMIT ${MAX_PER_GROUP}
+        `.then((records) => {
+          const results = records.map((r) => ({ id: r.supplier_id, label: r.supplier_name || r.supplier_id, subtitle: r.supplier_id, href: `/dashboard/purchasing/supplier/${encodeURIComponent(r.supplier_id)}` }));
+          if (results.length) groups.push({ type: 'Supplier', results });
+        })
       );
     }
 
@@ -77,12 +80,15 @@ export async function GET(request: NextRequest) {
           })
       );
       jobs.push(
-        prisma.customer
-          .findMany({ where: { OR: [{ customerId: contains }, { customerName: contains }] }, take: MAX_PER_GROUP })
-          .then((records) => {
-            const results = records.map((r) => ({ id: r.customerId, label: r.customerName || r.customerId, subtitle: r.customerId, href: `/dashboard/sales-order/customer/${encodeURIComponent(r.customerId)}` }));
-            if (results.length) groups.push({ type: 'Customer', results });
-          })
+        prisma.$queryRaw<{ customer_id: string; customer_name: string }[]>`
+          SELECT customer_id, customer_name FROM customer_list
+          WHERE search_vector @@ websearch_to_tsquery('simple', ${q})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('simple', ${q})) DESC
+          LIMIT ${MAX_PER_GROUP}
+        `.then((records) => {
+          const results = records.map((r) => ({ id: r.customer_id, label: r.customer_name || r.customer_id, subtitle: r.customer_id, href: `/dashboard/sales-order/customer/${encodeURIComponent(r.customer_id)}` }));
+          if (results.length) groups.push({ type: 'Customer', results });
+        })
       );
     }
 
@@ -99,12 +105,15 @@ export async function GET(request: NextRequest) {
 
     if (perms.inventory) {
       jobs.push(
-        prisma.item
-          .findMany({ where: { OR: [{ itemCode: contains }, { itemName: contains }] }, take: MAX_PER_GROUP })
-          .then((records) => {
-            const results = records.map((r) => ({ id: r.itemCode, label: r.itemName || r.itemCode, subtitle: r.itemCode, href: `/dashboard/inventory/item/${encodeURIComponent(r.itemCode)}` }));
-            if (results.length) groups.push({ type: 'Item', results });
-          })
+        prisma.$queryRaw<{ item_code: string; item_name: string }[]>`
+          SELECT item_code, item_name FROM item_list
+          WHERE search_vector @@ websearch_to_tsquery('simple', ${q})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('simple', ${q})) DESC
+          LIMIT ${MAX_PER_GROUP}
+        `.then((records) => {
+          const results = records.map((r) => ({ id: r.item_code, label: r.item_name || r.item_code, subtitle: r.item_code, href: `/dashboard/inventory/item/${encodeURIComponent(r.item_code)}` }));
+          if (results.length) groups.push({ type: 'Item', results });
+        })
       );
       jobs.push(
         prisma.warehouse
@@ -118,12 +127,15 @@ export async function GET(request: NextRequest) {
 
     if (perms.staff) {
       jobs.push(
-        prisma.staffList
-          .findMany({ where: { employeeName: contains }, take: MAX_PER_GROUP })
-          .then((records) => {
-            const results = records.map((r) => ({ id: r.employeeId, label: r.employeeName, subtitle: 'Staff', href: `/dashboard/hr/staff` }));
-            if (results.length) groups.push({ type: 'Staff', results });
-          })
+        prisma.$queryRaw<{ employee_id: string; employee_name: string }[]>`
+          SELECT employee_id, employee_name FROM staff_list
+          WHERE search_vector @@ websearch_to_tsquery('simple', ${q})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('simple', ${q})) DESC
+          LIMIT ${MAX_PER_GROUP}
+        `.then((records) => {
+          const results = records.map((r) => ({ id: r.employee_id, label: r.employee_name, subtitle: 'Staff', href: `/dashboard/hr/staff/${encodeURIComponent(r.employee_id)}` }));
+          if (results.length) groups.push({ type: 'Staff', results });
+        })
       );
     }
 
