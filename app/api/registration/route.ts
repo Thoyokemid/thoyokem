@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
+import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { generateId } from '@/lib/id';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
 
     await logActivity({ doctype: 'Registration', documentId: newId, action: 'Created', changedBy: data.name || data.email || '', before: null, after: { name: data.name, email: data.email, status: 'pending' } });
 
+    await broadcastNotificationsChanged();
+
     return NextResponse.json({ success: true, id: newId });
   } catch (error) {
     console.error('Error creating registration:', error);
@@ -124,6 +127,8 @@ export async function PATCH(request: NextRequest) {
       before: current,
       after: updated,
     });
+
+    await broadcastNotificationsChanged();
 
     return NextResponse.json({ success: true });
   } catch (error) {

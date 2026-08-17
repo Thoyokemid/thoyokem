@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -38,6 +38,18 @@ const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function CustomersTab() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const { data: session } = useSession();
   const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [viewMode, setViewMode] = useViewMode('sales_customers_view');

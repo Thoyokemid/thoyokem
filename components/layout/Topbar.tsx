@@ -32,9 +32,11 @@ import {
   Github,
   Bell,
   History,
+  Plus,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 import { getRecentlyViewed, RecentlyViewedItem } from '@/lib/recentlyViewed';
+import { supabaseBrowser } from '@/lib/supabaseClient';
 
 function WhatsAppIcon({ size = 14 }: { size?: number }) {
   return (
@@ -111,6 +113,7 @@ export default function Topbar({ user }: TopbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isNewOpen, setIsNewOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
@@ -124,6 +127,7 @@ export default function Topbar({ user }: TopbarProps) {
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
+  const newRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
@@ -148,8 +152,23 @@ export default function Topbar({ user }: TopbarProps) {
 
   useEffect(() => {
     fetchNotifications();
+    // Fallback poll in case the realtime channel drops — realtime below
+    // normally makes this a no-op refresh.
     const interval = setInterval(fetchNotifications, 60_000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Realtime: server broadcasts a "refresh" ping (no row data) whenever a
+  // notification-relevant document changes, so the bell updates instantly
+  // instead of waiting for the next poll.
+  useEffect(() => {
+    const channel = supabaseBrowser
+      .channel('notifications-refresh')
+      .on('broadcast', { event: 'refresh' }, () => fetchNotifications())
+      .subscribe();
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -173,6 +192,20 @@ export default function Topbar({ user }: TopbarProps) {
       return next;
     });
   };
+
+  const quickCreateItems: ModuleItem[] = [
+    { name: 'Purchase Order', href: '/dashboard/purchasing?tab=orders&new=1', icon: ShoppingCart, enabled: user.permissions.purchasing },
+    { name: 'Supplier', href: '/dashboard/purchasing?tab=suppliers&new=1', icon: Truck, enabled: user.permissions.purchasing },
+    { name: 'Sales Order', href: '/dashboard/sales-order?tab=orders&new=1', icon: ShoppingBag, enabled: user.permissions.sales_order },
+    { name: 'Customer', href: '/dashboard/sales-order?tab=customers&new=1', icon: UserIcon, enabled: user.permissions.sales_order },
+    { name: 'Item', href: '/dashboard/inventory?tab=items&new=1', icon: Package, enabled: user.permissions.inventory },
+    { name: 'Stock Entry', href: '/dashboard/inventory?tab=entries&new=1', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Warehouse', href: '/dashboard/inventory?tab=warehouses&new=1', icon: WarehouseIcon, enabled: user.permissions.inventory },
+    { name: 'BOM', href: '/dashboard/inventory?tab=bom&new=1', icon: Boxes, enabled: user.permissions.inventory },
+    { name: 'Staff', href: '/dashboard/hr/staff?new=1', icon: Users, enabled: user.permissions.staff },
+    { name: 'Leave', href: '/dashboard/hr/leave?new=1', icon: FileText, enabled: user.permissions.leave },
+    { name: 'Role', href: '/dashboard/settings?new=1', icon: Settings, enabled: user.permissions.setting },
+  ];
 
   const moduleItems: ModuleItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, enabled: user.permissions.dashboard },
@@ -242,6 +275,9 @@ export default function Topbar({ user }: TopbarProps) {
       }
       if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
         setIsHelpOpen(false);
+      }
+      if (newRef.current && !newRef.current.contains(e.target as Node)) {
+        setIsNewOpen(false);
       }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setIsNotifOpen(false);
@@ -453,6 +489,41 @@ export default function Topbar({ user }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Global quick-create */}
+        <div ref={newRef} className="relative">
+          <button
+            onClick={() => setIsNewOpen((v) => !v)}
+            title="Buat Baru"
+            className="flex items-center gap-1 justify-center h-8 px-2.5 rounded-full bg-primary text-white hover:bg-primary-600 transition-colors"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline text-xs font-medium">New</span>
+          </button>
+
+          {isNewOpen && (
+            <div className="absolute right-0 mt-1.5 w-56 max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1">
+              {quickCreateItems.filter((i) => i.enabled).length === 0 ? (
+                <p className="px-3 py-3 text-xs text-gray-400 text-center">Tidak ada akses buat dokumen baru</p>
+              ) : (
+                quickCreateItems.map((item) => {
+                  if (!item.enabled) return null;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.href}
+                      onClick={() => { setIsNewOpen(false); router.push(item.href); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Icon size={15} />
+                      {item.name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Notifications — items needing this user's action */}
         <div ref={notifRef} className="relative">
           <button

@@ -20,6 +20,8 @@ import {
   ShoppingBag,
   Truck,
   ShieldAlert,
+  Cpu,
+  ScrollText,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,6 +44,18 @@ function SidebarInner({ permissions }: SidebarProps) {
   const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setIsCollapsed(localStorage.getItem('sidebar_collapsed') === '1');
+  }, []);
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
   const [expanded, setExpanded] = useState<string[]>([]);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -135,6 +149,18 @@ function SidebarInner({ permissions }: SidebarProps) {
       href: '/dashboard/stock-reconciliation',
       enabled: isSuperAdmin,
     },
+    {
+      name: 'Audit Log',
+      icon: ScrollText,
+      href: '/dashboard/audit-log',
+      enabled: isSuperAdmin,
+    },
+    {
+      name: 'System Console',
+      icon: Cpu,
+      href: '/dashboard/system-console',
+      enabled: isSuperAdmin,
+    },
   ];
 
   const stripQuery = (url: string) => url.split('?')[0];
@@ -179,7 +205,7 @@ function SidebarInner({ permissions }: SidebarProps) {
           </div>
         )}
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={toggleCollapsed}
           className="hidden md:block absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
         >
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

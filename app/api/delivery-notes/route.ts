@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
+import { broadcastNotificationsChanged } from '@/lib/realtime';
 
 function requireAccess(session: any) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -232,6 +233,8 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.deliveryNote.update({ where: { dnId: dn_id }, data: updateData });
 
     await logActivity({ doctype: 'Delivery Note', documentId: dn_id, action: logAction, changedBy: session!.user.name || '', before: original, after: updated });
+
+    await broadcastNotificationsChanged();
 
     return NextResponse.json({ success: true });
   } catch (error) {

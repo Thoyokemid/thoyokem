@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { getNextDocId, getAmendedDocId } from '@/lib/numbering';
 import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
+import { broadcastNotificationsChanged } from '@/lib/realtime';
 
 async function requireSalesAccess() {
   const session = await getServerSession(authOptions);
@@ -322,6 +323,8 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.salesOrder.update({ where: { soId: so_id }, data: updateData });
 
     await logActivity({ doctype: 'Sales Order', documentId: so_id, action: logAction, changedBy: session?.user.name || '', before: original, after: updated });
+
+    await broadcastNotificationsChanged();
 
     return NextResponse.json({ success: true });
   } catch (error) {

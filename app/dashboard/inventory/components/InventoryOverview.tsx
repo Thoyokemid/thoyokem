@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { TrendingUp, AlertTriangle, Package, Warehouse as WarehouseIcon } from 'lucide-react';
+import { StatCardGrid, StatCardDef, useVisibleCards } from '@/components/ui/StatCards';
 
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899', '#84cc16'];
 
@@ -78,6 +79,14 @@ export default function InventoryOverview() {
     return Array.from(byWarehouse.entries()).map(([id, value]) => ({ name: nameMap.get(id) || id, value }));
   }, [balances, warehouses]);
 
+  const [visibleCards, setVisibleCards] = useVisibleCards('inventory_overview_cards', ['value', 'items', 'lowstock']);
+
+  const statCards: StatCardDef[] = [
+    { key: 'value', label: 'Total Nilai Stok', value: `Rp${totalStockValue.toLocaleString('id-ID')}`, icon: TrendingUp, color: 'primary' },
+    { key: 'items', label: 'Total Item', value: items.length, icon: Package, color: 'blue' },
+    { key: 'lowstock', label: 'Item Stok Menipis', value: lowStock.length, icon: AlertTriangle, color: 'orange' },
+  ];
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -88,41 +97,7 @@ export default function InventoryOverview() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-primary-50 dark:bg-primary-900/20">
-              <TrendingUp className="text-primary" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total Nilai Stok</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">Rp{totalStockValue.toLocaleString('id-ID')}</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-900/20">
-              <Package className="text-blue-500" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total Item</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{items.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-orange-50 dark:bg-orange-900/20">
-              <AlertTriangle className="text-orange-500" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Item Stok Menipis</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{lowStock.length}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      <StatCardGrid cards={statCards} visible={visibleCards} onVisibleChange={setVisibleCards} />
 
       <Card title="Trend Nilai Stok">
         {valueTrend.length === 0 ? (

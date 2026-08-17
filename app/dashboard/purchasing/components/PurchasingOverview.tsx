@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { ShoppingCart, Wallet, AlertTriangle } from 'lucide-react';
+import { StatCardGrid, StatCardDef, useVisibleCards } from '@/components/ui/StatCards';
 
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7'];
 
@@ -37,8 +38,16 @@ export default function PurchasingOverview() {
     }
   };
 
+  const [visibleCards, setVisibleCards] = useVisibleCards('purchasing_overview_cards', ['orders', 'spend', 'outstanding']);
+
   const totalOutstanding = useMemo(() => invoices.reduce((sum, i) => sum + i.outstanding_amount, 0), [invoices]);
   const totalSpend = useMemo(() => orders.filter((o) => o.status !== 'Cancelled').reduce((sum, o) => sum + o.total_amount, 0), [orders]);
+
+  const statCards: StatCardDef[] = [
+    { key: 'orders', label: 'Total Purchase Orders', value: orders.length, icon: ShoppingCart, color: 'primary' },
+    { key: 'spend', label: 'Total Belanja', value: `Rp${totalSpend.toLocaleString('id-ID')}`, icon: Wallet, color: 'blue' },
+    { key: 'outstanding', label: 'Outstanding Invoice', value: `Rp${totalOutstanding.toLocaleString('id-ID')}`, icon: AlertTriangle, color: 'orange' },
+  ];
 
   const statusBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
@@ -80,41 +89,7 @@ export default function PurchasingOverview() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-primary-50 dark:bg-primary-900/20">
-              <ShoppingCart className="text-primary" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total Purchase Orders</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{orders.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-900/20">
-              <Wallet className="text-blue-500" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total Belanja</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">Rp{totalSpend.toLocaleString('id-ID')}</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-orange-50 dark:bg-orange-900/20">
-              <AlertTriangle className="text-orange-500" size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Outstanding Invoice</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">Rp{totalOutstanding.toLocaleString('id-ID')}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      <StatCardGrid cards={statCards} visible={visibleCards} onVisibleChange={setVisibleCards} />
 
       <Card title="Trend Belanja per Bulan">
         {spendTrend.length === 0 ? (

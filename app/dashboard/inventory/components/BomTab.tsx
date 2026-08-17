@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
@@ -32,6 +32,18 @@ const DEFAULT_VISIBLE = REPORT_COLUMNS.map((c) => c.key);
 
 export default function BomTab() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [viewMode, setViewMode] = useViewMode('inventory_bom_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_bom_cols', DEFAULT_VISIBLE);
   const [boms, setBoms] = useState<Bom[]>([]);

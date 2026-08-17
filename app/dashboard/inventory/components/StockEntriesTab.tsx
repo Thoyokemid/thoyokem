@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect} from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -28,6 +28,18 @@ const TYPE_ICON: Record<string, React.ElementType> = {
 
 export default function StockEntriesTab() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useViewMode('inventory_stock_entries_view');
   const [visibleCols, setVisibleCols] = useVisibleColumns('inventory_stock_entries_cols', [

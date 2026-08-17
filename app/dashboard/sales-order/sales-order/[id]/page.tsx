@@ -11,7 +11,7 @@ import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
-import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer } from 'lucide-react';
+import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
 
 interface SalesOrderWithItems {
   so_id: string;
@@ -96,6 +96,33 @@ export default function SalesOrderDetailPage() {
     }
   };
 
+  const duplicateOrder = async () => {
+    if (!so || !confirm(`Buat Sales Order baru sebagai salinan dari ${so.so_id}?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/sales-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: so.customer_id,
+          delivery_date: so.delivery_date,
+          items: so.items.map((i) => ({ item_code: i.item_code, qty: i.qty, rate: i.rate, warehouse_id: i.warehouse_id })),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(data.so_id)}`);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Gagal menduplikasi SO');
+      }
+    } catch (error) {
+      console.error('Error duplicating sales order:', error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createInvoice = async () => {
     setBusy(true);
     try {
@@ -160,6 +187,9 @@ export default function SalesOrderDetailPage() {
             <>
               <Button variant="secondary" onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(id)}/print?size=a4`)}>
                 <Printer size={14} className="mr-1.5" />Print
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={duplicateOrder}>
+                <Copy size={14} className="mr-1.5" />Duplicate
               </Button>
               {so.status === 'Draft' && (
                 <Button variant="secondary" disabled={busy} onClick={() => runAction('submit')}><Send size={14} className="mr-1.5" />Confirm</Button>

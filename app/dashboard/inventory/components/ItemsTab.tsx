@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '@/components/ui/Button';
@@ -75,6 +75,18 @@ function UsdConversionHint({ purchasePrice, sellingPrice }: { purchasePrice: num
 
 export default function ItemsTab() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const { data: session } = useSession();
   const isSuperAdmin = !!session?.user.isSuperAdmin;
   const queryClient = useQueryClient();

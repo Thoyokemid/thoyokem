@@ -88,14 +88,14 @@ export function ReportViewControls<T>({
   return (
     <div className="flex items-center gap-2">
       <ViewModeDropdown mode={viewMode} onChange={onViewModeChange} />
-      <OverflowMenu>
-        {viewMode === 'report' && (
+      {viewMode === 'report' && (
+        <OverflowMenu>
           <OverflowMenuColumns columns={columns} visible={visibleColumns} onChange={onVisibleColumnsChange} />
-        )}
-        <OverflowMenuItem icon={Download} onClick={onExport}>
-          Export
-        </OverflowMenuItem>
-      </OverflowMenu>
+          <OverflowMenuItem icon={Download} onClick={onExport}>
+            Export
+          </OverflowMenuItem>
+        </OverflowMenu>
+      )}
     </div>
   );
 }
