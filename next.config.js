@@ -6,6 +6,19 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   register: true,
   workboxOptions: {
     disableDevLogs: true,
+    // Every page here needs a live session and fresh data, so the service
+    // worker must never answer from cache — a stale/broken cache entry was
+    // surfacing as a "no-response" error that made whole pages fail to load.
+    runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.mode === 'navigate',
+        handler: 'NetworkOnly',
+      },
+      {
+        urlPattern: /^\/api\/.*/,
+        handler: 'NetworkOnly',
+      },
+    ],
   },
 });
 
