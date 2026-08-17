@@ -18,8 +18,17 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { password, ...profile } = user;
-    return NextResponse.json(profile);
+    return NextResponse.json({
+      name: user.name,
+      photo_url: user.photoUrl,
+      phone: user.phone,
+      date_of_birth: user.dateOfBirth,
+      address: user.address,
+      gender: user.gender,
+      emergency_contact_name: user.emergencyContactName,
+      emergency_contact_phone: user.emergencyContactPhone,
+      bio: user.bio,
+    });
   } catch (error) {
     console.error('Error fetching profile:', error);
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
@@ -64,8 +73,10 @@ export async function PUT(request: NextRequest) {
         dateOfBirth: data.date_of_birth !== undefined ? data.date_of_birth : current.dateOfBirth,
         address: data.address !== undefined ? data.address : current.address,
         gender: data.gender !== undefined ? data.gender : current.gender,
-        emergencyContactName: data.emergency_contact_name !== undefined ? data.emergency_contact_name : current.emergencyContactName,
-        emergencyContactPhone: data.emergency_contact_phone !== undefined ? data.emergency_contact_phone : current.emergencyContactPhone,
+        emergencyContactName:
+          data.emergency_contact_name !== undefined ? data.emergency_contact_name : current.emergencyContactName,
+        emergencyContactPhone:
+          data.emergency_contact_phone !== undefined ? data.emergency_contact_phone : current.emergencyContactPhone,
         bio: data.bio !== undefined ? data.bio : current.bio,
         ...(newPassword ? { password: newPassword } : {}),
       },
