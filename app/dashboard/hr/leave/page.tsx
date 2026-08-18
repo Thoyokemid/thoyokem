@@ -23,7 +23,8 @@ import { getInitials } from "@/utils/format";
 import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { logExport } from "@/lib/logExport";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateTime } from "@/lib/date";
+import toast from "react-hot-toast";
 
 const LEAVE_COLUMNS: ColumnDef[] = [
   { key: "employee_name", header: "Name" },
@@ -184,7 +185,7 @@ export default function LeavePage() {
       return data.url;
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("Failed to upload file");
+      toast.error("Failed to upload file");
       return "";
     } finally {
       setIsUploading(false);
@@ -274,11 +275,11 @@ export default function LeavePage() {
   const handleExport = () => {
     const exportData = filteredLeaves.map((l) => ({
       Name: l.employee_name,
-      'Date From': l.from_date,
-      'Date To': l.to_date,
+      'Date From': formatDate(l.from_date),
+      'Date To': formatDate(l.to_date),
       Category: CATEGORY_LABELS[l.leave_type] || l.leave_type,
       Keterangan: l.description || '',
-      Created: l.created_at,
+      Created: formatDateTime(l.created_at),
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -503,7 +504,7 @@ export default function LeavePage() {
                       <FileText size={12} /> Document
                     </a>
                   ) : (
-                    new Date(row.created_at).toLocaleDateString()
+                    formatDateTime(row.created_at)
                   )
                 }
                 badges={<CategoryBadge category={row.leave_type} />}

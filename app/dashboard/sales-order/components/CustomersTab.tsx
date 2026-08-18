@@ -10,6 +10,7 @@ import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Customer } from '@/types';
+import { customerImportRowSchema } from '@/lib/validation';
 import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
 
 const IMPORT_COLUMNS: ImportColumn[] = [
@@ -228,6 +229,7 @@ export default function CustomersTab() {
           apiEndpoint="/api/customers/import"
           templateFilename="template_customer"
           onImported={fetchCustomers}
+          rowSchema={customerImportRowSchema}
         />
       )}
     </ListViewLayout>

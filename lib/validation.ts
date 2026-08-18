@@ -95,18 +95,18 @@ export const bulkRowsSchema = z.object({
   rows: z.array(z.record(z.string(), z.unknown())).min(1, 'Tidak ada baris untuk diimport'),
 });
 
-export const customerImportSchema = importRowsSchema(
-  z.object({
-    customer_id: z.string().optional().nullable(),
-    customer_name: z.string().min(1, 'customer_name wajib diisi'),
-    contact: z.string().optional().nullable(),
-    phone: z.string().optional().nullable(),
-    email: z.string().optional().nullable(),
-    address: z.string().optional().nullable(),
-    payment_terms: z.string().optional().nullable(),
-    credit_limit: z.coerce.number().optional().nullable(),
-  })
-);
+export const customerImportRowSchema = z.object({
+  customer_id: z.string().optional().nullable(),
+  customer_name: z.string().min(1, 'customer_name wajib diisi'),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
+  credit_limit: z.coerce.number().optional().nullable(),
+});
+
+export const customerImportSchema = importRowsSchema(customerImportRowSchema);
 
 // ── Master data: Supplier ───────────────────────────────────────────────
 
@@ -131,17 +131,17 @@ export const supplierUpdateSchema = z.object({
   is_active: z.boolean().optional().nullable(),
 });
 
-export const supplierImportSchema = importRowsSchema(
-  z.object({
-    supplier_id: z.string().optional().nullable(),
-    supplier_name: z.string().min(1, 'supplier_name wajib diisi'),
-    contact: z.string().optional().nullable(),
-    phone: z.string().optional().nullable(),
-    email: z.string().optional().nullable(),
-    address: z.string().optional().nullable(),
-    payment_terms: z.string().optional().nullable(),
-  })
-);
+export const supplierImportRowSchema = z.object({
+  supplier_id: z.string().optional().nullable(),
+  supplier_name: z.string().min(1, 'supplier_name wajib diisi'),
+  contact: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  payment_terms: z.string().optional().nullable(),
+});
+
+export const supplierImportSchema = importRowsSchema(supplierImportRowSchema);
 
 // ── Master data: Item ───────────────────────────────────────────────────
 
@@ -174,22 +174,22 @@ export const itemUpdateSchema = z.object({
   is_active: z.boolean().optional().nullable(),
 });
 
-export const itemImportSchema = importRowsSchema(
-  z.object({
-    item_name: z.string().min(1, 'item_name wajib diisi'),
-    item_code: z.string().optional().nullable(),
-    item_group: z.enum(['Liquid', 'Non-Liquid']).optional().nullable(),
-    unit: z.string().optional().nullable(),
-    purchase_price: z.coerce.number().optional().nullable(),
-    selling_price: z.coerce.number().optional().nullable(),
-    reorder_level: z.coerce.number().optional().nullable(),
-    opening_qty: z.coerce.number().optional().nullable(),
-    opening_valuation_rate: z.coerce.number().optional().nullable(),
-    valuation_method: z.enum(['FIFO', 'Average']).optional().nullable(),
-    currency: z.enum(['USD', 'IDR']).optional().nullable(),
-    item_type: z.enum(['Trading', 'Regular']).optional().nullable(),
-  })
-);
+export const itemImportRowSchema = z.object({
+  item_name: z.string().min(1, 'item_name wajib diisi'),
+  item_code: z.string().optional().nullable(),
+  item_group: z.enum(['Liquid', 'Non-Liquid']).optional().nullable(),
+  unit: z.string().optional().nullable(),
+  purchase_price: z.coerce.number().optional().nullable(),
+  selling_price: z.coerce.number().optional().nullable(),
+  reorder_level: z.coerce.number().optional().nullable(),
+  opening_qty: z.coerce.number().optional().nullable(),
+  opening_valuation_rate: z.coerce.number().optional().nullable(),
+  valuation_method: z.enum(['FIFO', 'Average']).optional().nullable(),
+  currency: z.enum(['USD', 'IDR']).optional().nullable(),
+  item_type: z.enum(['Trading', 'Regular']).optional().nullable(),
+});
+
+export const itemImportSchema = importRowsSchema(itemImportRowSchema);
 
 // ── Master data: Warehouse ──────────────────────────────────────────────
 
@@ -213,17 +213,17 @@ export const warehouseUpdateSchema = z.object({
   is_active: z.boolean().optional().nullable(),
 });
 
-export const warehouseImportSchema = importRowsSchema(
-  z.object({
-    warehouse_name: z.string().min(1, 'warehouse_name wajib diisi'),
-    warehouse_id: z.string().optional().nullable(),
-    location: z.string().optional().nullable(),
-    pic: z.string().optional().nullable(),
-    phone: z.string().optional().nullable(),
-    address: z.string().optional().nullable(),
-    postal_code: z.string().optional().nullable(),
-  })
-);
+export const warehouseImportRowSchema = z.object({
+  warehouse_name: z.string().min(1, 'warehouse_name wajib diisi'),
+  warehouse_id: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  pic: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  postal_code: z.string().optional().nullable(),
+});
+
+export const warehouseImportSchema = importRowsSchema(warehouseImportRowSchema);
 
 // ── HR: Staff / Leave ───────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Registration } from '@/types';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { formatDateTime } from '@/lib/date';
+import toast from 'react-hot-toast';
 
 const STATUS_TONE: Record<string, 'orange' | 'green' | 'red'> = {
   pending: 'orange',
@@ -59,7 +60,7 @@ export default function RegistrationDetailPage() {
       if (res.ok) {
         router.push('/dashboard/registration');
       } else {
-        alert('Gagal memproses registrasi');
+        toast.error('Gagal memproses registrasi');
       }
     } catch (error) {
       console.error('Error updating registration:', error);

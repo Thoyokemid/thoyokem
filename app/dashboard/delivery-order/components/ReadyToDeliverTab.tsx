@@ -6,6 +6,7 @@ import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, ListRowAvatar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Truck } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface SalesOrderWithItems {
   so_id: string;
@@ -63,7 +64,7 @@ export default function ReadyToDeliverTab() {
         fetchAll();
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal membuat delivery');
+        toast.error(err.error || 'Gagal membuat delivery');
       }
     } catch (error) {
       console.error('Error delivering:', error);

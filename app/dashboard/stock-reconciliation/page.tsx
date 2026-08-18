@@ -9,6 +9,7 @@ import { DetailTable } from '@/components/ui/DetailView';
 import Button from '@/components/ui/Button';
 import { AlertCircle, ShieldAlert, RefreshCw, Wrench } from 'lucide-react';
 import { Warehouse } from '@/types';
+import toast from 'react-hot-toast';
 
 interface Discrepancy {
   source: 'Delivery Note' | 'Purchase Receipt' | 'Stock Entry';
@@ -68,11 +69,11 @@ export default function StockReconciliationPage() {
         fetchData();
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal memperbaiki');
+        toast.error(err.error || 'Gagal memperbaiki');
       }
     } catch (err) {
       console.error('Error applying fix:', err);
-      alert('Gagal memperbaiki');
+      toast.error('Gagal memperbaiki');
     } finally {
       setBusyKey(null);
     }

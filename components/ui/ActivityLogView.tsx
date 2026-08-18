@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { History, Plus, Pencil, Trash2, Send, Check, Ban, XCircle, PackageCheck, Truck, MessageSquare, AtSign, Upload, Download } from 'lucide-react';
 import { formatDateTime } from '@/lib/date';
+import toast from 'react-hot-toast';
 
 interface FieldChange {
   field: string;
@@ -164,7 +165,7 @@ export default function ActivityLogView({ doctype, documentId }: { doctype: stri
         fetchAll();
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal mengirim komentar');
+        toast.error(err.error || 'Gagal mengirim komentar');
       }
     } catch (error) {
       console.error('Error posting comment:', error);

@@ -11,6 +11,7 @@ import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Warehouse } from '@/types';
+import { warehouseImportRowSchema } from '@/lib/validation';
 import { Plus, Edit, Trash2, Warehouse as WarehouseIcon, Search, Upload } from 'lucide-react';
 
 const IMPORT_COLUMNS: ImportColumn[] = [
@@ -346,6 +347,7 @@ export default function WarehousesTab() {
           apiEndpoint="/api/warehouses/import"
           templateFilename="template_warehouse"
           onImported={() => queryClient.invalidateQueries({ queryKey: ['warehouses'] })}
+          rowSchema={warehouseImportRowSchema}
         />
       )}
     </ListViewLayout>

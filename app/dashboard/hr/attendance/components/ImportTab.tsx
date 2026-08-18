@@ -15,9 +15,28 @@ interface ImportTabProps {
   onImported?: () => void;
 }
 
+const PREVIEW_COLUMNS: { key: keyof AttendanceImport; header: string }[] = [
+  { key: 'employee_name', header: 'Nama' },
+  { key: 'attendance_date', header: 'Tanggal' },
+  { key: 'jam_set', header: 'Jam Set' },
+  { key: 'jam_absensi', header: 'Jam Absensi' },
+  { key: 'verifikasi', header: 'Verifikasi' },
+  { key: 'tipe_absensi', header: 'Tipe' },
+  { key: 'designation', header: 'Jabatan' },
+  { key: 'branch', header: 'Kantor' },
+];
+
+function validateRow(row: AttendanceImport): string | null {
+  const missing: string[] = [];
+  if (!row.employee_name) missing.push('Nama');
+  if (!row.attendance_date) missing.push('Tanggal Absensi');
+  return missing.length > 0 ? `Kolom wajib kosong: ${missing.join(', ')}` : null;
+}
+
 export default function ImportTab({ onImported }: ImportTabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedResult | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{
     type: 'success' | 'error' | null;
@@ -39,12 +58,19 @@ export default function ImportTab({ onImported }: ImportTabProps) {
     setFile(selectedFile);
     setUploadStatus({ type: null, message: '' });
     setParsed(null);
+    setRowErrors({});
 
     // Parse preview
     try {
       const result = await parseFile(selectedFile);
       const dates = Array.from(new Set(result.map((r) => r.attendance_date).filter(Boolean))).sort();
       setParsed({ data: result, dates });
+      const errors: Record<number, string> = {};
+      result.forEach((row, i) => {
+        const err = validateRow(row);
+        if (err) errors[i] = err;
+      });
+      setRowErrors(errors);
     } catch {
       setUploadStatus({ type: 'error', message: 'Failed to read file. Please check the format.' });
       setFile(null);
@@ -53,6 +79,8 @@ export default function ImportTab({ onImported }: ImportTabProps) {
 
   const handleUpload = async () => {
     if (!file || !parsed) return;
+    const validRows = parsed.data.filter((_, i) => !rowErrors[i]);
+    if (validRows.length === 0) return;
 
     setIsUploading(true);
     setUploadStatus({ type: null, message: '' });
@@ -61,7 +89,7 @@ export default function ImportTab({ onImported }: ImportTabProps) {
       const response = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(validRows),
       });
 
       if (!response.ok) throw new Error('Failed to import data');
@@ -74,6 +102,7 @@ export default function ImportTab({ onImported }: ImportTabProps) {
       });
       setFile(null);
       setParsed(null);
+      setRowErrors({});
       if (fileInputRef.current) fileInputRef.current.value = '';
       onImported?.();
     } catch {
@@ -121,6 +150,7 @@ export default function ImportTab({ onImported }: ImportTabProps) {
   const resetFile = () => {
     setFile(null);
     setParsed(null);
+    setRowErrors({});
     setUploadStatus({ type: null, message: '' });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -172,7 +202,12 @@ export default function ImportTab({ onImported }: ImportTabProps) {
                     <FileText className="text-primary" size={20} />
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{file.name}</p>
-                      <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB · {parsed.data.length} records</p>
+                      <p className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(2)} KB · {parsed.data.length} records
+                        {Object.keys(rowErrors).length > 0 && (
+                          <span className="text-red-600 dark:text-red-400"> · {Object.keys(rowErrors).length} baris error</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <button
@@ -183,6 +218,50 @@ export default function ImportTab({ onImported }: ImportTabProps) {
                   </button>
                 </div>
               </div>
+
+              {/* Row preview */}
+              <div className="max-h-60 overflow-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                <table className="min-w-full text-xs">
+                  <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400">#</th>
+                      {PREVIEW_COLUMNS.map((c) => (
+                        <th key={c.key} className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {c.header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.data.map((row, i) => {
+                      const rowError = rowErrors[i];
+                      return (
+                        <tr
+                          key={i}
+                          className={rowError ? 'bg-red-50 dark:bg-red-900/20' : 'odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-800/50'}
+                          title={rowError}
+                        >
+                          <td className="px-2 py-1 text-gray-400">{i + 1}</td>
+                          {PREVIEW_COLUMNS.map((c) => (
+                            <td key={c.key} className={`px-2 py-1 whitespace-nowrap ${rowError ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                              {row[c.key] || <span className="text-gray-300 dark:text-gray-600">-</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {Object.keys(rowErrors).length > 0 && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <AlertCircle className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" size={16} />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    {Object.keys(rowErrors).length} baris (ditandai merah) tidak punya Nama atau Tanggal Absensi dan akan dilewati kalau tetap lanjut import. Arahkan kursor ke baris untuk lihat detailnya.
+                  </p>
+                </div>
+              )}
 
               {/* Dates preview */}
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-3">
@@ -208,8 +287,15 @@ export default function ImportTab({ onImported }: ImportTabProps) {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleUpload} variant="primary" isLoading={isUploading}>
-                  Import {parsed.data.length} Records
+                <Button
+                  onClick={handleUpload}
+                  variant="primary"
+                  isLoading={isUploading}
+                  disabled={parsed.data.length - Object.keys(rowErrors).length === 0}
+                >
+                  {Object.keys(rowErrors).length > 0
+                    ? `Import ${parsed.data.length - Object.keys(rowErrors).length} Records Valid`
+                    : `Import ${parsed.data.length} Records`}
                 </Button>
               </div>
             </div>

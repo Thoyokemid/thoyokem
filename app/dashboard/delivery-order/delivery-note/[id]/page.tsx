@@ -13,6 +13,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, XCircle, History, Printer, ChevronDown, ClipboardCheck, PackageCheck, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/date';
+import toast from 'react-hot-toast';
 
 const STATUS_TONE: Record<string, 'gray' | 'orange' | 'blue' | 'green' | 'red'> = {
   Unallocated: 'gray',
@@ -81,7 +82,7 @@ export default function DeliveryNoteDetailPage() {
         }
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal memproses aksi');
+        toast.error(err.error || 'Gagal memproses aksi');
       }
     } catch (error) {
       console.error('Error running action:', error);

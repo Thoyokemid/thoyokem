@@ -11,6 +11,7 @@ import Loading from "@/components/ui/Loading";
 import { Role } from "@/types";
 import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck, DollarSign, RefreshCw } from "lucide-react";
 import { formatDateTime } from "@/lib/date";
+import toast from "react-hot-toast";
 
 interface UserWithRole {
   id: string;
@@ -319,7 +320,7 @@ export default function SettingsPage() {
         fetchRoles();
       } else {
         const err = await res.json();
-        alert(err.error || "Gagal menghapus role");
+        toast.error(err.error || "Gagal menghapus role");
       }
     } catch (error) {
       console.error("Error deleting role:", error);

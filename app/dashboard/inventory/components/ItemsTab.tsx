@@ -11,6 +11,7 @@ import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Item } from '@/types';
+import { itemImportRowSchema } from '@/lib/validation';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Edit, Trash2, Search, Package, RefreshCw, Upload } from 'lucide-react';
 
@@ -408,6 +409,7 @@ export default function ItemsTab() {
           apiEndpoint="/api/items/import"
           templateFilename="template_item"
           onImported={() => queryClient.invalidateQueries({ queryKey: ['items'] })}
+          rowSchema={itemImportRowSchema}
         />
       )}
     </ListViewLayout>

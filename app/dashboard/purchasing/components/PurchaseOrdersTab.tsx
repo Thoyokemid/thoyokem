@@ -11,6 +11,7 @@ import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, export
 import { Supplier, Item, Warehouse } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Trash2, Send, PackageCheck, XCircle, FileText, ShoppingCart, Check, Ban, RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface POItemLine {
   item_code: string;
@@ -189,7 +190,7 @@ export default function PurchaseOrdersTab() {
         fetchAll();
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal memproses aksi');
+        toast.error(err.error || 'Gagal memproses aksi');
       }
     } catch (error) {
       console.error('Error running action:', error);
@@ -207,10 +208,10 @@ export default function PurchaseOrdersTab() {
         body: JSON.stringify({ po_id, due_date: '' }),
       });
       if (res.ok) {
-        alert('Invoice berhasil dibuat. Cek tab Invoices.');
+        toast.success('Invoice berhasil dibuat. Cek tab Invoices.');
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal membuat invoice');
+        toast.error(err.error || 'Gagal membuat invoice');
       }
     } catch (error) {
       console.error('Error creating invoice:', error);

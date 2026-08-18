@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { SessionProvider, useSession, signOut } from 'next-auth/react';
 import { Session } from 'next-auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -43,7 +44,18 @@ export default function AuthProvider({ children, session }: AuthProviderProps) {
   return (
     <SessionProvider session={session}>
       <InvalidSessionGuard />
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: { fontSize: '13px' },
+            success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
+            error: { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
+          }}
+        />
+      </QueryClientProvider>
     </SessionProvider>
   );
 }

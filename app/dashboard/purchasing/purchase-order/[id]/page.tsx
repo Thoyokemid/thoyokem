@@ -13,6 +13,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
 import { formatDate } from '@/lib/date';
+import toast from 'react-hot-toast';
 
 interface PurchaseOrderWithItems {
   po_id: string;
@@ -88,7 +89,7 @@ export default function PurchaseOrderDetailPage() {
         }
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal memproses aksi');
+        toast.error(err.error || 'Gagal memproses aksi');
       }
     } catch (error) {
       console.error('Error running action:', error);
@@ -115,7 +116,7 @@ export default function PurchaseOrderDetailPage() {
         router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(data.po_id)}`);
       } else {
         const err = await res.json();
-        alert(err.error || 'Gagal menduplikasi PO');
+        toast.error(err.error || 'Gagal menduplikasi PO');
       }
     } catch (error) {
       console.error('Error duplicating purchase order:', error);
@@ -128,10 +129,10 @@ export default function PurchaseOrderDetailPage() {
     setBusy(true);
     try {
       const res = await fetch('/api/purchase-invoices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ po_id: id, due_date: '' }) });
-      if (res.ok) alert('Invoice berhasil dibuat. Cek tab Invoices.');
+      if (res.ok) toast.success('Invoice berhasil dibuat. Cek tab Invoices.');
       else {
         const err = await res.json();
-        alert(err.error || 'Gagal membuat invoice');
+        toast.error(err.error || 'Gagal membuat invoice');
       }
     } catch (error) {
       console.error('Error creating invoice:', error);
