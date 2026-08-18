@@ -9,6 +9,7 @@ import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle } from 'lucide-react';
+import { formatDateTime } from '@/lib/date';
 
 interface UserWithRole {
   id: string;
@@ -21,9 +22,8 @@ interface UserWithRole {
 
 function formatLastActive(iso: string | undefined): string {
   if (!iso) return 'Never';
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return 'Never';
-  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const formatted = formatDateTime(iso);
+  return formatted === '-' ? 'Never' : formatted;
 }
 
 export default function UserDetailPage() {

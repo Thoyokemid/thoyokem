@@ -8,6 +8,7 @@ import { ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { StockLedgerEntry, Item, Warehouse } from '@/types';
 import { Search, ArrowLeftRight } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 // Maps a ledger entry's source voucher to its detail page, when one exists.
 // Purchase Receipt and correction entries have no dedicated detail page, so those stay non-clickable.
@@ -62,7 +63,7 @@ export default function StockLedgerTab() {
   const warehouseName = (id: string) => warehouses.find((w) => w.warehouse_id === id)?.warehouse_name || id;
 
   const REPORT_COLUMNS: ReportColumn<StockLedgerEntry>[] = [
-    { key: 'posting_date', header: 'Tanggal' },
+    { key: 'posting_date', header: 'Tanggal', render: (r) => formatDate(r.posting_date), exportValue: (r) => formatDate(r.posting_date) },
     { key: 'item_code', header: 'Item', render: (r) => itemName(r.item_code), exportValue: (r) => itemName(r.item_code) },
     { key: 'warehouse_id', header: 'Warehouse', render: (r) => warehouseName(r.warehouse_id), exportValue: (r) => warehouseName(r.warehouse_id) },
     { key: 'voucher_type', header: 'Voucher Type' },
@@ -160,7 +161,7 @@ export default function StockLedgerTab() {
               }
               title={itemName(r.item_code)}
               subtitle={`${warehouseName(r.warehouse_id)} · ${r.voucher_type} ${r.voucher_id}`}
-              meta={r.posting_date}
+              meta={formatDate(r.posting_date)}
               badges={
                 <>
                   <StatusBadge

@@ -12,6 +12,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Registration } from '@/types';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { formatDateTime } from '@/lib/date';
 
 const STATUS_TONE: Record<string, 'orange' | 'green' | 'red'> = {
   pending: 'orange',
@@ -123,8 +124,8 @@ export default function RegistrationDetailPage() {
                 fields={[
                   { label: 'Nama', value: registration.name },
                   { label: 'Email', value: registration.email },
-                  { label: 'Requested At', value: new Date(registration.created_at).toLocaleString('id-ID') },
-                  { label: 'Last Updated', value: registration.update_at ? new Date(registration.update_at).toLocaleString('id-ID') : '-' },
+                  { label: 'Requested At', value: formatDateTime(registration.created_at) },
+                  { label: 'Last Updated', value: registration.update_at ? formatDateTime(registration.update_at) : '-' },
                 ]}
               />
             </DetailSection>

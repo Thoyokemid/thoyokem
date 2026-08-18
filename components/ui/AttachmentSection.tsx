@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Paperclip, Upload, Trash2, FileText, Image as ImageIcon, Download } from 'lucide-react';
 import Loading from '@/components/ui/Loading';
+import { formatDateTime } from '@/lib/date';
 
 interface AttachmentItem {
   attachment_id: string;
@@ -15,12 +16,6 @@ interface AttachmentItem {
 interface AttachmentSectionProps {
   doctype: string;
   documentId: string;
-}
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return iso;
-  return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function isImage(fileName: string): boolean {
@@ -139,7 +134,7 @@ export default function AttachmentSection({ doctype, documentId }: AttachmentSec
                     {a.file_name}
                   </a>
                   <p className="text-[11px] text-gray-400">
-                    {a.uploaded_by} &middot; {formatTimestamp(a.timestamp)}
+                    {a.uploaded_by} &middot; {formatDateTime(a.timestamp)}
                   </p>
                 </div>
                 <a

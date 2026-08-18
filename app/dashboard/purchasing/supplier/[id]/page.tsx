@@ -11,6 +11,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Supplier } from '@/types';
 import { AlertCircle } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface PurchaseOrderRow {
   po_id: string;
@@ -123,7 +124,7 @@ export default function SupplierDetailPage() {
                       {o.po_id}
                     </button>
                   ),
-                  order_date: o.order_date,
+                  order_date: formatDate(o.order_date),
                   status: <StatusBadge label={o.status} tone={STATUS_TONE[o.status] || 'gray'} />,
                   total_amount: `Rp${o.total_amount.toLocaleString('id-ID')}`,
                 }))}

@@ -6,6 +6,7 @@ import Loading from '@/components/ui/Loading';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { PackageCheck } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface DeliveryNoteWithItems {
   dn_id: string;
@@ -29,7 +30,7 @@ const HISTORY_COLUMNS: ReportColumn<DeliveryNoteWithItems>[] = [
   { key: 'dn_id', header: 'DN ID' },
   { key: 'so_id', header: 'SO' },
   { key: 'customer_name', header: 'Customer' },
-  { key: 'posting_date', header: 'Posting Date' },
+  { key: 'posting_date', header: 'Posting Date', render: (r) => formatDate(r.posting_date), exportValue: (r) => formatDate(r.posting_date) },
   { key: 'items', header: 'Items', render: (r) => r.items.length, exportValue: (r) => r.items.length },
   { key: 'status', header: 'Status', render: (r) => <StatusBadge label={r.status} tone={STATUS_TONE[r.status] || 'gray'} /> },
 ];
@@ -87,7 +88,7 @@ export default function DeliveryHistoryTab() {
             }
             title={dn.dn_id}
             subtitle={`${dn.customer_name} · SO ${dn.so_id} · ${dn.items.length} item`}
-            meta={dn.posting_date}
+            meta={formatDate(dn.posting_date)}
             badges={<StatusBadge label={dn.status} tone={STATUS_TONE[dn.status] || 'gray'} />}
           />
         ))

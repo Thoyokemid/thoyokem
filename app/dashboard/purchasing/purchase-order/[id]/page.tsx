@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface PurchaseOrderWithItems {
   po_id: string;
@@ -229,7 +230,7 @@ export default function PurchaseOrderDetailPage() {
                       </Link>
                     ),
                   },
-                  { label: 'Order Date', value: po.order_date },
+                  { label: 'Order Date', value: formatDate(po.order_date) },
                   { label: 'Expected Date', value: po.expected_date || '-' },
                   { label: 'Total Amount', value: `Rp${po.total_amount.toLocaleString('id-ID')}` },
                   { label: 'Approved By', value: po.approved_by || '-' },

@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, XCircle, History, Printer, ChevronDown, ClipboardCheck, PackageCheck, Truck } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 const STATUS_TONE: Record<string, 'gray' | 'orange' | 'blue' | 'green' | 'red'> = {
   Unallocated: 'gray',
@@ -198,7 +199,7 @@ export default function DeliveryNoteDetailPage() {
                       </Link>
                     ),
                   },
-                  { label: 'Posting Date', value: dn.posting_date },
+                  { label: 'Posting Date', value: formatDate(dn.posting_date) },
                   { label: 'Owner', value: dn.owner || '-' },
                   {
                     label: 'Amended From',

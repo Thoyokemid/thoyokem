@@ -15,6 +15,7 @@ import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
 import { generateLeaveLetterPDF } from '@/utils/leaveLetter';
 import { AlertCircle, Download, FileText } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 const CATEGORY_LABELS: Record<string, string> = {
   sick: 'Sick Leave',
@@ -98,7 +99,7 @@ export default function LeaveDetailPage() {
         backHref="/dashboard/hr/leave"
         backLabel="Leave"
         title={leave?.employee_name || id}
-        subtitle={leave ? `${leave.from_date} - ${leave.to_date}` : undefined}
+        subtitle={leave ? `${formatDate(leave.from_date)} - ${formatDate(leave.to_date)}` : undefined}
         isLoading={isLoading}
         notFound={!isLoading && !leave}
         badges={leave && <StatusBadge label={CATEGORY_LABELS[leave.leave_type] || leave.leave_type} tone={CATEGORY_TONE[leave.leave_type] || 'gray'} />}
@@ -123,8 +124,8 @@ export default function LeaveDetailPage() {
                       </Link>
                     ) : leave.employee_name,
                   },
-                  { label: 'Tanggal Mulai', value: leave.from_date },
-                  { label: 'Tanggal Selesai', value: leave.to_date },
+                  { label: 'Tanggal Mulai', value: formatDate(leave.from_date) },
+                  { label: 'Tanggal Selesai', value: formatDate(leave.to_date) },
                   { label: 'Jumlah Hari', value: `${totalDays} hari` },
                   { label: 'Sisa Kuota Cuti', value: `${remaining} / ${quota} hari` },
                   { label: 'Keterangan', value: leave.description || '-' },

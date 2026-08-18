@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { validate, profileUpdateSchema } from '@/lib/validation';
+import { logActivity } from '@/lib/activityLog';
 
 export async function GET() {
   try {
@@ -79,6 +80,35 @@ export async function PUT(request: NextRequest) {
           data.emergency_contact_phone !== undefined ? data.emergency_contact_phone : current.emergencyContactPhone,
         bio: data.bio !== undefined ? data.bio : current.bio,
         ...(newPassword ? { password: newPassword } : {}),
+      },
+    });
+
+    await logActivity({
+      doctype: 'User',
+      documentId: session.user.id,
+      action: 'Updated',
+      changedBy: session.user.name || '',
+      before: {
+        name: current.name,
+        phone: current.phone,
+        date_of_birth: current.dateOfBirth,
+        address: current.address,
+        gender: current.gender,
+        emergency_contact_name: current.emergencyContactName,
+        emergency_contact_phone: current.emergencyContactPhone,
+        bio: current.bio,
+      },
+      after: {
+        name: data.name != null ? data.name : current.name,
+        phone: data.phone !== undefined ? data.phone : current.phone,
+        date_of_birth: data.date_of_birth !== undefined ? data.date_of_birth : current.dateOfBirth,
+        address: data.address !== undefined ? data.address : current.address,
+        gender: data.gender !== undefined ? data.gender : current.gender,
+        emergency_contact_name:
+          data.emergency_contact_name !== undefined ? data.emergency_contact_name : current.emergencyContactName,
+        emergency_contact_phone:
+          data.emergency_contact_phone !== undefined ? data.emergency_contact_phone : current.emergencyContactPhone,
+        bio: data.bio !== undefined ? data.bio : current.bio,
       },
     });
 

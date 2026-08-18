@@ -10,6 +10,7 @@ import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
 import { Role } from "@/types";
 import { Save, Clock, Timer, Plus, Edit, Trash2, ShieldCheck, DollarSign, RefreshCw } from "lucide-react";
+import { formatDateTime } from "@/lib/date";
 
 interface UserWithRole {
   id: string;
@@ -50,13 +51,7 @@ function formatLastActive(iso: string | undefined): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
 
-  return date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(date);
 }
 
 export default function SettingsPage() {

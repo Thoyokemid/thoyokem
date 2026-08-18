@@ -13,6 +13,7 @@ import { AttendanceImport } from '@/types';
 import { getInitials } from '@/utils/format';
 import { Search, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { logExport } from '@/lib/logExport';
 
 const PAGE_SIZE = 20;
 
@@ -145,6 +146,7 @@ export default function DataTab() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance Data');
     XLSX.writeFile(workbook, `attendance_data_${new Date().toISOString().split('T')[0]}.xlsx`);
+    logExport('Attendance', exportData.length);
     setIsExportModalOpen(false);
   };
 

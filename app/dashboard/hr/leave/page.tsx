@@ -22,6 +22,8 @@ import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { logExport } from "@/lib/logExport";
+import { formatDate } from "@/lib/date";
 
 const LEAVE_COLUMNS: ColumnDef[] = [
   { key: "employee_name", header: "Name" },
@@ -282,6 +284,7 @@ export default function LeavePage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Leave');
     XLSX.writeFile(workbook, `leave_${new Date().toISOString().split('T')[0]}.xlsx`);
+    logExport('Leave', exportData.length);
   };
 
   if (status !== "loading" && !session) redirect("/login");
@@ -492,7 +495,7 @@ export default function LeavePage() {
                 onClick={() => router.push(`/dashboard/hr/leave/${encodeURIComponent(row.id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(row.employee_name)} />}
                 title={row.employee_name}
-                subtitle={`${row.from_date} → ${row.to_date}${row.description ? ' · ' + row.description : ''}`}
+                subtitle={`${formatDate(row.from_date)} → ${formatDate(row.to_date)}${row.description ? ' · ' + row.description : ''}`}
                 meta={
                   row.attachment ? (
                     <a href={row.attachment} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}

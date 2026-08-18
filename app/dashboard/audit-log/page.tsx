@@ -9,6 +9,7 @@ import Loading from '@/components/ui/Loading';
 import Button from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/ListView';
 import { AlertCircle, ScrollText, RefreshCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { formatDateTime } from '@/lib/date';
 
 interface FieldChange {
   field: string;
@@ -38,6 +39,8 @@ const ACTION_TONE: Record<string, 'gray' | 'green' | 'blue' | 'red' | 'orange' |
   Received: 'green',
   Delivered: 'green',
   Paid: 'green',
+  Imported: 'blue',
+  Exported: 'gray',
 };
 
 const DOCTYPE_HREF: Record<string, (id: string) => string> = {
@@ -57,13 +60,8 @@ const DOCTYPE_HREF: Record<string, (id: string) => string> = {
   Registration: (id) => `/dashboard/registration/${encodeURIComponent(id)}`,
   User: (id) => `/dashboard/settings/user/${encodeURIComponent(id)}`,
   Role: (id) => `/dashboard/settings/role/${encodeURIComponent(id)}`,
+  Attendance: () => `/dashboard/hr/attendance?tab=data`,
 };
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return iso;
-  return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 export default function AuditLogPage() {
   const { data: session, status } = useSession();
@@ -235,7 +233,7 @@ export default function AuditLogPage() {
                         onClick={() => setExpanded(isExpanded ? null : e.log_id)}
                         className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer"
                       >
-                        <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatTimestamp(e.timestamp)}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatDateTime(e.timestamp)}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{e.doctype}</td>
                         <td className="px-4 py-2.5 text-xs">
                           {hrefFn ? (

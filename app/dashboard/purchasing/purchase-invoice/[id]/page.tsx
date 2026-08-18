@@ -14,6 +14,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { PurchaseInvoice } from '@/types';
 import { AlertCircle, Wallet, Printer } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface PaymentEntry {
   payment_id: string;
@@ -163,8 +164,8 @@ export default function PurchaseInvoiceDetailPage() {
                 fields={[
                   { label: 'Supplier', value: <Link href={`/dashboard/purchasing/supplier/${encodeURIComponent(invoice.supplier_id)}`} className="text-primary hover:underline">{invoice.supplier_name}</Link> },
                   { label: 'Purchase Order', value: <Link href={`/dashboard/purchasing/purchase-order/${encodeURIComponent(invoice.po_id)}`} className="text-primary hover:underline">{invoice.po_id}</Link> },
-                  { label: 'Posting Date', value: invoice.posting_date },
-                  { label: 'Due Date', value: invoice.due_date || '-' },
+                  { label: 'Posting Date', value: formatDate(invoice.posting_date) },
+                  { label: 'Due Date', value: invoice.due_date ? formatDate(invoice.due_date) : '-' },
                   { label: 'Grand Total', value: `Rp${invoice.grand_total.toLocaleString('id-ID')}` },
                   { label: 'Outstanding', value: `Rp${invoice.outstanding_amount.toLocaleString('id-ID')}` },
                 ]}
@@ -180,7 +181,7 @@ export default function PurchaseInvoiceDetailPage() {
                 ]}
                 rows={payments.map((p) => ({
                   payment_id: p.payment_id,
-                  posting_date: p.posting_date,
+                  posting_date: formatDate(p.posting_date),
                   mode_of_payment: p.mode_of_payment,
                   paid_amount: `Rp${p.paid_amount.toLocaleString('id-ID')}`,
                 }))}

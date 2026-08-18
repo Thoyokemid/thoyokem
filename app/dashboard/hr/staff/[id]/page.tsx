@@ -13,6 +13,7 @@ import AttachmentSection from '@/components/ui/AttachmentSection';
 import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
 import { AlertCircle } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 const CATEGORY_LABELS: Record<string, string> = {
   sick: 'Sick Leave',
@@ -104,7 +105,7 @@ export default function StaffDetailPage() {
             <DetailSection title="Detail">
               <FieldGrid
                 fields={[
-                  { label: 'Tanggal Lahir', value: staff.date_of_birth || '-' },
+                  { label: 'Tanggal Lahir', value: staff.date_of_birth ? formatDate(staff.date_of_birth) : '-' },
                   { label: 'Kuota Cuti', value: `${quota} hari/tahun` },
                   { label: 'Sisa Kuota', value: `${remaining} / ${quota} hari` },
                 ]}
@@ -122,10 +123,10 @@ export default function StaffDetailPage() {
                 rows={staffLeaves.map((l) => ({
                   from_date: (
                     <Link href={`/dashboard/hr/leave/${encodeURIComponent(l.id)}`} className="text-primary hover:underline">
-                      {l.from_date}
+                      {formatDate(l.from_date)}
                     </Link>
                   ),
-                  to_date: l.to_date,
+                  to_date: formatDate(l.to_date),
                   days: countLeaveDays(l),
                   category: <StatusBadge label={CATEGORY_LABELS[l.leave_type] || l.leave_type} tone={CATEGORY_TONE[l.leave_type] || 'gray'} />,
                   description: l.description || '-',

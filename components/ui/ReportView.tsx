@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { ViewModeDropdown, ViewMode, OverflowMenu, OverflowMenuItem, OverflowMenuColumns } from '@/components/ui/ListView';
 import { Download } from 'lucide-react';
+import { logExport } from '@/lib/logExport';
 
 export interface ReportColumn<T> {
   key: string;
@@ -67,6 +68,7 @@ export function exportToExcel<T>(rows: T[], columns: ReportColumn<T>[], filename
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  logExport(sheetName, exportRows.length);
 }
 
 /** ViewModeDropdown + "Pick Columns"/"Export" overflow menu, meant to sit in a ListViewLayout toolbar or header row. */

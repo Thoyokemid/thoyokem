@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { AttendanceImport } from '@/types';
 import { validate, attendanceImportSchema } from '@/lib/validation';
+import { logActivity } from '@/lib/activityLog';
 
 export async function GET() {
   try {
@@ -77,6 +78,15 @@ export async function POST(request: NextRequest) {
     ]);
 
     const total = await prisma.attendanceImport.count();
+
+    await logActivity({
+      doctype: 'Attendance',
+      documentId: incomingDates.sort().join(', ') || '-',
+      action: 'Imported',
+      changedBy: session.user.name || '',
+      before: null,
+      after: { rows_imported: data.length, dates_replaced: incomingDates.sort() },
+    });
 
     return NextResponse.json({
       success: true,

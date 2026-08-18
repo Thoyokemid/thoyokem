@@ -11,6 +11,7 @@ import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/component
 import { Registration } from "@/types";
 import { getInitials } from "@/utils/format";
 import { AlertCircle, CheckCircle, XCircle, Clock } from "lucide-react";
+import { formatDateTime } from "@/lib/date";
 
 export default function RegistrationPage() {
   const { data: session, status } = useSession();
@@ -171,7 +172,7 @@ export default function RegistrationPage() {
               avatar={<ListRowAvatar initials={getInitials(registration.name)} />}
               title={registration.name}
               subtitle={registration.email}
-              meta={`Requested: ${new Date(registration.created_at).toLocaleDateString()}`}
+              meta={`Requested: ${formatDateTime(registration.created_at)}`}
               badges={
                 activeTab === "approved" ? (
                   <StatusBadge label="Approved" tone="green" />

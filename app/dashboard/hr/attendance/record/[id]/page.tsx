@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { AttendanceImport } from '@/types';
 import { AlertCircle } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 export default function AttendanceRecordDetailPage() {
   const { data: session, status } = useSession();
@@ -67,7 +68,7 @@ export default function AttendanceRecordDetailPage() {
         backHref="/dashboard/hr/attendance?tab=data"
         backLabel="Attendance Data"
         title={record?.employee_name || id}
-        subtitle={record ? `${record.attendance_date} · ${record.jam_absensi || '-'}` : undefined}
+        subtitle={record ? `${formatDate(record.attendance_date)} · ${record.jam_absensi || '-'}` : undefined}
         isLoading={isLoading}
         notFound={!isLoading && !record}
       >
@@ -76,7 +77,7 @@ export default function AttendanceRecordDetailPage() {
             <FieldGrid
               fields={[
                 { label: 'Nama', value: record.employee_name || '-' },
-                { label: 'Tanggal', value: record.attendance_date || '-' },
+                { label: 'Tanggal', value: record.attendance_date ? formatDate(record.attendance_date) : '-' },
                 { label: 'Jam Absensi', value: record.jam_absensi || '-' },
                 { label: 'Jam Set', value: record.jam_set || '-' },
                 { label: 'Tipe', value: record.tipe_absensi || '-' },

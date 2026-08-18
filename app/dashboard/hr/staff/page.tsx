@@ -24,6 +24,8 @@ import { StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { logExport } from "@/lib/logExport";
+import { formatDate } from "@/lib/date";
 
 const STAFF_COLUMNS: ColumnDef[] = [
   { key: "employee_name", header: "Name" },
@@ -119,6 +121,7 @@ export default function StaffPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff');
     XLSX.writeFile(workbook, `staff_${new Date().toISOString().split('T')[0]}.xlsx`);
+    logExport('Staff', exportData.length);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -288,7 +291,7 @@ export default function StaffPage() {
                 meta={
                   <div className="flex items-center gap-1.5">
                     {s.date_of_birth && <Cake size={12} className="text-pink-400" />}
-                    {s.date_of_birth || 'No birth date'}
+                    {s.date_of_birth ? formatDate(s.date_of_birth) : 'No birth date'}
                   </div>
                 }
                 badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}

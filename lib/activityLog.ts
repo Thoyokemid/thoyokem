@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { generateId } from '@/lib/id';
 
-export type LogAction = 'Created' | 'Updated' | 'Deleted' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled' | 'Amended' | 'Received' | 'Delivered' | 'Paid';
+export type LogAction = 'Created' | 'Updated' | 'Deleted' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled' | 'Amended' | 'Received' | 'Delivered' | 'Paid' | 'Imported' | 'Exported';
 
 export interface FieldChange {
   field: string;
@@ -41,6 +41,7 @@ export function requiredDoctypePerms(perms: any): Record<string, boolean> {
     Staff: perms.staff,
     Leave: perms.leave,
     Registration: perms.registration_request,
+    Attendance: perms.attendance || perms.staff,
   };
 }
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { History, Plus, Pencil, Trash2, Send, Check, Ban, XCircle, PackageCheck, Truck, MessageSquare, AtSign } from 'lucide-react';
+import { History, Plus, Pencil, Trash2, Send, Check, Ban, XCircle, PackageCheck, Truck, MessageSquare, AtSign, Upload, Download } from 'lucide-react';
+import { formatDateTime } from '@/lib/date';
 
 interface FieldChange {
   field: string;
@@ -47,6 +48,8 @@ const ACTION_ICON: Record<string, React.ElementType> = {
   Received: PackageCheck,
   Delivered: Truck,
   Paid: Check,
+  Imported: Upload,
+  Exported: Download,
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -61,13 +64,9 @@ const ACTION_COLOR: Record<string, string> = {
   Received: 'text-green-500 bg-green-50 dark:bg-green-900/20',
   Delivered: 'text-green-500 bg-green-50 dark:bg-green-900/20',
   Paid: 'text-green-500 bg-green-50 dark:bg-green-900/20',
+  Imported: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
+  Exported: 'text-gray-500 bg-gray-100 dark:bg-gray-800',
 };
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return iso;
-  return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 // Renders comment text with @Mentioned Names bolded + highlighted.
 function renderCommentText(text: string, mentions: string[]) {
@@ -240,7 +239,7 @@ export default function ActivityLogView({ doctype, documentId }: { doctype: stri
                     <p className="text-xs text-gray-700 dark:text-gray-300">
                       <span className="font-medium text-gray-900 dark:text-gray-100">{c.author || 'Unknown'}</span>{' '}
                       berkomentar
-                      <span className="text-gray-400"> · {formatTimestamp(c.timestamp)}</span>
+                      <span className="text-gray-400"> · {formatDateTime(c.timestamp)}</span>
                     </p>
                     <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
                       {renderCommentText(c.text, c.mentions)}
@@ -262,7 +261,7 @@ export default function ActivityLogView({ doctype, documentId }: { doctype: stri
                   <p className="text-xs text-gray-700 dark:text-gray-300">
                     <span className="font-medium text-gray-900 dark:text-gray-100">{entry.changed_by || 'System'}</span>{' '}
                     {entry.action.toLowerCase()}
-                    <span className="text-gray-400"> · {formatTimestamp(entry.timestamp)}</span>
+                    <span className="text-gray-400"> · {formatDateTime(entry.timestamp)}</span>
                   </p>
                   {entry.changes.length > 0 && (
                     <div className="mt-1.5 space-y-1">

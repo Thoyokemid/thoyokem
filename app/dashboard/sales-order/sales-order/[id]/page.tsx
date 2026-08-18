@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface SalesOrderWithItems {
   so_id: string;
@@ -226,7 +227,7 @@ export default function SalesOrderDetailPage() {
                       </Link>
                     ),
                   },
-                  { label: 'Order Date', value: so.order_date },
+                  { label: 'Order Date', value: formatDate(so.order_date) },
                   { label: 'Delivery Date', value: so.delivery_date || '-' },
                   { label: 'Total Amount', value: `Rp${so.total_amount.toLocaleString('id-ID')}` },
                   { label: 'Approved By', value: so.approved_by || '-' },

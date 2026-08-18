@@ -14,6 +14,7 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { SalesInvoice } from '@/types';
 import { AlertCircle, Wallet, Printer } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 
 interface PaymentEntry {
   payment_id: string;
@@ -164,8 +165,8 @@ export default function SalesInvoiceDetailPage() {
                   { label: 'Customer', value: <Link href={`/dashboard/sales-order/customer/${encodeURIComponent(invoice.customer_id)}`} className="text-primary hover:underline">{invoice.customer_name}</Link> },
                   { label: 'Sales Order', value: <Link href={`/dashboard/sales-order/sales-order/${encodeURIComponent(invoice.so_id)}`} className="text-primary hover:underline">{invoice.so_id}</Link> },
                   { label: 'Delivery Note', value: invoice.dn_id ? <Link href={`/dashboard/delivery-order/delivery-note/${encodeURIComponent(invoice.dn_id)}`} className="text-primary hover:underline">{invoice.dn_id}</Link> : '-' },
-                  { label: 'Posting Date', value: invoice.posting_date },
-                  { label: 'Due Date', value: invoice.due_date || '-' },
+                  { label: 'Posting Date', value: formatDate(invoice.posting_date) },
+                  { label: 'Due Date', value: invoice.due_date ? formatDate(invoice.due_date) : '-' },
                   { label: 'Grand Total', value: `Rp${invoice.grand_total.toLocaleString('id-ID')}` },
                   { label: 'Outstanding', value: `Rp${invoice.outstanding_amount.toLocaleString('id-ID')}` },
                 ]}
@@ -181,7 +182,7 @@ export default function SalesInvoiceDetailPage() {
                 ]}
                 rows={payments.map((p) => ({
                   payment_id: p.payment_id,
-                  posting_date: p.posting_date,
+                  posting_date: formatDate(p.posting_date),
                   mode_of_payment: p.mode_of_payment,
                   paid_amount: `Rp${p.paid_amount.toLocaleString('id-ID')}`,
                 }))}
