@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { StaffList } from '@/types';
 import { validate, staffCreateSchema, staffUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!session.user.permissions.staff) {
+    if (!(await hasDoctypePermission(session, 'Staff', 'read'))) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.staff) {
+    if (!session || !(await hasDoctypePermission(session, 'Staff', 'create'))) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
@@ -71,7 +72,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.staff) {
+    if (!session || !(await hasDoctypePermission(session, 'Staff', 'write'))) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 
@@ -107,7 +108,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.staff) {
+    if (!session || !(await hasDoctypePermission(session, 'Staff', 'delete'))) {
       return NextResponse.json({ error: 'Forbidden: no staff access' }, { status: 403 });
     }
 

@@ -146,6 +146,7 @@ export default function BomTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(boms, REPORT_COLUMNS, 'bom', 'BOM')}
+            doctype="BOM"
           />
           <Button onClick={openNew}><Plus size={14} className="mr-1.5" />New BOM</Button>
         </div>

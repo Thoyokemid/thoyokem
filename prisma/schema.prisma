@@ -30,12 +30,44 @@ model Role {
   purchasing          Boolean @default(false)
   salesOrder          Boolean @default(false) @map("sales_order")
   deliveryOrder       Boolean @default(false) @map("delivery_order")
+  reportBuilder       Boolean @default(false) @map("report_builder")
   canApprove          Boolean @default(false) @map("can_approve")
   isSuperAdmin        Boolean @default(false) @map("is_super_admin")
 
   users User[]
+  rolePermissions RolePermission[]
 
   @@map("roles")
+}
+
+// Granular per-doctype × per-action override on top of Role's flat module flags.
+// A row present here takes precedence for that (roleId, doctype) pair; when absent,
+// lib/permissions.ts falls back to the legacy flat module flag on Role — see there
+// for the fallback mapping. This makes rollout additive/zero-downtime: existing
+// roles keep working exactly as before until an admin explicitly overrides a
+// doctype in the Permission Matrix (Settings).
+model RolePermission {
+  id        String  @id
+  roleId    String  @map("role_id")
+  doctype   String
+  canRead   Boolean @default(false) @map("can_read")
+  canCreate Boolean @default(false) @map("can_create")
+  canWrite  Boolean @default(false) @map("can_write")
+  canDelete Boolean @default(false) @map("can_delete")
+  canExport Boolean @default(false) @map("can_export")
+  canImport Boolean @default(false) @map("can_import")
+  onlyIfOwner Boolean @default(false) @map("only_if_owner")
+  restrictToAssigned Boolean @default(false) @map("restrict_to_assigned")
+  canSubmit Boolean @default(false) @map("can_submit")
+  canCancel Boolean @default(false) @map("can_cancel")
+  canAmend Boolean @default(false) @map("can_amend")
+  canApproveDoc Boolean @default(false) @map("can_approve_doc")
+  canPrint Boolean @default(false) @map("can_print")
+
+  role Role @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+
+  @@unique([roleId, doctype])
+  @@map("role_permissions")
 }
 
 model User {
@@ -525,6 +557,7 @@ model Assignment {
   assignedBy   String  @map("assigned_by")
   note         String?
   timestamp    String
+  grantsAccess Boolean @default(false) @map("grants_access")
 
   @@unique([doctype, documentId, assignedTo])
   @@index([assignedTo])

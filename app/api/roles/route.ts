@@ -6,12 +6,13 @@ import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { Role } from '@/types';
 import { validate, roleCreateSchema, roleUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
 
-// Only users with setting permission may manage roles.
-async function requireSettingAccess() {
+// Only users with setting permission (or a granular Role-doctype override) may manage roles.
+async function requireSettingAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.setting) {
+  if (!(await hasDoctypePermission(session, 'Role', action))) {
     return { error: NextResponse.json({ error: 'Forbidden: no setting access' }, { status: 403 }) };
   }
   return { session };
@@ -38,6 +39,7 @@ export async function GET() {
       purchasing: r.purchasing,
       sales_order: r.salesOrder,
       delivery_order: r.deliveryOrder,
+      report_builder: r.reportBuilder,
       can_approve: r.canApprove,
       is_super_admin: r.isSuperAdmin,
     }));
@@ -50,7 +52,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireSettingAccess();
+  const guard = await requireSettingAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
         purchasing: !!data.purchasing,
         salesOrder: !!data.sales_order,
         deliveryOrder: !!data.delivery_order,
+        reportBuilder: !!data.report_builder,
         canApprove: !!data.can_approve,
         isSuperAdmin: !!data.is_super_admin,
       },
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const guard = await requireSettingAccess();
+  const guard = await requireSettingAccess('write');
   if (guard.error) return guard.error;
 
   try {
@@ -115,6 +118,7 @@ export async function PUT(request: NextRequest) {
         purchasing: updates.purchasing !== undefined ? !!updates.purchasing : current.purchasing,
         salesOrder: updates.sales_order !== undefined ? !!updates.sales_order : current.salesOrder,
         deliveryOrder: updates.delivery_order !== undefined ? !!updates.delivery_order : current.deliveryOrder,
+        reportBuilder: updates.report_builder !== undefined ? !!updates.report_builder : current.reportBuilder,
         canApprove: updates.can_approve !== undefined ? !!updates.can_approve : current.canApprove,
         isSuperAdmin: updates.is_super_admin !== undefined ? !!updates.is_super_admin : current.isSuperAdmin,
       },
@@ -130,7 +134,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireSettingAccess();
+  const guard = await requireSettingAccess('delete');
   if (guard.error) return guard.error;
 
   try {

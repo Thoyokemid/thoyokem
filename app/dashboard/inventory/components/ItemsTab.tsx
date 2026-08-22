@@ -329,6 +329,7 @@ export default function ItemsTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(filteredItems, REPORT_COLUMNS, 'items', 'Items')}
+            doctype="Item"
           />
         </div>
       }

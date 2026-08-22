@@ -7,10 +7,11 @@ import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { validate, deliveryNoteActionSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
 
-function requireAccess(session: any) {
+async function requireAccess(session: any, action: PermissionAction) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!session.user.permissions.delivery_order && !session.user.permissions.sales_order) {
+  if (!(await hasDoctypePermission(session, 'Delivery Note', action))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   return null;
@@ -18,7 +19,7 @@ function requireAccess(session: any) {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  const err = requireAccess(session);
+  const err = await requireAccess(session, 'read');
   if (err) return err;
 
   try {
@@ -56,19 +57,31 @@ export async function GET() {
   }
 }
 
+const DN_ACTION_PERMISSION: Record<string, PermissionAction> = {
+  cancel: 'cancel', amend: 'amend',
+};
+
 // PATCH performs a status-transition action: confirm_pick | complete_pack | good_issue | cancel | amend
 export async function PATCH(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  const err = requireAccess(session);
-  if (err) return err;
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const parsed = validate(deliveryNoteActionSchema, await request.json());
     if (!parsed.success) return parsed.response;
     const { dn_id, action } = parsed.data;
 
+    if (!(await hasDoctypePermission(session, 'Delivery Note', DN_ACTION_PERMISSION[action] || 'write'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const current = await prisma.deliveryNote.findUnique({ where: { dnId: dn_id } });
     if (!current) return NextResponse.json({ error: 'Delivery note not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(session!, 'Delivery Note') && current.owner !== session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa mengubah Delivery Note yang Anda buat sendiri' }, { status: 403 });
+    }
+
     const original = { ...current };
 
     const now = new Date().toISOString();
@@ -143,9 +156,9 @@ export async function PATCH(request: NextRequest) {
       const wasGoodIssued = current.status === 'Good Issued';
 
       if (wasGoodIssued) {
-        const invoiceCount = await prisma.salesInvoice.count({ where: { dnId: dn_id } });
+        const invoiceCount = await prisma.salesInvoice.count({ where: { dnId: dn_id, status: { not: 'Cancelled' } } });
         if (invoiceCount > 0) {
-          return NextResponse.json({ error: 'Batalkan/hapus Sales Invoice yang terkait delivery ini dulu' }, { status: 400 });
+          return NextResponse.json({ error: 'Batalkan Sales Invoice yang terkait delivery ini dulu' }, { status: 400 });
         }
 
         // Stock already left the warehouse — reverse it back.

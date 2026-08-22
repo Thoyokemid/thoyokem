@@ -14,6 +14,7 @@ import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
 import { formatDate } from '@/lib/date';
+import { useDoctypePermission } from '@/lib/useDoctypePermission';
 import toast from 'react-hot-toast';
 
 interface PurchaseOrderWithItems {
@@ -47,6 +48,7 @@ const APPROVAL_TONE: Record<string, 'gray' | 'orange' | 'green' | 'red'> = {
 
 export default function PurchaseOrderDetailPage() {
   const { data: session, status } = useSession();
+  const perms = useDoctypePermission('Purchase Order');
   const params = useParams();
   const router = useRouter();
   const id = decodeURIComponent(String(params.id));
@@ -188,7 +190,7 @@ export default function PurchaseOrderDetailPage() {
         actions={
           po && (
             <>
-              <Button variant="secondary" onClick={() => router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(id)}/print?size=a4`)}>
+              <Button variant="secondary" disabled={!perms.print} title={perms.print ? undefined : "Anda tidak punya izin Print"} onClick={() => router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(id)}/print?size=a4`)}>
                 <Printer size={14} className="mr-1.5" />Print
               </Button>
               <Button variant="secondary" disabled={busy} onClick={duplicateOrder}>

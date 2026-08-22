@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { generateId } from '@/lib/id';
 import { validate, registrationCreateSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 import { Registration } from '@/types';
 import bcrypt from 'bcryptjs';
 
@@ -17,7 +18,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.registration_request) {
+    if (!session || !(await hasDoctypePermission(session, 'Registration', 'read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -77,7 +78,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.registration_request) {
+    if (!session || !(await hasDoctypePermission(session, 'Registration', 'write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -298,6 +298,7 @@ export default function SalesOrdersTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(orders, REPORT_COLUMNS, 'sales_orders', 'Sales Orders')}
+            doctype="Sales Order"
           />
           <Button onClick={openNew}><Plus size={14} className="mr-1.5" />New Sales Order</Button>
         </div>

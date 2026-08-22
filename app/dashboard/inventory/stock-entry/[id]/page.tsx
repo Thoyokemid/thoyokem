@@ -11,8 +11,10 @@ import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
 import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
+import Button from '@/components/ui/Button';
 import { StockEntry } from '@/types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function StockEntryDetailPage() {
   const { data: session, status } = useSession();
@@ -20,6 +22,31 @@ export default function StockEntryDetailPage() {
   const id = decodeURIComponent(String(params.id));
   const [entry, setEntry] = useState<StockEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const runCancel = async () => {
+    if (!confirm('Batalkan Stock Entry ini? Stok yang sudah dipindahkan akan dibalik ke kondisi semula.')) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/stock-entries', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry_id: id, action: 'cancel' }),
+      });
+      if (res.ok) {
+        fetchData();
+        toast.success('Stock entry dibatalkan');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Gagal membatalkan');
+      }
+    } catch (error) {
+      console.error('Error cancelling stock entry:', error);
+      toast.error('Gagal membatalkan');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (session?.user.permissions.inventory) fetchData();
@@ -75,7 +102,14 @@ export default function StockEntryDetailPage() {
         subtitle={entry?.entry_type}
         isLoading={isLoading}
         notFound={!isLoading && !entry}
-        badges={entry && <StatusBadge label={entry.status || 'Submitted'} tone="green" />}
+        badges={entry && <StatusBadge label={entry.status || 'Submitted'} tone={entry.status === 'Cancelled' ? 'red' : 'green'} />}
+        actions={
+          entry && entry.status !== 'Cancelled' && (
+            <Button variant="danger" disabled={busy} onClick={runCancel}>
+              <XCircle size={14} className="mr-1.5" />Cancel
+            </Button>
+          )
+        }
         sidebar={
           entry && (
             <>

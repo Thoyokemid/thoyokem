@@ -49,6 +49,21 @@ export const deliveryNoteActionSchema = z.object({
   action: z.enum(['confirm_pick', 'complete_pack', 'good_issue', 'cancel', 'amend']),
 });
 
+export const stockEntryActionSchema = z.object({
+  entry_id: z.string().min(1),
+  action: z.enum(['cancel']),
+});
+
+export const purchaseInvoiceActionSchema = z.object({
+  pi_id: z.string().min(1),
+  action: z.enum(['cancel']),
+});
+
+export const salesInvoiceActionSchema = z.object({
+  si_id: z.string().min(1),
+  action: z.enum(['cancel']),
+});
+
 export const registrationCreateSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi'),
   email: z.string().email('Email tidak valid'),
@@ -274,9 +289,28 @@ const permissionFlags = {
   purchasing: z.boolean().optional().nullable(),
   sales_order: z.boolean().optional().nullable(),
   delivery_order: z.boolean().optional().nullable(),
+  report_builder: z.boolean().optional().nullable(),
   can_approve: z.boolean().optional().nullable(),
   is_super_admin: z.boolean().optional().nullable(),
 };
+
+export const rolePermissionUpdateSchema = z.object({
+  role_id: z.string().min(1, 'role_id wajib diisi'),
+  doctype: z.string().min(1, 'doctype wajib diisi'),
+  read: z.boolean(),
+  create: z.boolean(),
+  write: z.boolean(),
+  delete: z.boolean(),
+  export: z.boolean(),
+  import: z.boolean(),
+  only_if_owner: z.boolean().optional(),
+  restrict_to_assigned: z.boolean().optional(),
+  submit: z.boolean().optional(),
+  cancel: z.boolean().optional(),
+  amend: z.boolean().optional(),
+  approve: z.boolean().optional(),
+  print: z.boolean().optional(),
+});
 
 export const roleCreateSchema = z.object({
   role_name: z.string().optional().nullable(),

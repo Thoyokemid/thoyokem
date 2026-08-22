@@ -37,6 +37,7 @@ export async function getRolePermissions(roleId: string) {
     purchasing: false,
     sales_order: false,
     delivery_order: false,
+    report_builder: false,
     can_approve: false,
   };
 
@@ -62,6 +63,7 @@ export async function getRolePermissions(roleId: string) {
     purchasing: role.purchasing,
     sales_order: role.salesOrder,
     delivery_order: role.deliveryOrder,
+    report_builder: role.reportBuilder,
     can_approve: role.canApprove,
   };
 }
@@ -139,7 +141,7 @@ export const authOptions: NextAuthOptions = {
             token.permissions = {
               dashboard: false, attendance: false, leave: false, registration_request: false,
               setting: false, staff: false, inventory: false, purchasing: false,
-              sales_order: false, delivery_order: false, can_approve: false,
+              sales_order: false, delivery_order: false, report_builder: false, can_approve: false,
             };
             token.isSuperAdmin = false;
             return token;

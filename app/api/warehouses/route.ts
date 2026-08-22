@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Warehouse } from '@/types';
 import { validate, warehouseCreateSchema, warehouseUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
 
 function generateWarehouseId(): string {
   let id = '';
@@ -12,17 +13,17 @@ function generateWarehouseId(): string {
   return id;
 }
 
-async function requireInventoryAccess() {
+async function requireInventoryAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.inventory) {
+  if (!(await hasDoctypePermission(session, 'Warehouse', action))) {
     return { error: NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -45,7 +46,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('write');
   if (guard.error) return guard.error;
 
   try {
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('delete');
   if (guard.error) return guard.error;
 
   try {

@@ -314,6 +314,7 @@ export default function WarehousesTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(warehouses, REPORT_COLUMNS, 'warehouses', 'Warehouses')}
+            doctype="Warehouse"
           />
           {isSuperAdmin && (
             <Button variant="secondary" onClick={() => setIsImportOpen(true)}>

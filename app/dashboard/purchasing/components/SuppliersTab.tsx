@@ -208,6 +208,7 @@ export default function SuppliersTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(suppliers, REPORT_COLUMNS, 'suppliers', 'Suppliers')}
+            doctype="Supplier"
           />
           {isSuperAdmin && (
             <Button variant="secondary" onClick={() => setIsImportOpen(true)}><Upload size={14} className="mr-1.5" />Import</Button>

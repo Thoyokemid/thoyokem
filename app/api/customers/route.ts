@@ -5,23 +5,31 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Customer } from '@/types';
 import { validate, customerCreateSchema, customerUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresAssignedOnly, filterToAssignedOnly, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.sales_order) {
+  if (!(await hasDoctypePermission(session, 'Customer', action))) {
     return { error: NextResponse.json({ error: 'Forbidden: no sales access' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireAccess();
-  if (guard.error) return guard.error;
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // A role without Customer Read can still see individually shared customers
+  // (Assignment with "grants access" checked) — see lib/permissions.ts.
+  const scope = await resolveReadScope(session, 'Customer');
+  if (scope === 'none') {
+    return NextResponse.json({ error: 'Forbidden: no sales access' }, { status: 403 });
+  }
 
   try {
     const records = await prisma.customer.findMany();
-    const customers: Customer[] = records.map((r) => ({
+    let customers: Customer[] = records.map((r) => ({
       customer_id: r.customerId,
       customer_name: r.customerName,
       contact: r.contact || '',
@@ -32,6 +40,14 @@ export async function GET() {
       credit_limit: Number(r.creditLimit),
       is_active: r.isActive,
     }));
+
+    if (scope === 'shared') {
+      const sharedIds = await getSharedDocumentIds(session, 'Customer');
+      customers = customers.filter((c) => sharedIds.has(c.customer_id));
+    } else if (await requiresAssignedOnly(session, 'Customer')) {
+      customers = await filterToAssignedOnly(session, 'Customer', customers, (c) => c.customer_id);
+    }
+
     return NextResponse.json(customers);
   } catch (error) {
     console.error('Error fetching customers:', error);
@@ -40,7 +56,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -79,7 +95,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('write');
   if (guard.error) return guard.error;
 
   try {
@@ -114,7 +130,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('delete');
   if (guard.error) return guard.error;
 
   try {

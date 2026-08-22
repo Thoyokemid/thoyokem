@@ -14,6 +14,7 @@ import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, XCircle, History, Printer, ChevronDown, ClipboardCheck, PackageCheck, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/date';
+import { useDoctypePermission } from '@/lib/useDoctypePermission';
 import toast from 'react-hot-toast';
 
 const STATUS_TONE: Record<string, 'gray' | 'orange' | 'blue' | 'green' | 'red'> = {
@@ -38,6 +39,7 @@ interface DeliveryNoteWithItems {
 
 export default function DeliveryNoteDetailPage() {
   const { data: session, status } = useSession();
+  const perms = useDoctypePermission('Delivery Note');
   const params = useParams();
   const router = useRouter();
   const id = decodeURIComponent(String(params.id));
@@ -133,7 +135,12 @@ export default function DeliveryNoteDetailPage() {
             <>
               {dn.status === 'Good Issued' && (
                 <div className="relative">
-                  <Button variant="secondary" onClick={() => setIsPrintMenuOpen((v) => !v)}>
+                  <Button
+                    variant="secondary"
+                    disabled={!perms.print}
+                    title={perms.print ? undefined : 'Anda tidak punya izin Print'}
+                    onClick={() => setIsPrintMenuOpen((v) => !v)}
+                  >
                     <Printer size={14} className="mr-1.5" />Print Surat Jalan<ChevronDown size={14} className="ml-1.5" />
                   </Button>
                   {isPrintMenuOpen && (

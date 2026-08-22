@@ -106,6 +106,7 @@ export default function SalesInvoicesTab() {
           visibleColumns={visibleCols}
           onVisibleColumnsChange={setVisibleCols}
           onExport={() => exportToExcel(invoices, REPORT_COLUMNS, 'sales_invoices', 'Sales Invoices')}
+          doctype="Sales Invoice"
         />
       }
     >

@@ -6,19 +6,20 @@ import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { StockEntry } from '@/types';
-import { validate, stockEntryCreateSchema } from '@/lib/validation';
+import { validate, stockEntryCreateSchema, stockEntryActionSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
 
-async function requireInventoryAccess() {
+async function requireInventoryAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.inventory) {
-    return { error: NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 }) };
+  if (!(await hasDoctypePermission(session, 'Stock Entry', action))) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -44,7 +45,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -189,5 +190,67 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating stock entry:', error);
     return NextResponse.json({ error: 'Failed to create stock entry' }, { status: 500 });
+  }
+}
+
+// PATCH performs a status-transition action: cancel
+export async function PATCH(request: NextRequest) {
+  const guard = await requireInventoryAccess('cancel');
+  if (guard.error) return guard.error;
+
+  try {
+    const parsed = validate(stockEntryActionSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { entry_id, action } = parsed.data;
+
+    const current = await prisma.stockEntry.findUnique({ where: { entryId: entry_id } });
+    if (!current) return NextResponse.json({ error: 'Stock entry not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(guard.session!, 'Stock Entry') && current.owner !== guard.session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa membatalkan Stock Entry yang Anda buat sendiri' }, { status: 403 });
+    }
+
+    if (action === 'cancel') {
+      if (current.status === 'Cancelled') {
+        return NextResponse.json({ error: 'Stock entry sudah dibatalkan' }, { status: 400 });
+      }
+
+      const now = new Date().toISOString();
+      // Reverse every ledger line this entry originally posted — covers Material
+      // Receipt/Issue/Transfer (1-2 lines) and Manufacture (N component lines + 1
+      // finished-good line) alike, without re-deriving quantities/rates.
+      const postedLines = await prisma.stockLedgerEntry.findMany({
+        where: { voucherType: 'Stock Entry', voucherId: entry_id },
+      });
+      for (const line of postedLines) {
+        await appendStockLedgerEntry({
+          itemCode: line.itemCode,
+          warehouseId: line.warehouseId,
+          voucherType: 'Stock Entry Cancellation',
+          voucherId: entry_id,
+          actualQty: -Number(line.actualQty),
+          valuationRate: Number(line.valuationRate),
+          postingDate: now.slice(0, 10),
+        });
+      }
+
+      const updated = await prisma.stockEntry.update({ where: { entryId: entry_id }, data: { status: 'Cancelled' } });
+
+      await logActivity({
+        doctype: 'Stock Entry',
+        documentId: entry_id,
+        action: 'Cancelled',
+        changedBy: guard.session?.user.name || '',
+        before: current,
+        after: updated,
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (error) {
+    console.error('Error updating stock entry:', error);
+    return NextResponse.json({ error: 'Failed to update stock entry' }, { status: 500 });
   }
 }

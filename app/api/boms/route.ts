@@ -5,18 +5,19 @@ import { prisma } from '@/lib/db';
 import { getNextDocId } from '@/lib/numbering';
 import { logActivity } from '@/lib/activityLog';
 import { validate, bomCreateSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.inventory) {
-    return { error: NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 }) };
+  if (!(await hasDoctypePermission(session, 'BOM', action))) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireAccess();
+  const guard = await requireAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -51,7 +52,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('delete');
   if (guard.error) return guard.error;
 
   try {
@@ -110,6 +111,10 @@ export async function DELETE(request: NextRequest) {
 
     const existing = await prisma.bom.findUnique({ where: { bomId } });
     if (!existing) return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(guard.session!, 'BOM') && existing.owner !== guard.session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa menghapus BOM yang Anda buat sendiri' }, { status: 403 });
+    }
 
     await prisma.bomComponent.deleteMany({ where: { bomId } });
     await prisma.bom.delete({ where: { bomId } });

@@ -4,19 +4,20 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getNextDocId } from '@/lib/numbering';
 import { logActivity } from '@/lib/activityLog';
-import { validate, salesInvoiceCreateSchema } from '@/lib/validation';
+import { validate, salesInvoiceCreateSchema, salesInvoiceActionSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.sales_order) {
-    return { error: NextResponse.json({ error: 'Forbidden: no sales access' }, { status: 403 }) };
+  if (!(await hasDoctypePermission(session, 'Sales Invoice', action))) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireAccess();
+  const guard = await requireAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -61,7 +62,7 @@ export async function GET() {
 
 // Create an invoice from a Sales Order (copies total + line items over).
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -117,5 +118,53 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating sales invoice:', error);
     return NextResponse.json({ error: 'Failed to create sales invoice' }, { status: 500 });
+  }
+}
+
+// PATCH performs a status-transition action: cancel
+export async function PATCH(request: NextRequest) {
+  const guard = await requireAccess('cancel');
+  if (guard.error) return guard.error;
+
+  try {
+    const parsed = validate(salesInvoiceActionSchema, await request.json());
+    if (!parsed.success) return parsed.response;
+    const { si_id, action } = parsed.data;
+
+    const current = await prisma.salesInvoice.findUnique({ where: { siId: si_id } });
+    if (!current) return NextResponse.json({ error: 'Sales invoice not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(guard.session!, 'Sales Invoice') && current.owner !== guard.session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa membatalkan Sales Invoice yang Anda buat sendiri' }, { status: 403 });
+    }
+
+    if (action === 'cancel') {
+      if (current.status === 'Cancelled') {
+        return NextResponse.json({ error: 'Sales invoice sudah dibatalkan' }, { status: 400 });
+      }
+
+      const paymentCount = await prisma.paymentEntry.count({ where: { referenceId: si_id } });
+      if (paymentCount > 0) {
+        return NextResponse.json({ error: 'Batalkan/hapus Payment Entry yang terkait invoice ini dulu sebelum membatalkannya' }, { status: 400 });
+      }
+
+      const updated = await prisma.salesInvoice.update({ where: { siId: si_id }, data: { status: 'Cancelled' } });
+
+      await logActivity({
+        doctype: 'Sales Invoice',
+        documentId: si_id,
+        action: 'Cancelled',
+        changedBy: guard.session?.user.name || '',
+        before: current,
+        after: updated,
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (error) {
+    console.error('Error updating sales invoice:', error);
+    return NextResponse.json({ error: 'Failed to update sales invoice' }, { status: 500 });
   }
 }

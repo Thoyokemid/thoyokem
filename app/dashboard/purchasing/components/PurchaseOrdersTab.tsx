@@ -241,6 +241,7 @@ export default function PurchaseOrdersTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(orders, REPORT_COLUMNS, 'purchase_orders', 'Purchase Orders')}
+            doctype="Purchase Order"
           />
           <Button onClick={openNew}><Plus size={14} className="mr-1.5" />New Purchase Order</Button>
         </div>

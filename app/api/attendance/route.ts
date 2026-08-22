@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { AttendanceImport } from '@/types';
 import { validate, attendanceImportSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 import { logActivity } from '@/lib/activityLog';
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.permissions.attendance) {
+    if (!(await hasDoctypePermission(session, 'Attendance', 'read'))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.attendance) {
+    if (!session || !(await hasDoctypePermission(session, 'Attendance', 'create'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

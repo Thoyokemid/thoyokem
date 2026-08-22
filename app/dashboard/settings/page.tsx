@@ -34,6 +34,7 @@ const PERMISSION_COLS: { key: keyof Omit<Role, "role_id" | "role_name">; label: 
   { key: "purchasing", label: "Purchasing" },
   { key: "sales_order", label: "Sales Order" },
   { key: "delivery_order", label: "Delivery Order" },
+  { key: "report_builder", label: "Report Builder" },
   { key: "can_approve", label: "Can Approve" },
   { key: "registration_request", label: "Registration" },
   { key: "setting", label: "Settings" },
@@ -50,6 +51,7 @@ const roleFormSchema = z.object({
   purchasing: z.boolean(),
   sales_order: z.boolean(),
   delivery_order: z.boolean(),
+  report_builder: z.boolean(),
   can_approve: z.boolean(),
   registration_request: z.boolean(),
   setting: z.boolean(),
@@ -66,6 +68,7 @@ const ROLE_FORM_DEFAULTS: RoleFormValues = {
   purchasing: false,
   sales_order: false,
   delivery_order: false,
+  report_builder: false,
   can_approve: false,
   registration_request: false,
   setting: false,
@@ -287,6 +290,7 @@ export default function SettingsPage() {
       purchasing: role.purchasing,
       sales_order: role.sales_order,
       delivery_order: role.delivery_order,
+      report_builder: role.report_builder,
       can_approve: role.can_approve,
       is_super_admin: role.is_super_admin,
     });
@@ -460,10 +464,16 @@ export default function SettingsPage() {
               </div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Roles</h3>
             </div>
-            <Button onClick={openNewRole}>
-              <Plus size={14} className="mr-1.5" />
-              Add Role
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => router.push('/dashboard/settings/permission-matrix')}>
+                <ShieldCheck size={14} className="mr-1.5" />
+                Permission Matrix
+              </Button>
+              <Button onClick={openNewRole}>
+                <Plus size={14} className="mr-1.5" />
+                Add Role
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">

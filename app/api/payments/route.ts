@@ -5,18 +5,19 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { validate, paymentCreateSchema } from '@/lib/validation';
+import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.purchasing && !session.user.permissions.sales_order) {
+  if (!(await hasDoctypePermission(session, 'Payment Entry', action))) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {

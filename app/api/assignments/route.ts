@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         assigned_by: r.assignedBy,
         note: r.note || '',
         timestamp: r.timestamp,
+        grants_access: r.grantsAccess,
       };
     });
     return NextResponse.json(assignments);
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { doctype, document_id: documentId, assigned_to: assignedTo, note } = body;
+    const { doctype, document_id: documentId, assigned_to: assignedTo, note, grants_access: grantsAccess } = body;
     if (!doctype || !documentId || !assignedTo) {
       return NextResponse.json({ error: 'doctype, document_id, dan assigned_to wajib diisi' }, { status: 400 });
     }
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
           assignedBy: session.user.name || '',
           note: note || null,
           timestamp: new Date().toISOString(),
+          grantsAccess: !!grantsAccess,
         },
       });
     } catch (createError: any) {

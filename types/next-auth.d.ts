@@ -16,6 +16,7 @@ declare module 'next-auth' {
       purchasing: boolean;
       sales_order: boolean;
       delivery_order: boolean;
+      report_builder: boolean;
       can_approve: boolean;
     };
     isSuperAdmin: boolean;
@@ -40,6 +41,7 @@ declare module 'next-auth' {
         purchasing: boolean;
         sales_order: boolean;
         delivery_order: boolean;
+        report_builder: boolean;
         can_approve: boolean;
       };
       isSuperAdmin: boolean;
@@ -64,6 +66,7 @@ declare module 'next-auth/jwt' {
       purchasing: boolean;
       sales_order: boolean;
       delivery_order: boolean;
+      report_builder: boolean;
       can_approve: boolean;
     };
     isSuperAdmin: boolean;

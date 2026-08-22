@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { ViewModeDropdown, ViewMode, OverflowMenu, OverflowMenuItem, OverflowMenuColumns } from '@/components/ui/ListView';
 import { Download } from 'lucide-react';
 import { logExport } from '@/lib/logExport';
+import { useDoctypePermission } from '@/lib/useDoctypePermission';
 
 export interface ReportColumn<T> {
   key: string;
@@ -79,6 +80,7 @@ export function ReportViewControls<T>({
   visibleColumns,
   onVisibleColumnsChange,
   onExport,
+  doctype,
 }: {
   viewMode: ViewMode;
   onViewModeChange: (m: ViewMode) => void;
@@ -86,14 +88,24 @@ export function ReportViewControls<T>({
   visibleColumns: string[];
   onVisibleColumnsChange: (cols: string[]) => void;
   onExport: () => void;
+  /** When set, gates the Export item to this doctype's "export" permission (see lib/useDoctypePermission). Omit to leave Export ungated. */
+  doctype?: string;
 }) {
+  const perms = useDoctypePermission(doctype || '');
+  const canExport = !doctype || perms.export;
+
   return (
     <div className="flex items-center gap-2">
       <ViewModeDropdown mode={viewMode} onChange={onViewModeChange} />
       {viewMode === 'report' && (
         <OverflowMenu>
           <OverflowMenuColumns columns={columns} visible={visibleColumns} onChange={onVisibleColumnsChange} />
-          <OverflowMenuItem icon={Download} onClick={onExport}>
+          <OverflowMenuItem
+            icon={Download}
+            onClick={onExport}
+            disabled={!canExport}
+            title={canExport ? undefined : 'Anda tidak punya izin Export untuk data ini'}
+          >
             Export
           </OverflowMenuItem>
         </OverflowMenu>

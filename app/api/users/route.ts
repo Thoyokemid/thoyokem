@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { validate, userUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 
 interface UserWithRole {
   id: string;
@@ -18,7 +19,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.setting) {
+    if (!session || !(await hasDoctypePermission(session, 'User', 'read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -45,7 +46,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user.permissions.setting) {
+    if (!session || !(await hasDoctypePermission(session, 'User', 'write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

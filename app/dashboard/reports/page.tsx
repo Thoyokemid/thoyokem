@@ -9,26 +9,26 @@ import { OverflowMenu, OverflowMenuColumns } from '@/components/ui/ListView';
 import { ReportTable, ReportColumn, exportToExcel } from '@/components/ui/ReportView';
 import { BarChart3, Search, Download, Columns3 } from 'lucide-react';
 
-type PermKey = 'inventory' | 'purchasing' | 'sales_order' | 'staff' | 'leave';
-
 interface DataSource {
   key: string;
   label: string;
   endpoint: string;
   idKey: string;
-  /** Module permission gating access to this data source. */
-  permKey: PermKey;
+  /** Doctype gating access to this data source — checked via /api/my-permissions'
+   *  Read action, so a Permission Matrix override narrows/grants this per report,
+   *  independent of the source's module flag. */
+  doctype: string;
 }
 
 const DATA_SOURCES: DataSource[] = [
-  { key: 'items', label: 'Item', endpoint: '/api/items', idKey: 'item_code', permKey: 'inventory' },
-  { key: 'warehouses', label: 'Warehouse', endpoint: '/api/warehouses', idKey: 'warehouse_id', permKey: 'inventory' },
-  { key: 'customers', label: 'Customer', endpoint: '/api/customers', idKey: 'customer_id', permKey: 'sales_order' },
-  { key: 'suppliers', label: 'Supplier', endpoint: '/api/suppliers', idKey: 'supplier_id', permKey: 'purchasing' },
-  { key: 'purchase-orders', label: 'Purchase Order', endpoint: '/api/purchase-orders', idKey: 'po_id', permKey: 'purchasing' },
-  { key: 'sales-orders', label: 'Sales Order', endpoint: '/api/sales-orders', idKey: 'so_id', permKey: 'sales_order' },
-  { key: 'staff', label: 'Staff', endpoint: '/api/staff', idKey: 'employee_id', permKey: 'staff' },
-  { key: 'leave', label: 'Leave', endpoint: '/api/leave', idKey: 'id', permKey: 'leave' },
+  { key: 'items', label: 'Item', endpoint: '/api/items', idKey: 'item_code', doctype: 'Item' },
+  { key: 'warehouses', label: 'Warehouse', endpoint: '/api/warehouses', idKey: 'warehouse_id', doctype: 'Warehouse' },
+  { key: 'customers', label: 'Customer', endpoint: '/api/customers', idKey: 'customer_id', doctype: 'Customer' },
+  { key: 'suppliers', label: 'Supplier', endpoint: '/api/suppliers', idKey: 'supplier_id', doctype: 'Supplier' },
+  { key: 'purchase-orders', label: 'Purchase Order', endpoint: '/api/purchase-orders', idKey: 'po_id', doctype: 'Purchase Order' },
+  { key: 'sales-orders', label: 'Sales Order', endpoint: '/api/sales-orders', idKey: 'so_id', doctype: 'Sales Order' },
+  { key: 'staff', label: 'Staff', endpoint: '/api/staff', idKey: 'employee_id', doctype: 'Staff' },
+  { key: 'leave', label: 'Leave', endpoint: '/api/leave', idKey: 'id', doctype: 'Leave' },
 ];
 
 /** Field keys that are arrays/objects (line items, nested records) — not meaningful as flat report columns. */
@@ -50,9 +50,21 @@ export default function ReportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [visibleCols, setVisibleCols] = useState<string[]>([]);
 
+  const [readableSources, setReadableSources] = useState<Set<string> | null>(null);
   const source = DATA_SOURCES.find((s) => s.key === activeSource) || DATA_SOURCES[0];
-  const permissions = session?.user.permissions;
-  const accessibleSources = DATA_SOURCES.filter((s) => permissions?.[s.permKey]);
+  const accessibleSources = readableSources ? DATA_SOURCES.filter((s) => readableSources.has(s.key)) : [];
+
+  useEffect(() => {
+    if (!session) return;
+    Promise.all(
+      DATA_SOURCES.map((s) =>
+        fetch(`/api/my-permissions?doctype=${encodeURIComponent(s.doctype)}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((perms) => (perms?.read ? s.key : null))
+          .catch(() => null)
+      )
+    ).then((keys) => setReadableSources(new Set(keys.filter((k): k is string => !!k))));
+  }, [session]);
 
   useEffect(() => {
     if (accessibleSources.length > 0 && !accessibleSources.some((s) => s.key === activeSource)) {
@@ -112,6 +124,20 @@ export default function ReportsPage() {
     permissions: session.user.permissions,
   };
 
+  if (!session.user.permissions.report_builder) {
+    return (
+      <DashboardLayout user={layoutUser}>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <BarChart3 className="mx-auto text-gray-400 mb-3" size={40} />
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">You don't have permission to access Report Builder.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout user={layoutUser}>
       <div className="space-y-4">
@@ -125,7 +151,9 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        {accessibleSources.length === 0 ? (
+        {readableSources === null ? (
+          <div className="flex justify-center py-12"><Loading size="lg" /></div>
+        ) : accessibleSources.length === 0 ? (
           <div className="card p-6 text-center text-sm text-gray-500">Tidak ada data yang bisa diakses.</div>
         ) : (
           <>

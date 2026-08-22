@@ -39,6 +39,7 @@ interface SidebarProps {
     purchasing: boolean;
     sales_order: boolean;
     delivery_order: boolean;
+    report_builder: boolean;
   };
 }
 
@@ -156,7 +157,7 @@ function SidebarInner({ permissions, animateIn }: SidebarProps) {
       name: 'Report Builder',
       icon: BarChart3,
       href: '/dashboard/reports',
-      enabled: permissions.inventory || permissions.purchasing || permissions.sales_order || permissions.staff || permissions.leave,
+      enabled: permissions.report_builder,
     },
     {
       name: 'Settings',

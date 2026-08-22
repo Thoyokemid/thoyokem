@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { UserPlus, X } from 'lucide-react';
+import { UserPlus, X, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Assignment {
@@ -12,6 +12,7 @@ interface Assignment {
   assigned_by: string;
   note: string;
   timestamp: string;
+  grants_access?: boolean;
 }
 
 interface MentionableUser {
@@ -35,6 +36,7 @@ export default function AssignedToSection({ doctype, documentId }: { doctype: st
   const [users, setUsers] = useState<MentionableUser[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [grantAccessOnAssign, setGrantAccessOnAssign] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const fetchAssignments = () => {
@@ -71,9 +73,10 @@ export default function AssignedToSection({ doctype, documentId }: { doctype: st
       const res = await fetch('/api/assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doctype, document_id: documentId, assigned_to: userId }),
+        body: JSON.stringify({ doctype, document_id: documentId, assigned_to: userId, grants_access: grantAccessOnAssign }),
       });
       if (res.ok) {
+        setGrantAccessOnAssign(false);
         fetchAssignments();
       } else {
         const err = await res.json();
@@ -121,21 +124,32 @@ export default function AssignedToSection({ doctype, documentId }: { doctype: st
             + Assign
           </button>
           {isPickerOpen && (
-            <div className="absolute right-0 z-10 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-              {assignableUsers.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-gray-400 text-center">Semua user sudah di-assign</p>
-              ) : (
-                assignableUsers.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => assign(u.id)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    {u.name}
-                  </button>
-                ))
-              )}
+            <div className="absolute right-0 z-10 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
+              <label className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={grantAccessOnAssign}
+                  onChange={(e) => setGrantAccessOnAssign(e.target.checked)}
+                  className="w-3 h-3 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                Beri akses lihat dokumen ini juga
+              </label>
+              <div className="max-h-56 overflow-y-auto">
+                {assignableUsers.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-400 text-center">Semua user sudah di-assign</p>
+                ) : (
+                  assignableUsers.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => assign(u.id)}
+                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      {u.name}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -157,6 +171,11 @@ export default function AssignedToSection({ doctype, documentId }: { doctype: st
                 </span>
               )}
               <span className="flex-1 min-w-0 text-xs text-gray-700 dark:text-gray-300 truncate">{a.assigned_to_name}</span>
+              {a.grants_access && (
+                <span title="Punya akses lihat dokumen ini walau di luar izin role" className="flex-shrink-0">
+                  <Eye size={11} className="text-blue-500" strokeWidth={2.5} />
+                </span>
+              )}
               <button
                 onClick={() => unassign(a.assignment_id)}
                 disabled={busyId === a.assignment_id}

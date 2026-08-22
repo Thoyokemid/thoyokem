@@ -67,6 +67,7 @@ export default function DeliveryHistoryTab() {
           visibleColumns={visibleCols}
           onVisibleColumnsChange={setVisibleCols}
           onExport={() => exportToExcel(deliveries, HISTORY_COLUMNS, 'delivery_history', 'Delivery History')}
+          doctype="Delivery Note"
         />
       }
     >

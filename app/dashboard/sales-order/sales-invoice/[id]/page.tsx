@@ -14,8 +14,10 @@ import ActivityLogView from '@/components/ui/ActivityLogView';
 import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { SalesInvoice } from '@/types';
-import { AlertCircle, Wallet, Printer } from 'lucide-react';
+import { AlertCircle, Wallet, Printer, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/date';
+import { useDoctypePermission } from '@/lib/useDoctypePermission';
+import toast from 'react-hot-toast';
 
 interface PaymentEntry {
   payment_id: string;
@@ -25,14 +27,16 @@ interface PaymentEntry {
   status: string;
 }
 
-const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange'> = {
+const STATUS_TONE: Record<string, 'gray' | 'blue' | 'green' | 'orange' | 'red'> = {
   Submitted: 'blue',
   'Partially Paid': 'orange',
   Paid: 'green',
+  Cancelled: 'red',
 };
 
 export default function SalesInvoiceDetailPage() {
   const { data: session, status } = useSession();
+  const perms = useDoctypePermission('Sales Invoice');
   const router = useRouter();
   const params = useParams();
   const id = decodeURIComponent(String(params.id));
@@ -65,6 +69,27 @@ export default function SalesInvoiceDetailPage() {
       console.error('Error fetching sales invoice:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const runCancel = async () => {
+    if (!confirm('Batalkan Sales Invoice ini?')) return;
+    try {
+      const res = await fetch('/api/sales-invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ si_id: id, action: 'cancel' }),
+      });
+      if (res.ok) {
+        fetchData();
+        toast.success('Sales invoice dibatalkan');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Gagal membatalkan');
+      }
+    } catch (error) {
+      console.error('Error cancelling sales invoice:', error);
+      toast.error('Gagal membatalkan');
     }
   };
 
@@ -148,11 +173,14 @@ export default function SalesInvoiceDetailPage() {
         actions={
           invoice && (
             <>
-              <Button variant="secondary" onClick={() => router.push(`/dashboard/sales-order/sales-invoice/${encodeURIComponent(id)}/print?size=a4`)}>
+              <Button variant="secondary" disabled={!perms.print} title={perms.print ? undefined : "Anda tidak punya izin Print"} onClick={() => router.push(`/dashboard/sales-order/sales-invoice/${encodeURIComponent(id)}/print?size=a4`)}>
                 <Printer size={14} className="mr-1.5" />Print
               </Button>
-              {invoice.outstanding_amount > 0 && (
+              {invoice.outstanding_amount > 0 && invoice.status !== 'Cancelled' && (
                 <Button variant="secondary" onClick={openPay}><Wallet size={14} className="mr-1.5" />Receive Payment</Button>
+              )}
+              {invoice.status !== 'Cancelled' && invoice.outstanding_amount === invoice.grand_total && (
+                <Button variant="danger" onClick={runCancel}><XCircle size={14} className="mr-1.5" />Cancel</Button>
               )}
             </>
           )

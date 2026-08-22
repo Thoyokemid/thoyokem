@@ -5,18 +5,19 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Supplier } from '@/types';
 import { validate, supplierCreateSchema, supplierUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.purchasing) {
-    return { error: NextResponse.json({ error: 'Forbidden: no purchasing access' }, { status: 403 }) };
+  if (!(await hasDoctypePermission(session, 'Supplier', action))) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireAccess();
+  const guard = await requireAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -39,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('write');
   if (guard.error) return guard.error;
 
   try {
@@ -111,7 +112,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('delete');
   if (guard.error) return guard.error;
 
   try {

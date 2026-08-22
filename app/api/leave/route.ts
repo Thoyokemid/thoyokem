@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { LeaveAttendance } from '@/types';
 import { validate, leaveCreateSchema, leaveUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 
 export async function GET() {
   try {
@@ -15,7 +16,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.permissions.leave) {
+    if (!(await hasDoctypePermission(session, 'Leave', 'read'))) {
       return NextResponse.json({ error: 'Forbidden: no leave access' }, { status: 403 });
     }
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.permissions.leave) {
+    if (!(await hasDoctypePermission(session, 'Leave', 'create'))) {
       return NextResponse.json({ error: 'Forbidden: no leave access' }, { status: 403 });
     }
 
@@ -95,7 +96,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.permissions.leave) {
+    if (!(await hasDoctypePermission(session, 'Leave', 'write'))) {
       return NextResponse.json({ error: 'Forbidden: no leave access' }, { status: 403 });
     }
 
@@ -140,7 +141,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.permissions.leave) {
+    if (!(await hasDoctypePermission(session, 'Leave', 'delete'))) {
       return NextResponse.json({ error: 'Forbidden: no leave access' }, { status: 403 });
     }
 

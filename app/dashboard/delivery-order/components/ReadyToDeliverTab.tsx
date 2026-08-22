@@ -83,6 +83,7 @@ export default function ReadyToDeliverTab() {
           visibleColumns={visibleCols}
           onVisibleColumnsChange={setVisibleCols}
           onExport={() => exportToExcel(readyOrders, READY_COLUMNS, 'ready_to_deliver', 'Ready to Deliver')}
+          doctype="Delivery Note"
         />
       }
     >

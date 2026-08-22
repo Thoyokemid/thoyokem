@@ -5,23 +5,31 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Item } from '@/types';
 import { validate, itemCreateSchema, itemUpdateSchema } from '@/lib/validation';
+import { hasDoctypePermission, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
 
-async function requireInventoryAccess() {
+async function requireInventoryAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.inventory) {
+  if (!(await hasDoctypePermission(session, 'Item', action))) {
     return { error: NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireInventoryAccess();
-  if (guard.error) return guard.error;
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // A role without Item Read can still see individually shared items
+  // (Assignment with "grants access" checked) — see lib/permissions.ts.
+  const scope = await resolveReadScope(session, 'Item');
+  if (scope === 'none') {
+    return NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 });
+  }
 
   try {
     const records = await prisma.item.findMany();
-    const items: Item[] = records.map((r) => ({
+    let items: Item[] = records.map((r) => ({
       item_code: r.itemCode,
       item_name: r.itemName,
       item_group: r.itemGroup,
@@ -36,6 +44,12 @@ export async function GET() {
       currency: r.currency as 'IDR' | 'USD',
       item_type: r.itemType as 'Trading' | 'Regular',
     }));
+
+    if (scope === 'shared') {
+      const sharedIds = await getSharedDocumentIds(session, 'Item');
+      items = items.filter((i) => sharedIds.has(i.item_code));
+    }
+
     return NextResponse.json(items);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -44,7 +58,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -85,7 +99,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('write');
   if (guard.error) return guard.error;
 
   try {
@@ -124,7 +138,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const guard = await requireInventoryAccess();
+  const guard = await requireInventoryAccess('delete');
   if (guard.error) return guard.error;
 
   try {

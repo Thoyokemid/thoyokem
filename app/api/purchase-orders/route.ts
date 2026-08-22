@@ -7,18 +7,19 @@ import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { validate, purchaseOrderCreateSchema, purchaseOrderActionSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
 
-async function requireAccess() {
+async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.purchasing) {
-    return { error: NextResponse.json({ error: 'Forbidden: no purchasing access' }, { status: 403 }) };
+  if (!(await hasDoctypePermission(session, 'Purchase Order', action))) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { session };
 }
 
 export async function GET() {
-  const guard = await requireAccess();
+  const guard = await requireAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -63,7 +64,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAccess();
+  const guard = await requireAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -121,18 +122,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
+const PO_ACTION_PERMISSION: Record<string, PermissionAction> = {
+  submit: 'submit', cancel: 'cancel', amend: 'amend', approve: 'approve', reject: 'approve', receive: 'write',
+};
+
 // PATCH performs a status-transition action: submit | receive | cancel | amend | approve | reject
 export async function PATCH(request: NextRequest) {
-  const guard = await requireAccess();
-  if (guard.error) return guard.error;
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const parsed = validate(purchaseOrderActionSchema, await request.json());
     if (!parsed.success) return parsed.response;
     const { po_id, action } = parsed.data;
 
+    if (!(await hasDoctypePermission(session, 'Purchase Order', PO_ACTION_PERMISSION[action] || 'write'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const guard = { session };
+
     const current = await prisma.purchaseOrder.findUnique({ where: { poId: po_id } });
     if (!current) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(guard.session!, 'Purchase Order') && current.owner !== guard.session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa mengubah Purchase Order yang Anda buat sendiri' }, { status: 403 });
+    }
+
     const original = { ...current };
 
     const now = new Date().toISOString();
@@ -151,9 +166,9 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (current.status === 'Received') {
-        const invoiceCount = await prisma.purchaseInvoice.count({ where: { poId: po_id } });
+        const invoiceCount = await prisma.purchaseInvoice.count({ where: { poId: po_id, status: { not: 'Cancelled' } } });
         if (invoiceCount > 0) {
-          return NextResponse.json({ error: 'Batalkan/hapus Purchase Invoice yang terkait PO ini dulu sebelum membatalkan PO' }, { status: 400 });
+          return NextResponse.json({ error: 'Batalkan Purchase Invoice yang terkait PO ini dulu sebelum membatalkan PO' }, { status: 400 });
         }
 
         // Reverse the stock impact of the receipt.
@@ -228,9 +243,7 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({ success: true, po_id: newPoId });
     } else if (action === 'approve' || action === 'reject') {
-      if (!guard.session?.user.permissions.can_approve) {
-        return NextResponse.json({ error: 'Kamu tidak punya izin approve' }, { status: 403 });
-      }
+      // Permission already checked above via hasDoctypePermission(..., 'approve').
       if (current.status !== 'Submitted') {
         return NextResponse.json({ error: 'PO harus berstatus Submitted sebelum di-approve/reject' }, { status: 400 });
       }

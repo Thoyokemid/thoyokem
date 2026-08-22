@@ -1,0 +1,1 @@
+ALTER TABLE "roles" ADD COLUMN IF NOT EXISTS "report_builder" BOOLEAN NOT NULL DEFAULT false;

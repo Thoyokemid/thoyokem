@@ -190,6 +190,7 @@ export default function StockEntriesTab() {
             visibleColumns={visibleCols}
             onVisibleColumnsChange={setVisibleCols}
             onExport={() => exportToExcel(entries, REPORT_COLUMNS, 'stock_entries', 'Stock Entries')}
+            doctype="Stock Entry"
           />
           <Button onClick={openNew}>
             <Plus size={14} className="mr-1.5" />

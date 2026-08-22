@@ -12,6 +12,7 @@ export interface Role {
   purchasing: boolean;
   sales_order: boolean;
   delivery_order: boolean;
+  report_builder: boolean;
   can_approve: boolean;
   is_super_admin: boolean;
 }
@@ -143,6 +144,7 @@ export interface SessionUser {
     purchasing: boolean;
     sales_order: boolean;
     delivery_order: boolean;
+    report_builder: boolean;
     can_approve: boolean;
   };
   isSuperAdmin?: boolean;

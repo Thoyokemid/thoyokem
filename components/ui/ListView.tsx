@@ -328,15 +328,21 @@ export function OverflowMenuItem({
   onClick,
   icon: Icon,
   children,
+  disabled,
+  title,
 }: {
   onClick: () => void;
   icon?: React.ElementType;
   children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      disabled={disabled}
+      title={title}
+      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
     >
       {Icon && <Icon size={13} />}
       {children}

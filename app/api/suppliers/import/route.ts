@@ -4,12 +4,13 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { validate, bulkRowsSchema } from '@/lib/validation';
+import { hasDoctypePermission } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!session.user.isSuperAdmin) {
-    return NextResponse.json({ error: 'Forbidden: super admin only' }, { status: 403 });
+  if (!(await hasDoctypePermission(session, 'Supplier', 'import'))) {
+    return NextResponse.json({ error: 'Forbidden: no import access' }, { status: 403 });
   }
 
   try {

@@ -7,11 +7,12 @@ import { appendStockLedgerEntry, getCurrentStockQty } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { validate, salesOrderCreateSchema, salesOrderActionSchema } from '@/lib/validation';
+import { hasDoctypePermission, requiresOwnerMatch, requiresAssignedOnly, filterToAssignedOnly, PermissionAction } from '@/lib/permissions';
 
-async function requireSalesAccess() {
+async function requireSalesAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!session.user.permissions.sales_order) {
+  if (!(await hasDoctypePermission(session, 'Sales Order', action))) {
     return { error: NextResponse.json({ error: 'Forbidden: no sales access' }, { status: 403 }) };
   }
   return { session };
@@ -27,7 +28,7 @@ async function requireDeliveryAccess() {
 }
 
 export async function GET() {
-  const guard = await requireSalesAccess();
+  const guard = await requireSalesAccess('read');
   if (guard.error) return guard.error;
 
   try {
@@ -38,7 +39,7 @@ export async function GET() {
     const customers = await prisma.customer.findMany({ select: { customerId: true, customerName: true } });
     const customerMap = new Map(customers.map((c) => [c.customerId, c.customerName]));
 
-    const result = orders.map((so) => ({
+    let result = orders.map((so) => ({
       so_id: so.soId,
       customer_id: so.customerId,
       customer_name: customerMap.get(so.customerId) || so.customerId,
@@ -64,6 +65,10 @@ export async function GET() {
       })),
     }));
 
+    if (await requiresAssignedOnly(guard.session!, 'Sales Order')) {
+      result = await filterToAssignedOnly(guard.session!, 'Sales Order', result, (so) => so.so_id);
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching sales orders:', error);
@@ -72,7 +77,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireSalesAccess();
+  const guard = await requireSalesAccess('create');
   if (guard.error) return guard.error;
 
   try {
@@ -131,6 +136,10 @@ export async function POST(request: NextRequest) {
 }
 
 // PATCH performs a status-transition action: submit | deliver | cancel | amend | approve | reject
+const SO_ACTION_PERMISSION: Record<string, PermissionAction> = {
+  submit: 'submit', cancel: 'cancel', amend: 'amend', approve: 'approve', reject: 'approve',
+};
+
 export async function PATCH(request: NextRequest) {
   try {
     const parsed = validate(salesOrderActionSchema, await request.json());
@@ -138,12 +147,17 @@ export async function PATCH(request: NextRequest) {
     const { so_id, action } = parsed.data;
 
     // Permission depends on the action: delivering needs delivery_order access,
-    // everything else needs sales_order access.
-    const guard = action === 'deliver' ? await requireDeliveryAccess() : await requireSalesAccess();
+    // everything else uses its own granular Sales Order permission.
+    const guard = action === 'deliver' ? await requireDeliveryAccess() : await requireSalesAccess(SO_ACTION_PERMISSION[action] || 'write');
     if (guard.error) return guard.error;
 
     const current = await prisma.salesOrder.findUnique({ where: { soId: so_id } });
     if (!current) return NextResponse.json({ error: 'Sales order not found' }, { status: 404 });
+
+    if (await requiresOwnerMatch(guard.session!, 'Sales Order') && current.owner !== guard.session!.user.name) {
+      return NextResponse.json({ error: 'Anda hanya bisa mengubah Sales Order yang Anda buat sendiri' }, { status: 403 });
+    }
+
     const original = { ...current };
 
     const now = new Date().toISOString();
@@ -163,9 +177,9 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (current.status === 'Delivered') {
-        const invoiceCount = await prisma.salesInvoice.count({ where: { soId: so_id } });
+        const invoiceCount = await prisma.salesInvoice.count({ where: { soId: so_id, status: { not: 'Cancelled' } } });
         if (invoiceCount > 0) {
-          return NextResponse.json({ error: 'Batalkan/hapus Sales Invoice yang terkait SO ini dulu sebelum membatalkan SO' }, { status: 400 });
+          return NextResponse.json({ error: 'Batalkan Sales Invoice yang terkait SO ini dulu sebelum membatalkan SO' }, { status: 400 });
         }
 
         // Reverse the stock impact of the delivery.
@@ -249,9 +263,7 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({ success: true, so_id: newSoId });
     } else if (action === 'approve' || action === 'reject') {
-      if (!session?.user.permissions.can_approve) {
-        return NextResponse.json({ error: 'Kamu tidak punya izin approve' }, { status: 403 });
-      }
+      // Permission already checked above via hasDoctypePermission(..., 'approve').
       if (current.status !== 'Confirmed') {
         return NextResponse.json({ error: 'SO harus berstatus Confirmed sebelum di-approve/reject' }, { status: 400 });
       }
