@@ -45,3 +45,6 @@ ERPNext_Database_Schema.xlsx
 ERP_Schema_Import.xlsx
 
 /lib/generated/prisma
+
+# Claude Code local session/config data, not part of the app source
+.claude/
