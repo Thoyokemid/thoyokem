@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
@@ -99,6 +100,17 @@ export default function StaffDetailPage() {
         subtitle={staff?.user_id}
         isLoading={isLoading}
         notFound={!isLoading && !staff}
+        sidebar={
+          staff && (
+            <>
+              <AssignedToSection doctype="Staff" documentId={staff.employee_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Staff" documentId={staff.employee_id} />
+                <AttachmentSection doctype="Staff" documentId={staff.employee_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {staff && (
           <div className="space-y-4">
@@ -132,10 +144,6 @@ export default function StaffDetailPage() {
                   description: l.description || '-',
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Staff" documentId={staff.employee_id} />
-              <AttachmentSection doctype="Staff" documentId={staff.employee_id} />
             </DetailSection>
           </div>
         )}

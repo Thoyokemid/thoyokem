@@ -3,15 +3,27 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
-import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { ListViewLayout, ListRow, StatusBadge, ListSelectionBar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Customer } from '@/types';
-import { customerImportRowSchema } from '@/lib/validation';
-import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
+import { customerImportRowSchema, customerCreateSchema } from '@/lib/validation';
+import { Plus, Edit, Trash2, User, Upload, Ban, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+// Same shape the API validates against (lib/validation.ts), just with customer_name
+// tightened to required for immediate client-side feedback instead of only on submit.
+const customerFormSchema = customerCreateSchema.extend({
+  customer_name: z.string().min(1, 'Nama customer wajib diisi'),
+});
+type CustomerFormInput = z.input<typeof customerFormSchema>;
+type CustomerFormValues = z.output<typeof customerFormSchema>;
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'customer_id', label: 'Customer ID (kosongkan untuk auto)', example: '' },
@@ -62,8 +74,18 @@ export default function CustomersTab() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({ customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: '' });
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    formState: { errors: formErrors },
+  } = useForm<CustomerFormInput, any, CustomerFormValues>({
+    resolver: zodResolver(customerFormSchema),
+    defaultValues: { customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: 0 },
+  });
 
   useEffect(() => {
     fetchCustomers();
@@ -82,24 +104,23 @@ export default function CustomersTab() {
 
   const openNew = () => {
     setEditing(null);
-    setFormData({ customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: '' });
+    resetForm({ customer_id: '', customer_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '', credit_limit: 0 });
     setError('');
     setIsModalOpen(true);
   };
 
   const openEdit = (c: Customer) => {
     setEditing(c);
-    setFormData({ customer_id: c.customer_id, customer_name: c.customer_name, contact: c.contact, phone: c.phone, email: c.email, address: c.address, payment_terms: c.payment_terms, credit_limit: String(c.credit_limit) });
+    resetForm({ customer_id: c.customer_id, customer_name: c.customer_name, contact: c.contact, phone: c.phone, email: c.email, address: c.address, payment_terms: c.payment_terms, credit_limit: c.credit_limit });
     setError('');
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: CustomerFormValues) => {
     setIsSaving(true);
     setError('');
     try {
-      const payload = { ...formData, credit_limit: parseFloat(formData.credit_limit) || 0 };
+      const payload = editing ? { ...data, customer_id: editing.customer_id } : data;
       const res = editing
         ? await fetch('/api/customers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         : await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -121,12 +142,67 @@ export default function CustomersTab() {
 
   const handleDelete = async (customerId: string) => {
     if (!confirm('Hapus customer ini?')) return;
+    // Optimistic: remove immediately, re-insert just this row on failure. Using a functional
+    // update (not a captured full-array snapshot) so a concurrent delete of another row that
+    // already succeeded isn't clobbered back in by this rollback.
+    const removed = customers.find((c) => c.customer_id === customerId);
+    setCustomers((prev) => prev.filter((c) => c.customer_id !== customerId));
+    const restore = () => {
+      if (!removed) return;
+      setCustomers((prev) => (prev.some((c) => c.customer_id === customerId) ? prev : [...prev, removed]));
+    };
     try {
       const res = await fetch(`/api/customers?customer_id=${customerId}`, { method: 'DELETE' });
-      if (res.ok) fetchCustomers();
+      if (!res.ok) {
+        restore();
+        toast.error('Gagal menghapus customer');
+      }
     } catch (error) {
       console.error('Error deleting customer:', error);
+      restore();
+      toast.error('Gagal menghapus customer');
     }
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!confirm(`Nonaktifkan ${selectedIds.size} customer terpilih?`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch('/api/customers', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_id: id, is_active: false }),
+          })
+        )
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${selectedIds.size} gagal dinonaktifkan` : `${selectedIds.size} customer dinonaktifkan`
+      );
+      setSelectedIds(new Set());
+      fetchCustomers();
+    } catch (error) {
+      console.error('Error bulk-deactivating customers:', error);
+      toast.error('Gagal menonaktifkan customer terpilih');
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = customers.filter((c) => selectedIds.has(c.customer_id));
+    exportToExcel(rows, REPORT_COLUMNS, 'customers_selected', 'Customers');
   };
 
   return (
@@ -148,8 +224,18 @@ export default function CustomersTab() {
         </div>
       }
     >
+      {viewMode === 'list' && (
+        <ListSelectionBar
+          count={selectedIds.size}
+          onClear={() => setSelectedIds(new Set())}
+          actions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Nonaktifkan', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDeactivate },
+          ]}
+        />
+      )}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={customers} keyField={(r) => r.customer_id} />
       ) : customers.length === 0 ? (
@@ -161,9 +247,12 @@ export default function CustomersTab() {
             onClick={() => router.push(`/dashboard/sales-order/customer/${encodeURIComponent(c.customer_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><User size={14} /></span>}
             title={c.customer_name}
+            statusTone={c.is_active ? 'green' : 'red'}
             subtitle={`${c.customer_id} · ${c.phone || c.contact || '-'}`}
             meta={c.payment_terms}
             badges={!c.is_active ? <StatusBadge label="Inactive" tone="red" /> : undefined}
+            selected={selectedIds.has(c.customer_id)}
+            onSelectChange={(checked) => toggleSelect(c.customer_id, checked)}
             actions={
               <>
                 <button onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400"><Edit size={14} /></button>
@@ -175,41 +264,43 @@ export default function CustomersTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editing ? 'Edit Customer' : 'Add Customer'} size="sm">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="label-field">Customer ID</label>
-            <input type="text" value={formData.customer_id} onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })} className="input-field" placeholder="Kosongkan untuk auto-generate" disabled={!!editing} />
+            <input type="text" {...register('customer_id')} className="input-field" placeholder="Kosongkan untuk auto-generate" disabled={!!editing} />
           </div>
           <div>
             <label className="label-field">Customer Name</label>
-            <input type="text" value={formData.customer_name} onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })} className="input-field" required />
+            <input type="text" {...register('customer_name')} className="input-field" />
+            {formErrors.customer_name && <p className="text-xs text-red-600 mt-1">{formErrors.customer_name.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Contact Person</label>
-              <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} className="input-field" />
+              <input type="text" {...register('contact')} className="input-field" />
             </div>
             <div>
               <label className="label-field">Phone</label>
-              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input-field" />
+              <input type="text" {...register('phone')} className="input-field" />
             </div>
           </div>
           <div>
             <label className="label-field">Email</label>
-            <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="input-field" />
+            <input type="email" {...register('email')} className="input-field" />
+            {formErrors.email && <p className="text-xs text-red-600 mt-1">{formErrors.email.message}</p>}
           </div>
           <div>
             <label className="label-field">Address</label>
-            <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="input-field" />
+            <input type="text" {...register('address')} className="input-field" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Payment Terms</label>
-              <input type="text" value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} className="input-field" placeholder="cth. Net 30" />
+              <input type="text" {...register('payment_terms')} className="input-field" placeholder="cth. Net 30" />
             </div>
             <div>
               <label className="label-field">Credit Limit</label>
-              <input type="number" min={0} value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })} className="input-field" />
+              <input type="number" min={0} {...register('credit_limit')} className="input-field" />
             </div>
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}

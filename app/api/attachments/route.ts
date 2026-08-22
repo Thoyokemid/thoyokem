@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { requiredDoctypePerms } from '@/lib/activityLog';
+import { requiredDoctypePerms, logActivity } from '@/lib/activityLog';
 import { generateId } from '@/lib/id';
 import { uploadToSupabaseStorage, deleteFromSupabaseStorage } from '@/lib/supabase';
 import { validate, attachmentUploadSchema } from '@/lib/validation';
@@ -71,7 +71,13 @@ export async function POST(request: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const fileUrl = await uploadToSupabaseStorage(buffer, file.name, file.type);
+    let fileUrl: string;
+    try {
+      fileUrl = await uploadToSupabaseStorage(buffer, file.name, file.type);
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : 'Upload gagal';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
 
     const newId = generateId();
     await prisma.attachment.create({
@@ -84,6 +90,15 @@ export async function POST(request: NextRequest) {
         uploadedBy: session.user.name || '',
         timestamp: new Date().toISOString(),
       },
+    });
+
+    await logActivity({
+      doctype,
+      documentId,
+      action: 'Attached',
+      changedBy: session.user.name || '',
+      before: null,
+      after: { file_name: file.name },
     });
 
     return NextResponse.json({ success: true, attachment_id: newId, file_url: fileUrl });
@@ -114,6 +129,16 @@ export async function DELETE(request: NextRequest) {
 
     await prisma.attachment.delete({ where: { attachmentId } });
     await deleteFromSupabaseStorage(record.fileUrl);
+
+    await logActivity({
+      doctype: record.doctype,
+      documentId: record.documentId,
+      action: 'Detached',
+      changedBy: session.user.name || '',
+      before: null,
+      after: { file_name: record.fileName },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting attachment:', error);

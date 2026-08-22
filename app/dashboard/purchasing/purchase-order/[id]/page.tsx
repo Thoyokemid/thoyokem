@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, PackageCheck, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
 import { formatDate } from '@/lib/date';
@@ -217,6 +218,17 @@ export default function PurchaseOrderDetailPage() {
             </>
           )
         }
+        sidebar={
+          po && (
+            <>
+              <AssignedToSection doctype="Purchase Order" documentId={po.po_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Purchase Order" documentId={po.po_id} />
+                <AttachmentSection doctype="Purchase Order" documentId={po.po_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {po && (
           <div className="space-y-4">
@@ -276,10 +288,6 @@ export default function PurchaseOrderDetailPage() {
                   amount: `Rp${i.amount.toLocaleString('id-ID')}`,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Purchase Order" documentId={po.po_id} />
-              <AttachmentSection doctype="Purchase Order" documentId={po.po_id} />
             </DetailSection>
           </div>
         )}

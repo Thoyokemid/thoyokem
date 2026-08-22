@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle } from 'lucide-react';
 import { formatDateTime } from '@/lib/date';
@@ -87,6 +88,17 @@ export default function UserDetailPage() {
         subtitle={user ? `@${user.username}` : undefined}
         isLoading={isLoading}
         notFound={!isLoading && !user}
+        sidebar={
+          user && (
+            <>
+              <AssignedToSection doctype="User" documentId={user.id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="User" documentId={user.id} />
+                <AttachmentSection doctype="User" documentId={user.id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {user && (
           <div className="space-y-4">
@@ -99,10 +111,6 @@ export default function UserDetailPage() {
                   { label: 'Last Active', value: formatLastActive(user.last_active) },
                 ]}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="User" documentId={user.id} />
-              <AttachmentSection doctype="User" documentId={user.id} />
             </DetailSection>
           </div>
         )}

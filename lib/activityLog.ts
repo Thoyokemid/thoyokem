@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { generateId } from '@/lib/id';
 
-export type LogAction = 'Created' | 'Updated' | 'Deleted' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled' | 'Amended' | 'Received' | 'Delivered' | 'Paid' | 'Imported' | 'Exported';
+export type LogAction = 'Created' | 'Updated' | 'Deleted' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled' | 'Amended' | 'Received' | 'Delivered' | 'Paid' | 'Imported' | 'Exported' | 'Assigned' | 'Unassigned' | 'Commented' | 'Attached' | 'Detached';
 
 export interface FieldChange {
   field: string;

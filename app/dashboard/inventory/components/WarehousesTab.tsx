@@ -4,15 +4,24 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
-import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { ListViewLayout, ListRow, StatusBadge, ListSelectionBar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Warehouse } from '@/types';
-import { warehouseImportRowSchema } from '@/lib/validation';
-import { Plus, Edit, Trash2, Warehouse as WarehouseIcon, Search, Upload } from 'lucide-react';
+import { warehouseImportRowSchema, warehouseCreateSchema } from '@/lib/validation';
+import { Plus, Edit, Trash2, Warehouse as WarehouseIcon, Search, Upload, Ban, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const warehouseFormSchema = warehouseCreateSchema.extend({
+  warehouse_name: z.string().min(1, 'Nama warehouse wajib diisi'),
+});
+type WarehouseFormValues = z.infer<typeof warehouseFormSchema>;
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'warehouse_id', label: 'Warehouse ID (kosongkan untuk auto)', example: '' },
@@ -168,19 +177,30 @@ export default function WarehousesTab() {
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({ warehouse_name: '', location: '', pic: '', phone: '', address: '', postal_code: '' });
+  const {
+    register,
+    control,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    formState: { errors: formErrors },
+  } = useForm<WarehouseFormValues>({
+    resolver: zodResolver(warehouseFormSchema),
+    defaultValues: { warehouse_name: '', location: '', pic: '', phone: '', address: '', postal_code: '' },
+  });
 
   const openNew = () => {
     setEditingWarehouse(null);
-    setFormData({ warehouse_name: '', location: '', pic: '', phone: '', address: '', postal_code: '' });
+    resetForm({ warehouse_name: '', location: '', pic: '', phone: '', address: '', postal_code: '' });
     setError('');
     setIsModalOpen(true);
   };
 
   const openEdit = (w: Warehouse) => {
     setEditingWarehouse(w);
-    setFormData({
+    resetForm({
       warehouse_name: w.warehouse_name,
       location: w.location,
       pic: w.pic || '',
@@ -192,14 +212,13 @@ export default function WarehousesTab() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: WarehouseFormValues) => {
     setIsSaving(true);
     setError('');
     try {
       const payload = editingWarehouse
-        ? { warehouse_id: editingWarehouse.warehouse_id, ...formData }
-        : { ...formData };
+        ? { warehouse_id: editingWarehouse.warehouse_id, ...data }
+        : { ...data };
 
       const res = editingWarehouse
         ? await fetch('/api/warehouses', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -222,12 +241,66 @@ export default function WarehousesTab() {
 
   const handleDelete = async (warehouseId: string) => {
     if (!confirm('Hapus warehouse ini?')) return;
+    const removed = queryClient.getQueryData<Warehouse[]>(['warehouses'])?.find((w) => w.warehouse_id === warehouseId);
+    queryClient.setQueryData<Warehouse[]>(['warehouses'], (old) => (old ?? []).filter((w) => w.warehouse_id !== warehouseId));
+    const restore = () => {
+      if (!removed) return;
+      queryClient.setQueryData<Warehouse[]>(['warehouses'], (old) =>
+        (old ?? []).some((w) => w.warehouse_id === warehouseId) ? old! : [...(old ?? []), removed]
+      );
+    };
     try {
       const res = await fetch(`/api/warehouses?warehouse_id=${warehouseId}`, { method: 'DELETE' });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      if (!res.ok) {
+        restore();
+        toast.error('Gagal menghapus warehouse');
+      }
     } catch (error) {
       console.error('Error deleting warehouse:', error);
+      restore();
+      toast.error('Gagal menghapus warehouse');
     }
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!confirm(`Nonaktifkan ${selectedIds.size} warehouse terpilih?`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch('/api/warehouses', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ warehouse_id: id, is_active: false }),
+          })
+        )
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${selectedIds.size} gagal dinonaktifkan` : `${selectedIds.size} warehouse dinonaktifkan`
+      );
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+    } catch (error) {
+      console.error('Error bulk-deactivating warehouses:', error);
+      toast.error('Gagal menonaktifkan warehouse terpilih');
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = warehouses.filter((w) => selectedIds.has(w.warehouse_id));
+    exportToExcel(rows, REPORT_COLUMNS, 'warehouses_selected', 'Warehouses');
   };
 
   return (
@@ -255,10 +328,18 @@ export default function WarehousesTab() {
         </div>
       }
     >
+      {viewMode === 'list' && (
+        <ListSelectionBar
+          count={selectedIds.size}
+          onClear={() => setSelectedIds(new Set())}
+          actions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Nonaktifkan', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDeactivate },
+          ]}
+        />
+      )}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loading size="lg" />
-        </div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={warehouses} keyField={(r) => r.warehouse_id} />
       ) : warehouses.length === 0 ? (
@@ -274,8 +355,11 @@ export default function WarehousesTab() {
               </span>
             }
             title={w.warehouse_name}
+            statusTone={w.is_active ? 'green' : 'red'}
             subtitle={`${w.warehouse_id} · ${w.location || '-'}`}
             badges={!w.is_active ? <StatusBadge label="Inactive" tone="red" /> : undefined}
+            selected={selectedIds.has(w.warehouse_id)}
+            onSelectChange={(checked) => toggleSelect(w.warehouse_id, checked)}
             actions={
               <>
                 <button onClick={() => openEdit(w)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
@@ -291,7 +375,7 @@ export default function WarehousesTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingWarehouse ? 'Edit Warehouse' : 'Add Warehouse'} size="sm">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           {editingWarehouse && (
             <div>
               <label className="label-field">Warehouse ID</label>
@@ -300,35 +384,34 @@ export default function WarehousesTab() {
           )}
           <div>
             <label className="label-field">Warehouse Name</label>
-            <input
-              type="text"
-              value={formData.warehouse_name}
-              onChange={(e) => setFormData({ ...formData, warehouse_name: e.target.value })}
-              className="input-field"
-              required
-            />
+            <input type="text" {...register('warehouse_name')} className="input-field" />
+            {formErrors.warehouse_name && <p className="text-xs text-red-600 mt-1">{formErrors.warehouse_name.message}</p>}
           </div>
           <div>
             <label className="label-field">City</label>
-            <CityPicker value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} />
+            <Controller
+              name="location"
+              control={control}
+              render={({ field }) => <CityPicker value={field.value || ''} onChange={field.onChange} />}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">PIC</label>
-              <input type="text" value={formData.pic} onChange={(e) => setFormData({ ...formData, pic: e.target.value })} className="input-field" />
+              <input type="text" {...register('pic')} className="input-field" />
             </div>
             <div>
               <label className="label-field">Phone Number</label>
-              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input-field" />
+              <input type="text" {...register('phone')} className="input-field" />
             </div>
           </div>
           <div>
             <label className="label-field">Address</label>
-            <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="input-field" />
+            <input type="text" {...register('address')} className="input-field" />
           </div>
           <div>
             <label className="label-field">Postal Code</label>
-            <input type="text" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} className="input-field" />
+            <input type="text" {...register('postal_code')} className="input-field" />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-2 justify-end pt-2">

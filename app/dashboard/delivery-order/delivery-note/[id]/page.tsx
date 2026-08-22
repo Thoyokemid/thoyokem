@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, XCircle, History, Printer, ChevronDown, ClipboardCheck, PackageCheck, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/date';
@@ -178,6 +179,17 @@ export default function DeliveryNoteDetailPage() {
             </>
           )
         }
+        sidebar={
+          dn && (
+            <>
+              <AssignedToSection doctype="Delivery Note" documentId={dn.dn_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Delivery Note" documentId={dn.dn_id} />
+                <AttachmentSection doctype="Delivery Note" documentId={dn.dn_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {dn && (
           <div className="space-y-4">
@@ -236,10 +248,6 @@ export default function DeliveryNoteDetailPage() {
                   uom: i.uom,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Delivery Note" documentId={dn.dn_id} />
-              <AttachmentSection doctype="Delivery Note" documentId={dn.dn_id} />
             </DetailSection>
           </div>
         )}

@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Registration } from '@/types';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
@@ -117,6 +118,17 @@ export default function RegistrationDetailPage() {
             </>
           )
         }
+        sidebar={
+          registration && (
+            <>
+              <AssignedToSection doctype="Registration" documentId={registration.id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Registration" documentId={registration.id} />
+                <AttachmentSection doctype="Registration" documentId={registration.id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {registration && (
           <div className="space-y-4">
@@ -129,10 +141,6 @@ export default function RegistrationDetailPage() {
                   { label: 'Last Updated', value: registration.update_at ? formatDateTime(registration.update_at) : '-' },
                 ]}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Registration" documentId={registration.id} />
-              <AttachmentSection doctype="Registration" documentId={registration.id} />
             </DetailSection>
           </div>
         )}

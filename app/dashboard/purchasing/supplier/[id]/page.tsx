@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Supplier } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -96,6 +97,17 @@ export default function SupplierDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !supplier}
         badges={supplier && <StatusBadge label={supplier.is_active ? 'Active' : 'Inactive'} tone={supplier.is_active ? 'green' : 'gray'} />}
+        sidebar={
+          supplier && (
+            <>
+              <AssignedToSection doctype="Supplier" documentId={supplier.supplier_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Supplier" documentId={supplier.supplier_id} />
+                <AttachmentSection doctype="Supplier" documentId={supplier.supplier_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {supplier && (
           <div className="space-y-4">
@@ -129,10 +141,6 @@ export default function SupplierDetailPage() {
                   total_amount: `Rp${o.total_amount.toLocaleString('id-ID')}`,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Supplier" documentId={supplier.supplier_id} />
-              <AttachmentSection doctype="Supplier" documentId={supplier.supplier_id} />
             </DetailSection>
           </div>
         )}

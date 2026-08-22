@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Warehouse, StockBalance } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -80,6 +81,17 @@ export default function WarehouseDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !warehouse}
         badges={warehouse && <StatusBadge label={warehouse.is_active ? 'Active' : 'Inactive'} tone={warehouse.is_active ? 'green' : 'gray'} />}
+        sidebar={
+          warehouse && (
+            <>
+              <AssignedToSection doctype="Warehouse" documentId={warehouse.warehouse_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Warehouse" documentId={warehouse.warehouse_id} />
+                <AttachmentSection doctype="Warehouse" documentId={warehouse.warehouse_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {warehouse && (
           <div className="space-y-4">
@@ -113,10 +125,6 @@ export default function WarehouseDetailPage() {
                   stock_value: `Rp${b.stock_value.toLocaleString('id-ID')}`,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Warehouse" documentId={warehouse.warehouse_id} />
-              <AttachmentSection doctype="Warehouse" documentId={warehouse.warehouse_id} />
             </DetailSection>
           </div>
         )}

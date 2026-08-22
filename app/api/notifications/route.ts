@@ -12,6 +12,26 @@ interface NotificationItem {
   action: string;
 }
 
+// Maps a doctype to its detail page — kept in sync with app/dashboard/audit-log/page.tsx's DOCTYPE_HREF.
+const DOCTYPE_HREF: Record<string, (id: string) => string> = {
+  'Purchase Order': (id) => `/dashboard/purchasing/purchase-order/${encodeURIComponent(id)}`,
+  'Purchase Invoice': (id) => `/dashboard/purchasing/purchase-invoice/${encodeURIComponent(id)}`,
+  Supplier: (id) => `/dashboard/purchasing/supplier/${encodeURIComponent(id)}`,
+  'Sales Order': (id) => `/dashboard/sales-order/sales-order/${encodeURIComponent(id)}`,
+  'Sales Invoice': (id) => `/dashboard/sales-order/sales-invoice/${encodeURIComponent(id)}`,
+  Customer: (id) => `/dashboard/sales-order/customer/${encodeURIComponent(id)}`,
+  'Delivery Note': (id) => `/dashboard/delivery-order/delivery-note/${encodeURIComponent(id)}`,
+  Item: (id) => `/dashboard/inventory/item/${encodeURIComponent(id)}`,
+  Warehouse: (id) => `/dashboard/inventory/warehouse/${encodeURIComponent(id)}`,
+  'Stock Entry': (id) => `/dashboard/inventory/stock-entry/${encodeURIComponent(id)}`,
+  BOM: (id) => `/dashboard/inventory/bom/${encodeURIComponent(id)}`,
+  Staff: (id) => `/dashboard/hr/staff/${encodeURIComponent(id)}`,
+  Leave: (id) => `/dashboard/hr/leave/${encodeURIComponent(id)}`,
+  Registration: (id) => `/dashboard/registration/${encodeURIComponent(id)}`,
+  Role: (id) => `/dashboard/settings/role/${encodeURIComponent(id)}`,
+  User: (id) => `/dashboard/settings/user/${encodeURIComponent(id)}`,
+};
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -94,6 +114,23 @@ export async function GET() {
         })
       );
     }
+
+    jobs.push(
+      prisma.assignment.findMany({ where: { assignedTo: session.user.id }, orderBy: { timestamp: 'desc' } }).then((records) => {
+        for (const a of records) {
+          const hrefFn = DOCTYPE_HREF[a.doctype];
+          if (!hrefFn) continue;
+          items.push({
+            doctype: a.doctype,
+            id: a.documentId,
+            label: a.documentId,
+            subtitle: `Di-assign oleh ${a.assignedBy}${a.note ? `: ${a.note}` : ''}`,
+            href: hrefFn(a.documentId),
+            action: 'Lihat',
+          });
+        }
+      })
+    );
 
     await Promise.all(jobs);
 

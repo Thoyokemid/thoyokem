@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { AlertCircle, Send, XCircle, FileText, Check, Ban, History, Printer, Copy } from 'lucide-react';
 import { formatDate } from '@/lib/date';
@@ -214,6 +215,17 @@ export default function SalesOrderDetailPage() {
             </>
           )
         }
+        sidebar={
+          so && (
+            <>
+              <AssignedToSection doctype="Sales Order" documentId={so.so_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Sales Order" documentId={so.so_id} />
+                <AttachmentSection doctype="Sales Order" documentId={so.so_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {so && (
           <div className="space-y-4">
@@ -273,10 +285,6 @@ export default function SalesOrderDetailPage() {
                   amount: `Rp${i.amount.toLocaleString('id-ID')}`,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Sales Order" documentId={so.so_id} />
-              <AttachmentSection doctype="Sales Order" documentId={so.so_id} />
             </DetailSection>
           </div>
         )}

@@ -3,15 +3,24 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
-import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { ListViewLayout, ListRow, StatusBadge, ListSelectionBar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Supplier } from '@/types';
-import { supplierImportRowSchema } from '@/lib/validation';
-import { Plus, Edit, Trash2, Truck, Upload } from 'lucide-react';
+import { supplierImportRowSchema, supplierCreateSchema } from '@/lib/validation';
+import { Plus, Edit, Trash2, Truck, Upload, Ban, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const supplierFormSchema = supplierCreateSchema.extend({
+  supplier_name: z.string().min(1, 'Nama supplier wajib diisi'),
+});
+type SupplierFormValues = z.infer<typeof supplierFormSchema>;
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'supplier_id', label: 'Supplier ID (kosongkan untuk auto)', example: '' },
@@ -60,8 +69,18 @@ export default function SuppliersTab() {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({ supplier_id: '', supplier_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '' });
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    formState: { errors: formErrors },
+  } = useForm<SupplierFormValues>({
+    resolver: zodResolver(supplierFormSchema),
+    defaultValues: { supplier_id: '', supplier_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '' },
+  });
 
   useEffect(() => {
     fetchSuppliers();
@@ -80,26 +99,26 @@ export default function SuppliersTab() {
 
   const openNew = () => {
     setEditing(null);
-    setFormData({ supplier_id: '', supplier_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '' });
+    resetForm({ supplier_id: '', supplier_name: '', contact: '', phone: '', email: '', address: '', payment_terms: '' });
     setError('');
     setIsModalOpen(true);
   };
 
   const openEdit = (s: Supplier) => {
     setEditing(s);
-    setFormData({ supplier_id: s.supplier_id, supplier_name: s.supplier_name, contact: s.contact, phone: s.phone, email: s.email, address: s.address, payment_terms: s.payment_terms });
+    resetForm({ supplier_id: s.supplier_id, supplier_name: s.supplier_name, contact: s.contact, phone: s.phone, email: s.email, address: s.address, payment_terms: s.payment_terms });
     setError('');
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: SupplierFormValues) => {
     setIsSaving(true);
     setError('');
     try {
+      const payload = editing ? { ...data, supplier_id: editing.supplier_id } : data;
       const res = editing
-        ? await fetch('/api/suppliers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) })
-        : await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+        ? await fetch('/api/suppliers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
       if (res.ok) {
         setIsModalOpen(false);
@@ -118,12 +137,64 @@ export default function SuppliersTab() {
 
   const handleDelete = async (supplierId: string) => {
     if (!confirm('Hapus supplier ini?')) return;
+    const removed = suppliers.find((s) => s.supplier_id === supplierId);
+    setSuppliers((prev) => prev.filter((s) => s.supplier_id !== supplierId));
+    const restore = () => {
+      if (!removed) return;
+      setSuppliers((prev) => (prev.some((s) => s.supplier_id === supplierId) ? prev : [...prev, removed]));
+    };
     try {
       const res = await fetch(`/api/suppliers?supplier_id=${supplierId}`, { method: 'DELETE' });
-      if (res.ok) fetchSuppliers();
+      if (!res.ok) {
+        restore();
+        toast.error('Gagal menghapus supplier');
+      }
     } catch (error) {
       console.error('Error deleting supplier:', error);
+      restore();
+      toast.error('Gagal menghapus supplier');
     }
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!confirm(`Nonaktifkan ${selectedIds.size} supplier terpilih?`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch('/api/suppliers', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ supplier_id: id, is_active: false }),
+          })
+        )
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${selectedIds.size} gagal dinonaktifkan` : `${selectedIds.size} supplier dinonaktifkan`
+      );
+      setSelectedIds(new Set());
+      fetchSuppliers();
+    } catch (error) {
+      console.error('Error bulk-deactivating suppliers:', error);
+      toast.error('Gagal menonaktifkan supplier terpilih');
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = suppliers.filter((s) => selectedIds.has(s.supplier_id));
+    exportToExcel(rows, REPORT_COLUMNS, 'suppliers_selected', 'Suppliers');
   };
 
   return (
@@ -145,8 +216,18 @@ export default function SuppliersTab() {
         </div>
       }
     >
+      {viewMode === 'list' && (
+        <ListSelectionBar
+          count={selectedIds.size}
+          onClear={() => setSelectedIds(new Set())}
+          actions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Nonaktifkan', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDeactivate },
+          ]}
+        />
+      )}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={suppliers} keyField={(r) => r.supplier_id} />
       ) : suppliers.length === 0 ? (
@@ -158,9 +239,12 @@ export default function SuppliersTab() {
             onClick={() => router.push(`/dashboard/purchasing/supplier/${encodeURIComponent(s.supplier_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><Truck size={14} /></span>}
             title={s.supplier_name}
+            statusTone={s.is_active ? 'green' : 'red'}
             subtitle={`${s.supplier_id} · ${s.phone || s.contact || '-'}`}
             meta={s.payment_terms}
             badges={!s.is_active ? <StatusBadge label="Inactive" tone="red" /> : undefined}
+            selected={selectedIds.has(s.supplier_id)}
+            onSelectChange={(checked) => toggleSelect(s.supplier_id, checked)}
             actions={
               <>
                 <button onClick={() => openEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400"><Edit size={14} /></button>
@@ -172,36 +256,37 @@ export default function SuppliersTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editing ? 'Edit Supplier' : 'Add Supplier'} size="sm">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="label-field">Supplier ID</label>
-            <input type="text" value={formData.supplier_id} onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })} className="input-field" placeholder="Kosongkan untuk auto-generate" disabled={!!editing} />
+            <input type="text" {...register('supplier_id')} className="input-field" placeholder="Kosongkan untuk auto-generate" disabled={!!editing} />
           </div>
           <div>
             <label className="label-field">Supplier Name</label>
-            <input type="text" value={formData.supplier_name} onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })} className="input-field" required />
+            <input type="text" {...register('supplier_name')} className="input-field" />
+            {formErrors.supplier_name && <p className="text-xs text-red-600 mt-1">{formErrors.supplier_name.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Contact Person</label>
-              <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} className="input-field" />
+              <input type="text" {...register('contact')} className="input-field" />
             </div>
             <div>
               <label className="label-field">Phone</label>
-              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input-field" />
+              <input type="text" {...register('phone')} className="input-field" />
             </div>
           </div>
           <div>
             <label className="label-field">Email</label>
-            <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="input-field" />
+            <input type="email" {...register('email')} className="input-field" />
           </div>
           <div>
             <label className="label-field">Address</label>
-            <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="input-field" />
+            <input type="text" {...register('address')} className="input-field" />
           </div>
           <div>
             <label className="label-field">Payment Terms</label>
-            <input type="text" value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} className="input-field" placeholder="cth. Net 30" />
+            <input type="text" {...register('payment_terms')} className="input-field" placeholder="cth. Net 30" />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-2 justify-end pt-2">

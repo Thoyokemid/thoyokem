@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { PurchaseInvoice } from '@/types';
@@ -110,7 +110,7 @@ export default function PurchaseInvoicesTab() {
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={invoices} keyField={(r) => r.pi_id} />
       ) : invoices.length === 0 ? (
@@ -122,6 +122,7 @@ export default function PurchaseInvoicesTab() {
             onClick={() => router.push(`/dashboard/purchasing/purchase-invoice/${encodeURIComponent(inv.pi_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><FileText size={14} /></span>}
             title={inv.pi_id}
+            statusTone={STATUS_TONE[inv.status] || 'gray'}
             subtitle={`${inv.supplier_name} · PO ${inv.po_id}`}
             meta={`Sisa: Rp${inv.outstanding_amount.toLocaleString('id-ID')} / Rp${inv.grand_total.toLocaleString('id-ID')}`}
             badges={<StatusBadge label={inv.status} tone={STATUS_TONE[inv.status] || 'gray'} />}

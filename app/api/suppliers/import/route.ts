@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       await logActivity({
         doctype: 'Supplier',
         documentId: `bulk-import-${Date.now()}`,
-        action: 'Created',
+        action: 'Imported',
         changedBy: session.user.name || '',
         before: null,
         after: { bulk_import: true, created, skipped: errors.length },

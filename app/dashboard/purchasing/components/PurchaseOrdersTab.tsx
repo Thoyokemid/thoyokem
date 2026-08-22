@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Supplier, Item, Warehouse } from '@/types';
@@ -13,12 +16,22 @@ import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
 import { Plus, Trash2, Send, PackageCheck, XCircle, FileText, ShoppingCart, Check, Ban, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface POItemLine {
-  item_code: string;
-  qty: string;
-  rate: string;
-  warehouse_id: string;
-}
+const poFormSchema = z.object({
+  supplier_id: z.string().min(1, 'Supplier wajib dipilih'),
+  expected_date: z.string().optional(),
+  lines: z
+    .array(
+      z.object({
+        item_code: z.string().min(1, 'Item wajib dipilih'),
+        warehouse_id: z.string().min(1, 'Warehouse wajib dipilih'),
+        qty: z.coerce.number().gt(0, 'Qty wajib diisi'),
+        rate: z.coerce.number().min(0),
+      })
+    )
+    .min(1, 'Minimal 1 baris item'),
+});
+type POFormInput = z.input<typeof poFormSchema>;
+type POFormValues = z.output<typeof poFormSchema>;
 
 interface PurchaseOrderWithItems {
   po_id: string;
@@ -86,10 +99,22 @@ export default function PurchaseOrdersTab() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [supplierId, setSupplierId] = useState('');
-  const [expectedDate, setExpectedDate] = useState('');
-  const [lines, setLines] = useState<POItemLine[]>([{ item_code: '', qty: '', rate: '', warehouse_id: '' }]);
   const [usdRate, setUsdRate] = useState(15800);
+
+  const {
+    register,
+    control,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    watch,
+    setValue,
+    formState: { errors: formErrors },
+  } = useForm<POFormInput, any, POFormValues>({
+    resolver: zodResolver(poFormSchema),
+    defaultValues: { supplier_id: '', expected_date: '', lines: [{ item_code: '', qty: 0, rate: 0, warehouse_id: '' }] },
+  });
+  const { fields: lineFields, append: appendLine, remove: removeLineField } = useFieldArray({ control, name: 'lines' });
+  const watchedLines = watch('lines');
 
   useEffect(() => {
     fetchAll();
@@ -116,9 +141,7 @@ export default function PurchaseOrdersTab() {
   };
 
   const openNew = () => {
-    setSupplierId('');
-    setExpectedDate('');
-    setLines([{ item_code: '', qty: '', rate: '', warehouse_id: '' }]);
+    resetForm({ supplier_id: '', expected_date: '', lines: [{ item_code: '', qty: 0, rate: 0, warehouse_id: '' }] });
     setError('');
     setIsModalOpen(true);
   };
@@ -129,41 +152,28 @@ export default function PurchaseOrdersTab() {
     return Math.round(toIDR(item.purchase_price, item.currency, usdRate));
   };
 
-  const updateLine = (idx: number, field: keyof POItemLine, value: string) => {
-    setLines((prev) =>
-      prev.map((l, i) => {
-        if (i !== idx) return l;
-        if (field === 'item_code') {
-          const generated = generatedRateFor(value);
-          return { ...l, item_code: value, rate: generated !== null ? String(generated) : l.rate };
-        }
-        return { ...l, [field]: value };
-      })
-    );
+  const handleItemChange = (idx: number, itemCode: string) => {
+    setValue(`lines.${idx}.item_code`, itemCode);
+    const generated = generatedRateFor(itemCode);
+    if (generated !== null) setValue(`lines.${idx}.rate`, generated);
   };
 
   const regenerateRate = (idx: number) => {
-    const line = lines[idx];
-    const generated = generatedRateFor(line.item_code);
-    if (generated !== null) updateLine(idx, 'rate', String(generated));
+    const line = watchedLines?.[idx];
+    const generated = line ? generatedRateFor(line.item_code) : null;
+    if (generated !== null) setValue(`lines.${idx}.rate`, generated);
   };
 
-  const addLine = () => setLines((prev) => [...prev, { item_code: '', qty: '', rate: '', warehouse_id: '' }]);
-  const removeLine = (idx: number) => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+  const total = (watchedLines || []).reduce((sum, l) => sum + (Number(l?.qty) || 0) * (Number(l?.rate) || 0), 0);
 
-  const total = lines.reduce((sum, l) => sum + (parseFloat(l.qty) || 0) * (parseFloat(l.rate) || 0), 0);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: POFormValues) => {
     setIsSaving(true);
     setError('');
     try {
       const payload = {
-        supplier_id: supplierId,
-        expected_date: expectedDate,
-        items: lines
-          .filter((l) => l.item_code && l.qty)
-          .map((l) => ({ item_code: l.item_code, qty: parseFloat(l.qty) || 0, rate: parseFloat(l.rate) || 0, warehouse_id: l.warehouse_id })),
+        supplier_id: data.supplier_id,
+        expected_date: data.expected_date,
+        items: data.lines.map((l) => ({ item_code: l.item_code, qty: l.qty, rate: l.rate, warehouse_id: l.warehouse_id })),
       };
       const res = await fetch('/api/purchase-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
@@ -237,7 +247,7 @@ export default function PurchaseOrdersTab() {
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={orders} keyField={(r) => r.po_id} />
       ) : orders.length === 0 ? (
@@ -249,6 +259,7 @@ export default function PurchaseOrdersTab() {
             onClick={() => router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(po.po_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><ShoppingCart size={14} /></span>}
             title={po.po_id}
+            statusTone={STATUS_TONE[po.status] || 'gray'}
             subtitle={`${po.supplier_name} · ${po.items.length} item`}
             meta={`Rp${po.total_amount.toLocaleString('id-ID')}`}
             badges={
@@ -298,44 +309,49 @@ export default function PurchaseOrdersTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Purchase Order" size="lg">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Supplier</label>
-              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="input-field" required>
+              <select {...register('supplier_id')} className="input-field">
                 <option value="">Pilih supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</option>
                 ))}
               </select>
+              {formErrors.supplier_id && <p className="text-xs text-red-600 mt-1">{formErrors.supplier_id.message}</p>}
             </div>
             <div>
               <label className="label-field">Expected Date</label>
-              <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="input-field" />
+              <input type="date" {...register('expected_date')} className="input-field" />
             </div>
           </div>
 
           <div>
             <label className="label-field">Items</label>
             <div className="space-y-2">
-              {lines.map((line, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <select value={line.item_code} onChange={(e) => updateLine(idx, 'item_code', e.target.value)} className="input-field col-span-4 text-xs" required>
+              {lineFields.map((line, idx) => (
+                <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
+                  <select
+                    value={watchedLines?.[idx]?.item_code || ''}
+                    onChange={(e) => handleItemChange(idx, e.target.value)}
+                    className="input-field col-span-4 text-xs"
+                  >
                     <option value="">Item</option>
                     {items.map((i) => (
                       <option key={i.item_code} value={i.item_code}>{i.item_name}</option>
                     ))}
                   </select>
-                  <select value={line.warehouse_id} onChange={(e) => updateLine(idx, 'warehouse_id', e.target.value)} className="input-field col-span-3 text-xs" required>
+                  <select {...register(`lines.${idx}.warehouse_id`)} className="input-field col-span-3 text-xs">
                     <option value="">Warehouse</option>
                     {warehouses.map((w) => (
                       <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name}</option>
                     ))}
                   </select>
-                  <input type="number" min={0} step="any" placeholder="Qty" value={line.qty} onChange={(e) => updateLine(idx, 'qty', e.target.value)} className="input-field col-span-2 text-xs" required />
+                  <input type="number" min={0} step="any" placeholder="Qty" {...register(`lines.${idx}.qty`)} className="input-field col-span-2 text-xs" />
                   <div className="col-span-2 relative">
-                    <input type="number" min={0} step="any" placeholder="Rate (IDR)" value={line.rate} onChange={(e) => updateLine(idx, 'rate', e.target.value)} className="input-field text-xs pr-6" required />
-                    {items.find((i) => i.item_code === line.item_code)?.currency === 'USD' && (
+                    <input type="number" min={0} step="any" placeholder="Rate (IDR)" {...register(`lines.${idx}.rate`)} className="input-field text-xs pr-6" />
+                    {items.find((i) => i.item_code === watchedLines?.[idx]?.item_code)?.currency === 'USD' && (
                       <button
                         type="button"
                         onClick={() => regenerateRate(idx)}
@@ -346,18 +362,26 @@ export default function PurchaseOrdersTab() {
                       </button>
                     )}
                   </div>
-                  <button type="button" onClick={() => removeLine(idx)} className="col-span-1 text-red-500 hover:text-red-700">
+                  <button
+                    type="button"
+                    onClick={() => (lineFields.length > 1 ? removeLineField(idx) : undefined)}
+                    className="col-span-1 text-red-500 hover:text-red-700"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
               ))}
-              {lines.some((l) => items.find((i) => i.item_code === l.item_code)?.currency === 'USD') && (
+              {watchedLines?.some((l) => items.find((i) => i.item_code === l?.item_code)?.currency === 'USD') && (
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
                   Kurs saat ini: $1 = Rp{usdRate.toLocaleString('id-ID')}. Rate untuk item USD otomatis di-generate ke IDR, tapi tetap bisa kamu edit manual.
                 </p>
               )}
             </div>
-            <button type="button" onClick={addLine} className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => appendLine({ item_code: '', qty: 0, rate: 0, warehouse_id: '' })}
+              className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
               <Plus size={12} /> Add row
             </button>
           </div>

@@ -2,18 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Bom, Item } from '@/types';
 import { Plus, Trash2, Layers } from 'lucide-react';
 
-interface ComponentLine {
-  component_item_code: string;
-  qty: string;
-}
+const bomFormSchema = z.object({
+  item_code: z.string().min(1, 'Produk wajib dipilih'),
+  output_qty: z.coerce.number().gt(0, 'Qty output wajib diisi'),
+  components: z
+    .array(
+      z.object({
+        component_item_code: z.string().min(1, 'Item komponen wajib dipilih'),
+        qty: z.coerce.number().gt(0, 'Qty wajib diisi'),
+      })
+    )
+    .min(1, 'Minimal 1 komponen'),
+});
+type BomFormInput = z.input<typeof bomFormSchema>;
+type BomFormValues = z.output<typeof bomFormSchema>;
 
 const REPORT_COLUMNS: ReportColumn<Bom>[] = [
   { key: 'bom_id', header: 'BOM ID' },
@@ -53,9 +66,17 @@ export default function BomTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const [itemCode, setItemCode] = useState('');
-  const [outputQty, setOutputQty] = useState('1');
-  const [lines, setLines] = useState<ComponentLine[]>([{ component_item_code: '', qty: '' }]);
+  const {
+    register,
+    control,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    formState: { errors: formErrors },
+  } = useForm<BomFormInput, any, BomFormValues>({
+    resolver: zodResolver(bomFormSchema),
+    defaultValues: { item_code: '', output_qty: 1, components: [{ component_item_code: '', qty: 0 }] },
+  });
+  const { fields: componentFields, append: appendComponent, remove: removeComponentField } = useFieldArray({ control, name: 'components' });
 
   useEffect(() => {
     fetchAll();
@@ -74,31 +95,19 @@ export default function BomTab() {
   };
 
   const openNew = () => {
-    setItemCode('');
-    setOutputQty('1');
-    setLines([{ component_item_code: '', qty: '' }]);
+    resetForm({ item_code: '', output_qty: 1, components: [{ component_item_code: '', qty: 0 }] });
     setError('');
     setIsModalOpen(true);
   };
 
-  const updateLine = (idx: number, field: keyof ComponentLine, value: string) => {
-    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
-  };
-
-  const addLine = () => setLines((prev) => [...prev, { component_item_code: '', qty: '' }]);
-  const removeLine = (idx: number) => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: BomFormValues) => {
     setIsSaving(true);
     setError('');
     try {
       const payload = {
-        item_code: itemCode,
-        qty: parseFloat(outputQty) || 1,
-        components: lines
-          .filter((l) => l.component_item_code && l.qty)
-          .map((l) => ({ component_item_code: l.component_item_code, qty: parseFloat(l.qty) || 0 })),
+        item_code: data.item_code,
+        qty: data.output_qty,
+        components: data.components.map((c) => ({ component_item_code: c.component_item_code, qty: c.qty })),
       };
       const res = await fetch('/api/boms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
@@ -146,7 +155,7 @@ export default function BomTab() {
         BOM (Bill of Materials) mendefinisikan produk yang merupakan campuran/rakitan dari beberapa item lain. Produksinya lewat Stock Entries → tipe "Manufacture".
       </div>
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={boms} keyField={(r) => r.bom_id} />
       ) : boms.length === 0 ? (
@@ -158,6 +167,7 @@ export default function BomTab() {
             onClick={() => router.push(`/dashboard/inventory/bom/${encodeURIComponent(b.bom_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center"><Layers size={14} /></span>}
             title={b.item_name || b.item_code}
+            statusTone={b.is_active ? 'green' : 'gray'}
             subtitle={`${b.bom_id} · Output ${b.qty} · ${b.components.length} komponen`}
             meta={b.components.map((c) => `${c.component_item_name} x${c.qty}`).join(', ')}
             badges={<StatusBadge label={b.is_active ? 'Active' : 'Inactive'} tone={b.is_active ? 'green' : 'gray'} />}
@@ -169,42 +179,51 @@ export default function BomTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New BOM (Produk Campuran)" size="lg">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Produk Hasil Campuran</label>
-              <select value={itemCode} onChange={(e) => setItemCode(e.target.value)} className="input-field" required>
+              <select {...register('item_code')} className="input-field">
                 <option value="">Pilih item</option>
                 {items.map((i) => (
                   <option key={i.item_code} value={i.item_code}>{i.item_name}</option>
                 ))}
               </select>
+              {formErrors.item_code && <p className="text-xs text-red-600 mt-1">{formErrors.item_code.message}</p>}
             </div>
             <div>
               <label className="label-field">Qty Output per Produksi</label>
-              <input type="number" min={0.01} step="any" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} className="input-field" required />
+              <input type="number" min={0.01} step="any" {...register('output_qty')} className="input-field" />
             </div>
           </div>
 
           <div>
             <label className="label-field">Komponen</label>
             <div className="space-y-2">
-              {lines.map((line, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <select value={line.component_item_code} onChange={(e) => updateLine(idx, 'component_item_code', e.target.value)} className="input-field col-span-8 text-xs" required>
+              {componentFields.map((line, idx) => (
+                <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
+                  <select {...register(`components.${idx}.component_item_code`)} className="input-field col-span-8 text-xs">
                     <option value="">Item komponen</option>
                     {items.map((i) => (
                       <option key={i.item_code} value={i.item_code}>{i.item_name}</option>
                     ))}
                   </select>
-                  <input type="number" min={0} step="any" placeholder="Qty" value={line.qty} onChange={(e) => updateLine(idx, 'qty', e.target.value)} className="input-field col-span-3 text-xs" required />
-                  <button type="button" onClick={() => removeLine(idx)} className="col-span-1 text-red-500 hover:text-red-700">
+                  <input type="number" min={0} step="any" placeholder="Qty" {...register(`components.${idx}.qty`)} className="input-field col-span-3 text-xs" />
+                  <button
+                    type="button"
+                    onClick={() => (componentFields.length > 1 ? removeComponentField(idx) : undefined)}
+                    className="col-span-1 text-red-500 hover:text-red-700"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addLine} className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => appendComponent({ component_item_code: '', qty: 0 })}
+              className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
               <Plus size={12} /> Add row
             </button>
           </div>

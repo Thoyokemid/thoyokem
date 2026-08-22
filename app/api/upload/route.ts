@@ -23,7 +23,13 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // Upload to Supabase Storage
-    const fileUrl = await uploadToSupabaseStorage(buffer, file.name, file.type);
+    let fileUrl: string;
+    try {
+      fileUrl = await uploadToSupabaseStorage(buffer, file.name, file.type);
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : 'Upload gagal';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
 
     return NextResponse.json({ success: true, url: fileUrl });
   } catch (error) {

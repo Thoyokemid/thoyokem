@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { validate, settingsUpdateSchema } from '@/lib/validation';
+import { logActivity } from '@/lib/activityLog';
 
 const DEFAULTS: Record<string, string> = {
   jam_masuk: '08:00',
@@ -45,6 +46,10 @@ export async function PUT(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const data = parsed.data;
 
+    const existingRows = await prisma.setting.findMany({ where: { key: { in: Object.keys(data) } } });
+    const before: Record<string, string> = {};
+    existingRows.forEach((row) => { before[row.key] = row.value; });
+
     await Promise.all(
       Object.entries(data).map(([key, value]) =>
         prisma.setting.upsert({
@@ -54,6 +59,15 @@ export async function PUT(request: NextRequest) {
         })
       )
     );
+
+    await logActivity({
+      doctype: 'Settings',
+      documentId: 'global',
+      action: 'Updated',
+      changedBy: session.user.name || '',
+      before,
+      after: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

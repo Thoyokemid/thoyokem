@@ -178,7 +178,13 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 60, // 30 minutes
+    maxAge: 30 * 60, // 30 minutes of inactivity before logout
+    // How often the session is "renewed" (its expiry pushed back to now + maxAge). Without
+    // this, NextAuth's default is 24h, so the session would hard-expire 30 min after sign-in
+    // no matter how active the user was. SessionActivityRenewer (AuthProvider.tsx) pings the
+    // session endpoint on real user activity, which — combined with this short updateAge —
+    // is what makes it a sliding 30-minute idle timeout instead of a fixed one.
+    updateAge: 5 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',

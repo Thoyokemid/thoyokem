@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { PackageCheck } from 'lucide-react';
@@ -71,7 +71,7 @@ export default function DeliveryHistoryTab() {
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={HISTORY_COLUMNS} visibleColumns={visibleCols} rows={deliveries} keyField={(r) => r.dn_id} />
       ) : deliveries.length === 0 ? (
@@ -87,6 +87,7 @@ export default function DeliveryHistoryTab() {
               </span>
             }
             title={dn.dn_id}
+            statusTone={STATUS_TONE[dn.status] || 'gray'}
             subtitle={`${dn.customer_name} · SO ${dn.so_id} · ${dn.items.length} item`}
             meta={formatDate(dn.posting_date)}
             badges={<StatusBadge label={dn.status} tone={STATUS_TONE[dn.status] || 'gray'} />}

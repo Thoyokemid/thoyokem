@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, ListRowAvatar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Truck } from 'lucide-react';
@@ -87,7 +87,7 @@ export default function ReadyToDeliverTab() {
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loading size="lg" /></div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={READY_COLUMNS} visibleColumns={visibleCols} rows={readyOrders} keyField={(r) => r.so_id} />
       ) : readyOrders.length === 0 ? (

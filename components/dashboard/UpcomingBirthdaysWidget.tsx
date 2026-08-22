@@ -17,6 +17,22 @@ interface UpcomingBirthday extends BirthdayEntry {
   nextBirthday: Date;
 }
 
+// date_of_birth is stored as a plain "YYYY-MM-DD" string. Parsing it with `new Date(str)`
+// reads it as UTC midnight, which shifts to the previous day in negative-UTC-offset
+// timezones once read back via local getMonth()/getDate() — parse the parts directly instead.
+function parseDobParts(dob: string): { month: number; day: number } | null {
+  const match = dob.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const month = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+  return { month, day };
+}
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
 function getInitials(name: string): string {
   return name
     .split(' ')
@@ -41,15 +57,21 @@ export default function UpcomingBirthdaysWidget() {
 
         const computed = data
           .map((entry) => {
-            const bd = new Date(entry.date_of_birth);
-            if (isNaN(bd.getTime())) return null;
-            const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
-            const nextBirthday = thisYear < today ? new Date(today.getFullYear() + 1, bd.getMonth(), bd.getDate()) : thisYear;
+            const parts = parseDobParts(entry.date_of_birth);
+            if (!parts) return null;
+            const { month, day } = parts;
+            // Feb 29 birthdays: land on Feb 28 in non-leap years instead of silently
+            // rolling into March 1, which is what `new Date(y, 1, 29)` would otherwise do.
+            const dayForYear = (year: number) => (month === 1 && day === 29 && !isLeapYear(year) ? 28 : day);
+            const thisYear = new Date(today.getFullYear(), month, dayForYear(today.getFullYear()));
+            const nextBirthday =
+              thisYear < today ? new Date(today.getFullYear() + 1, month, dayForYear(today.getFullYear() + 1)) : thisYear;
             const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             return { ...entry, nextBirthday, daysUntil };
           })
-          .filter((e): e is UpcomingBirthday => e !== null && e.daysUntil <= 30)
-          .sort((a, b) => a.daysUntil - b.daysUntil);
+          .filter((e): e is UpcomingBirthday => e !== null)
+          .sort((a, b) => a.daysUntil - b.daysUntil)
+          .slice(0, 5);
 
         setUpcoming(computed);
       })

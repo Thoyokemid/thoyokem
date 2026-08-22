@@ -3,14 +3,40 @@
 import { useState, useEffect} from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import QRScanner from '@/components/ui/QRScanner';
 import { StockEntry, Item, Warehouse, StockEntryType, Bom } from '@/types';
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Layers, ScanLine } from 'lucide-react';
+
+const NEEDS_SOURCE: StockEntryType[] = ['Material Issue', 'Material Transfer', 'Manufacture'];
+const NEEDS_TARGET: StockEntryType[] = ['Material Receipt', 'Material Transfer', 'Manufacture'];
+
+const stockEntryFormSchema = z
+  .object({
+    entry_type: z.enum(['Material Receipt', 'Material Issue', 'Material Transfer', 'Manufacture']),
+    item_code: z.string().min(1, 'Item wajib dipilih'),
+    source_warehouse: z.string().optional(),
+    target_warehouse: z.string().optional(),
+    qty: z.coerce.number().gt(0, 'Qty wajib diisi'),
+    remarks: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (NEEDS_SOURCE.includes(data.entry_type) && !data.source_warehouse) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Source warehouse wajib dipilih', path: ['source_warehouse'] });
+    }
+    if (NEEDS_TARGET.includes(data.entry_type) && !data.target_warehouse) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Target warehouse wajib dipilih', path: ['target_warehouse'] });
+    }
+  });
+type StockEntryFormInput = z.input<typeof stockEntryFormSchema>;
+type StockEntryFormValues = z.output<typeof stockEntryFormSchema>;
 
 const TYPE_TONE: Record<string, 'green' | 'red' | 'blue' | 'purple'> = {
   'Material Receipt': 'green',
@@ -83,30 +109,35 @@ export default function StockEntriesTab() {
   const [error, setError] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  const [formData, setFormData] = useState({
-    entry_type: 'Material Receipt' as StockEntryType,
-    item_code: '',
-    source_warehouse: '',
-    target_warehouse: '',
-    qty: '',
-    remarks: '',
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    watch,
+    setValue,
+    formState: { errors: formErrors },
+  } = useForm<StockEntryFormInput, any, StockEntryFormValues>({
+    resolver: zodResolver(stockEntryFormSchema),
+    defaultValues: { entry_type: 'Material Receipt', item_code: '', source_warehouse: '', target_warehouse: '', qty: 0, remarks: '' },
   });
+  const watchedEntryType = watch('entry_type');
+  const watchedItemCode = watch('item_code');
+  const watchedQty = watch('qty');
 
   const openNew = () => {
-    setFormData({ entry_type: 'Material Receipt', item_code: '', source_warehouse: '', target_warehouse: '', qty: '', remarks: '' });
+    resetForm({ entry_type: 'Material Receipt', item_code: '', source_warehouse: '', target_warehouse: '', qty: 0, remarks: '' });
     setError('');
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: StockEntryFormValues) => {
     setIsSaving(true);
     setError('');
     try {
       const res = await fetch('/api/stock-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, qty: parseFloat(formData.qty) || 0 }),
+        body: JSON.stringify(data),
       });
       if (res.ok) {
         setIsModalOpen(false);
@@ -126,7 +157,7 @@ export default function StockEntriesTab() {
   const handleScan = (decodedText: string) => {
     const match = items.find((i) => i.item_code === decodedText.trim());
     if (match) {
-      setFormData((prev) => ({ ...prev, item_code: match.item_code }));
+      setValue('item_code', match.item_code);
       setIsScannerOpen(false);
     } else {
       setError(`Item dengan kode "${decodedText}" tidak ditemukan`);
@@ -168,9 +199,7 @@ export default function StockEntriesTab() {
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loading size="lg" />
-        </div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={entries} keyField={(r) => r.entry_id} />
       ) : entries.length === 0 ? (
@@ -209,14 +238,10 @@ export default function StockEntriesTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Stock Entry" size="sm">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="label-field">Entry Type</label>
-            <select
-              value={formData.entry_type}
-              onChange={(e) => setFormData({ ...formData, entry_type: e.target.value as StockEntryType })}
-              className="input-field"
-            >
+            <select {...register('entry_type')} className="input-field">
               <option value="Material Receipt">Material Receipt (barang masuk)</option>
               <option value="Material Issue">Material Issue (barang keluar)</option>
               <option value="Material Transfer">Material Transfer (antar gudang)</option>
@@ -225,16 +250,11 @@ export default function StockEntriesTab() {
           </div>
 
           <div>
-            <label className="label-field">{formData.entry_type === 'Manufacture' ? 'Produk (harus punya BOM)' : 'Item'}</label>
+            <label className="label-field">{watchedEntryType === 'Manufacture' ? 'Produk (harus punya BOM)' : 'Item'}</label>
             <div className="flex gap-2">
-              <select
-                value={formData.item_code}
-                onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
-                className="input-field flex-1"
-                required
-              >
+              <select {...register('item_code')} className="input-field flex-1">
                 <option value="">Pilih item</option>
-                {(formData.entry_type === 'Manufacture' ? items.filter((i) => boms.some((b) => b.item_code === i.item_code && b.is_active)) : items).map((i) => (
+                {(watchedEntryType === 'Manufacture' ? items.filter((i) => boms.some((b) => b.item_code === i.item_code && b.is_active)) : items).map((i) => (
                   <option key={i.item_code} value={i.item_code}>{i.item_name} ({i.item_code})</option>
                 ))}
               </select>
@@ -247,15 +267,16 @@ export default function StockEntriesTab() {
                 <ScanLine size={16} />
               </button>
             </div>
-            {formData.entry_type === 'Manufacture' && boms.filter((b) => b.is_active).length === 0 && (
+            {formErrors.item_code && <p className="text-xs text-red-600 mt-1">{formErrors.item_code.message}</p>}
+            {watchedEntryType === 'Manufacture' && boms.filter((b) => b.is_active).length === 0 && (
               <p className="text-xs text-orange-500 mt-1">Belum ada BOM aktif. Buat dulu di tab "Product Campuran (BOM)".</p>
             )}
           </div>
 
-          {formData.entry_type === 'Manufacture' && formData.item_code && (() => {
-            const bom = boms.find((b) => b.item_code === formData.item_code && b.is_active);
+          {watchedEntryType === 'Manufacture' && watchedItemCode && (() => {
+            const bom = boms.find((b) => b.item_code === watchedItemCode && b.is_active);
             if (!bom) return null;
-            const producedQty = parseFloat(formData.qty) || 0;
+            const producedQty = Number(watchedQty) || 0;
             const ratio = producedQty / (bom.qty || 1);
             return (
               <div className="rounded-md border border-gray-200 dark:border-gray-700 p-2.5 text-xs space-y-1">
@@ -269,61 +290,40 @@ export default function StockEntriesTab() {
             );
           })()}
 
-          {(formData.entry_type === 'Material Issue' || formData.entry_type === 'Material Transfer' || formData.entry_type === 'Manufacture') && (
+          {NEEDS_SOURCE.includes(watchedEntryType) && (
             <div>
-              <label className="label-field">{formData.entry_type === 'Manufacture' ? 'Ambil Komponen dari Warehouse' : 'Source Warehouse'}</label>
-              <select
-                value={formData.source_warehouse}
-                onChange={(e) => setFormData({ ...formData, source_warehouse: e.target.value })}
-                className="input-field"
-                required
-              >
+              <label className="label-field">{watchedEntryType === 'Manufacture' ? 'Ambil Komponen dari Warehouse' : 'Source Warehouse'}</label>
+              <select {...register('source_warehouse')} className="input-field">
                 <option value="">Pilih warehouse</option>
                 {warehouses.map((w) => (
                   <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name}</option>
                 ))}
               </select>
+              {formErrors.source_warehouse && <p className="text-xs text-red-600 mt-1">{formErrors.source_warehouse.message}</p>}
             </div>
           )}
 
-          {(formData.entry_type === 'Material Receipt' || formData.entry_type === 'Material Transfer' || formData.entry_type === 'Manufacture') && (
+          {NEEDS_TARGET.includes(watchedEntryType) && (
             <div>
               <label className="label-field">Target Warehouse</label>
-              <select
-                value={formData.target_warehouse}
-                onChange={(e) => setFormData({ ...formData, target_warehouse: e.target.value })}
-                className="input-field"
-                required
-              >
+              <select {...register('target_warehouse')} className="input-field">
                 <option value="">Pilih warehouse</option>
                 {warehouses.map((w) => (
                   <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name}</option>
                 ))}
               </select>
+              {formErrors.target_warehouse && <p className="text-xs text-red-600 mt-1">{formErrors.target_warehouse.message}</p>}
             </div>
           )}
 
           <div>
             <label className="label-field">Qty</label>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={formData.qty}
-              onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
-              className="input-field"
-              required
-            />
+            <input type="number" min={0} step="any" {...register('qty')} className="input-field" />
           </div>
 
           <div>
             <label className="label-field">Remarks</label>
-            <textarea
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-              className="input-field"
-              rows={2}
-            />
+            <textarea {...register('remarks')} className="input-field" rows={2} />
           </div>
 
           {error && <p className="text-xs text-red-600">{error}</p>}

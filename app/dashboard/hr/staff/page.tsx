@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useSession } from "next-auth/react";
 import { redirect, useRouter, useSearchParams, usePathname } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import Pagination from "@/components/ui/Pagination";
 import { ColumnDef } from "@/components/ui/ColumnPicker";
 import {
@@ -19,13 +23,28 @@ import {
   OverflowMenu,
   OverflowMenuItem,
   OverflowMenuColumns,
+  SavedViewsMenu,
+  ListSelectionBar,
 } from "@/components/ui/ListView";
 import { StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download } from "lucide-react";
+import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download, Ban } from "lucide-react";
 import * as XLSX from "xlsx";
 import { logExport } from "@/lib/logExport";
 import { formatDate } from "@/lib/date";
+import { useSavedViews } from "@/lib/savedViews";
+import toast from "react-hot-toast";
+
+// Mirrors staffCreateSchema's fields (lib/validation.ts) under the form's own field
+// names — mapped to the API's names in onSubmit — with name required client-side.
+const staffFormSchema = z.object({
+  name: z.string().min(1, 'Nama wajib diisi'),
+  registration_id: z.string().optional(),
+  birth_date: z.string().optional(),
+  leave_quota: z.coerce.number().optional(),
+});
+type StaffFormInput = z.input<typeof staffFormSchema>;
+type StaffFormValues = z.output<typeof staffFormSchema>;
 
 const STAFF_COLUMNS: ColumnDef[] = [
   { key: "employee_name", header: "Name" },
@@ -63,12 +82,27 @@ export default function StaffPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE_COLS);
   const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    registration_id: "",
-    birth_date: "",
-    leave_quota: "12",
+  interface StaffFilters {
+    searchName: string;
+    birthdayFilter: 'all' | 'has' | 'missing';
+  }
+  const { views: savedViews, saveView, deleteView } = useSavedViews<StaffFilters>('hr_staff');
+  const applyView = (f: StaffFilters) => {
+    setSearchName(f.searchName);
+    setBirthdayFilter(f.birthdayFilter);
+  };
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetFormFields,
+    formState: { errors: formErrors },
+  } = useForm<StaffFormInput, any, StaffFormValues>({
+    resolver: zodResolver(staffFormSchema),
+    defaultValues: { name: '', registration_id: '', birth_date: '', leave_quota: 12 },
   });
 
   useEffect(() => {
@@ -124,15 +158,14 @@ export default function StaffPage() {
     logExport('Staff', exportData.length);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: StaffFormValues) => {
     setIsSaving(true);
     try {
       const payload = {
-        employee_name: formData.name,
-        user_id: formData.registration_id,
-        date_of_birth: formData.birth_date,
-        leave_allocation: parseInt(formData.leave_quota, 10) || 12,
+        employee_name: data.name,
+        user_id: data.registration_id,
+        date_of_birth: data.birth_date,
+        leave_allocation: data.leave_quota ?? 12,
       };
 
       const response = editingStaff
@@ -160,11 +193,11 @@ export default function StaffPage() {
 
   const handleEdit = (s: StaffList) => {
     setEditingStaff(s);
-    setFormData({
+    resetFormFields({
       name: s.employee_name,
       registration_id: s.user_id,
       birth_date: s.date_of_birth || "",
-      leave_quota: String(s.leave_allocation ?? 12),
+      leave_quota: s.leave_allocation ?? 12,
     });
     setIsModalOpen(true);
   };
@@ -179,10 +212,55 @@ export default function StaffPage() {
     }
   };
 
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Hapus ${selectedIds.size} data karyawan terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) => fetch(`/api/staff?id=${id}`, { method: "DELETE" }))
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${selectedIds.size} gagal dihapus` : `${selectedIds.size} data karyawan dihapus`
+      );
+      setSelectedIds(new Set());
+      fetchData();
+    } catch (error) {
+      console.error("Error bulk-deleting staff:", error);
+      toast.error("Gagal menghapus data terpilih");
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = filteredStaff.filter((s) => selectedIds.has(s.employee_id));
+    const exportData = rows.map((s) => ({
+      Name: s.employee_name,
+      'Registration ID': s.user_id,
+      'Birth Date': s.date_of_birth || '',
+      'Leave Quota': s.leave_allocation ?? 12,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff');
+    XLSX.writeFile(workbook, `staff_selected_${new Date().toISOString().split('T')[0]}.xlsx`);
+    logExport('Staff', exportData.length);
+  };
+
   const resetForm = () => {
     setIsModalOpen(false);
     setEditingStaff(null);
-    setFormData({ name: "", registration_id: "", birth_date: "", leave_quota: "12" });
+    resetFormFields({ name: "", registration_id: "", birth_date: "", leave_quota: 12 });
   };
 
   if (status !== "loading" && !session) redirect("/login");
@@ -253,6 +331,12 @@ export default function StaffPage() {
                 className="input-field pl-9"
               />
             </div>
+            <SavedViewsMenu
+              views={savedViews}
+              onApply={applyView}
+              onSave={(name) => saveView(name, { searchName, birthdayFilter })}
+              onDelete={deleteView}
+            />
             <ViewModeDropdown mode={viewMode} onChange={setViewMode} />
             <OverflowMenu>
               {viewMode === 'report' && (
@@ -268,10 +352,18 @@ export default function StaffPage() {
           </div>
         }
       >
+        {viewMode === 'list' && (
+          <ListSelectionBar
+            count={selectedIds.size}
+            onClear={() => setSelectedIds(new Set())}
+            actions={[
+              { label: 'Export', icon: Download, onClick: handleBulkExport },
+              { label: 'Hapus', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDelete },
+            ]}
+          />
+        )}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loading size="lg" />
-          </div>
+          <SkeletonList />
         ) : loadError ? (
           <div className="px-3 py-6 text-center">
             <p className="text-sm text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
@@ -295,6 +387,8 @@ export default function StaffPage() {
                   </div>
                 }
                 badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}
+                selected={selectedIds.has(s.employee_id)}
+                onSelectChange={(checked) => toggleSelect(s.employee_id, checked)}
                 actions={
                   <>
                     <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
@@ -356,25 +450,23 @@ export default function StaffPage() {
       </ListViewLayout>
 
         <Modal isOpen={isModalOpen} onClose={resetForm} title={editingStaff ? "Edit Staff" : "Add Staff"} size="sm">
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
             <div>
               <label className="label-field">Full Name</label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                {...register('name')}
                 className="input-field"
                 placeholder="Nama lengkap karyawan"
-                required
               />
+              {formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name.message}</p>}
             </div>
 
             <div>
               <label className="label-field">Registration ID</label>
               <input
                 type="text"
-                value={formData.registration_id}
-                onChange={(e) => setFormData({ ...formData, registration_id: e.target.value })}
+                {...register('registration_id')}
                 className="input-field"
                 placeholder="cth. TYID0120814"
               />
@@ -386,8 +478,7 @@ export default function StaffPage() {
                 <label className="label-field">Birth Date</label>
                 <input
                   type="date"
-                  value={formData.birth_date}
-                  onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                  {...register('birth_date')}
                   className="input-field"
                 />
               </div>
@@ -396,8 +487,7 @@ export default function StaffPage() {
                 <input
                   type="number"
                   min={0}
-                  value={formData.leave_quota}
-                  onChange={(e) => setFormData({ ...formData, leave_quota: e.target.value })}
+                  {...register('leave_quota')}
                   className="input-field"
                 />
               </div>

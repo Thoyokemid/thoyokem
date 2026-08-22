@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Bom } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -75,6 +76,17 @@ export default function BomDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !bom}
         badges={bom && <StatusBadge label={bom.is_active ? 'Active' : 'Inactive'} tone={bom.is_active ? 'green' : 'gray'} />}
+        sidebar={
+          bom && (
+            <>
+              <AssignedToSection doctype="BOM" documentId={bom.bom_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="BOM" documentId={bom.bom_id} />
+                <AttachmentSection doctype="BOM" documentId={bom.bom_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {bom && (
           <div className="space-y-4">
@@ -110,10 +122,6 @@ export default function BomDetailPage() {
                   qty: c.qty,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="BOM" documentId={bom.bom_id} />
-              <AttachmentSection doctype="BOM" documentId={bom.bom_id} />
             </DetailSection>
           </div>
         )}

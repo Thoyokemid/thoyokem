@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Item, StockBalance } from '@/types';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
@@ -103,6 +104,17 @@ export default function ItemDetailPage() {
             </>
           )
         }
+        sidebar={
+          item && (
+            <>
+              <AssignedToSection doctype="Item" documentId={item.item_code} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Item" documentId={item.item_code} />
+                <AttachmentSection doctype="Item" documentId={item.item_code} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {item && (
           <div className="space-y-4">
@@ -173,10 +185,6 @@ export default function ItemDetailPage() {
                   last_transaction_date: b.last_transaction_date,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Item" documentId={item.item_code} />
-              <AttachmentSection doctype="Item" documentId={item.item_code} />
             </DetailSection>
           </div>
         )}

@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { StockEntry } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -75,6 +76,17 @@ export default function StockEntryDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !entry}
         badges={entry && <StatusBadge label={entry.status || 'Submitted'} tone="green" />}
+        sidebar={
+          entry && (
+            <>
+              <AssignedToSection doctype="Stock Entry" documentId={entry.entry_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Stock Entry" documentId={entry.entry_id} />
+                <AttachmentSection doctype="Stock Entry" documentId={entry.entry_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {entry && (
           <div className="space-y-4">
@@ -112,10 +124,6 @@ export default function StockEntryDetailPage() {
                 { label: 'Owner', value: entry.owner || '-' },
               ]}
             />
-          </DetailSection>
-          <DetailSection title="Riwayat">
-            <ActivityLogView doctype="Stock Entry" documentId={entry.entry_id} />
-            <AttachmentSection doctype="Stock Entry" documentId={entry.entry_id} />
           </DetailSection>
           </div>
         )}

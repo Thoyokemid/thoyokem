@@ -700,8 +700,9 @@ export default function Topbar({ user, animateIn }: TopbarProps) {
             <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5 list-disc list-inside">
               <li>Next.js 14 (App Router) + TypeScript</li>
               <li>Tailwind CSS</li>
+              <li>Prisma ORM + PostgreSQL (Supabase)</li>
               <li>NextAuth (Credentials/JWT)</li>
-              <li>Google Sheets API (data layer)</li>
+              <li>React Hook Form + Zod</li>
               <li>Recharts, Framer Motion, Lucide Icons</li>
             </ul>
           </div>

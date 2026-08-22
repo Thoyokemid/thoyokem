@@ -517,6 +517,21 @@ model Attachment {
   @@map("attachments")
 }
 
+model Assignment {
+  assignmentId String  @id @map("assignment_id")
+  doctype      String
+  documentId   String  @map("document_id")
+  assignedTo   String  @map("assigned_to")
+  assignedBy   String  @map("assigned_by")
+  note         String?
+  timestamp    String
+
+  @@unique([doctype, documentId, assignedTo])
+  @@index([assignedTo])
+  @@index([doctype, documentId])
+  @@map("assignments")
+}
+
 model NumberingSeries {
   seriesName    String @id @map("series_name")
   prefix        String

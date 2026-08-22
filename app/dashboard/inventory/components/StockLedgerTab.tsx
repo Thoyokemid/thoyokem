@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { ListRow, StatusBadge } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { StockLedgerEntry, Item, Warehouse } from '@/types';
@@ -100,9 +100,7 @@ export default function StockLedgerTab() {
   if (isLoading) {
     return (
       <Card>
-        <div className="flex items-center justify-center py-12">
-          <Loading size="lg" />
-        </div>
+        <SkeletonList />
       </Card>
     );
   }

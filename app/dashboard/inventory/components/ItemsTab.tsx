@@ -4,16 +4,26 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import BulkImportModal, { ImportColumn } from '@/components/ui/BulkImportModal';
-import { ListViewLayout, ListRow, StatusBadge } from '@/components/ui/ListView';
+import { ListViewLayout, ListRow, StatusBadge, ListSelectionBar } from '@/components/ui/ListView';
 import { useViewMode, useVisibleColumns, ReportViewControls, ReportTable, exportToExcel, ReportColumn } from '@/components/ui/ReportView';
 import { Item } from '@/types';
-import { itemImportRowSchema } from '@/lib/validation';
+import { itemImportRowSchema, itemCreateSchema } from '@/lib/validation';
 import { fetchUsdIdrRate, toIDR } from '@/lib/currency';
-import { Plus, Edit, Trash2, Search, Package, RefreshCw, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, RefreshCw, Upload, Ban, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const itemFormSchema = itemCreateSchema.extend({
+  item_name: z.string().min(1, 'Nama item wajib diisi'),
+});
+type ItemFormInput = z.input<typeof itemFormSchema>;
+type ItemFormValues = z.output<typeof itemFormSchema>;
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'item_code', label: 'Item Code (kosongkan untuk auto)', example: '' },
@@ -107,19 +117,35 @@ export default function ItemsTab() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({
-    item_code: generateItemCode('Liquid'),
-    item_name: '',
-    item_group: 'Liquid',
-    unit: 'PCS',
-    purchase_price: '',
-    selling_price: '',
-    reorder_level: '',
-    valuation_method: 'Average',
-    currency: 'IDR',
-    item_type: 'Regular',
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetForm,
+    watch,
+    setValue,
+    formState: { errors: formErrors },
+  } = useForm<ItemFormInput, any, ItemFormValues>({
+    resolver: zodResolver(itemFormSchema),
+    defaultValues: {
+      item_code: generateItemCode('Liquid'),
+      item_name: '',
+      item_group: 'Liquid',
+      unit: 'PCS',
+      purchase_price: 0,
+      selling_price: 0,
+      reorder_level: 0,
+      valuation_method: 'Average',
+      currency: 'IDR',
+      item_type: 'Regular',
+    },
   });
+  const watchedItemGroup = watch('item_group');
+  const watchedCurrency = watch('currency');
+  const watchedPurchasePrice = watch('purchase_price');
+  const watchedSellingPrice = watch('selling_price');
 
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
@@ -129,16 +155,23 @@ export default function ItemsTab() {
     );
   }, [items, searchTerm]);
 
+  // Bulk actions must only ever touch rows currently visible under the search filter —
+  // otherwise "N dipilih" can silently include hidden rows the user can no longer see.
+  const visibleSelectedIds = useMemo(
+    () => new Set(filteredItems.filter((i) => selectedIds.has(i.item_code)).map((i) => i.item_code)),
+    [filteredItems, selectedIds]
+  );
+
   const openNew = () => {
     setEditingItem(null);
-    setFormData({
+    resetForm({
       item_code: generateItemCode('Liquid'),
       item_name: '',
       item_group: 'Liquid',
       unit: 'PCS',
-      purchase_price: '',
-      selling_price: '',
-      reorder_level: '',
+      purchase_price: 0,
+      selling_price: 0,
+      reorder_level: 0,
       valuation_method: 'Average',
       currency: 'IDR',
       item_type: 'Regular',
@@ -148,23 +181,24 @@ export default function ItemsTab() {
   };
 
   const handleGroupChange = (group: string) => {
-    setFormData((prev) => ({ ...prev, item_group: group, item_code: editingItem ? prev.item_code : generateItemCode(group) }));
+    setValue('item_group', group);
+    if (!editingItem) setValue('item_code', generateItemCode(group));
   };
 
   const regenerateCode = () => {
-    setFormData((prev) => ({ ...prev, item_code: generateItemCode(prev.item_group) }));
+    setValue('item_code', generateItemCode(watchedItemGroup || 'Liquid'));
   };
 
   const openEdit = (item: Item) => {
     setEditingItem(item);
-    setFormData({
+    resetForm({
       item_code: item.item_code,
       item_name: item.item_name,
       item_group: item.item_group,
       unit: item.unit,
-      purchase_price: String(item.purchase_price),
-      selling_price: String(item.selling_price),
-      reorder_level: String(item.reorder_level),
+      purchase_price: item.purchase_price,
+      selling_price: item.selling_price,
+      reorder_level: item.reorder_level,
       valuation_method: item.valuation_method,
       currency: item.currency || 'IDR',
       item_type: item.item_type || 'Regular',
@@ -173,27 +207,13 @@ export default function ItemsTab() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: ItemFormValues) => {
     setIsSaving(true);
     setError('');
     try {
-      const payload = {
-        item_code: formData.item_code,
-        item_name: formData.item_name,
-        item_group: formData.item_group,
-        unit: formData.unit,
-        purchase_price: parseFloat(formData.purchase_price) || 0,
-        selling_price: parseFloat(formData.selling_price) || 0,
-        reorder_level: parseFloat(formData.reorder_level) || 0,
-        valuation_method: formData.valuation_method,
-        currency: formData.currency,
-        item_type: formData.item_type,
-      };
-
       const res = editingItem
-        ? await fetch('/api/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        : await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        ? await fetch('/api/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+        : await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 
       if (res.ok) {
         setIsModalOpen(false);
@@ -212,12 +232,66 @@ export default function ItemsTab() {
 
   const handleDelete = async (itemCode: string) => {
     if (!confirm('Hapus item ini?')) return;
+    const removed = queryClient.getQueryData<Item[]>(['items'])?.find((i) => i.item_code === itemCode);
+    queryClient.setQueryData<Item[]>(['items'], (old) => (old ?? []).filter((i) => i.item_code !== itemCode));
+    const restore = () => {
+      if (!removed) return;
+      queryClient.setQueryData<Item[]>(['items'], (old) =>
+        (old ?? []).some((i) => i.item_code === itemCode) ? old! : [...(old ?? []), removed]
+      );
+    };
     try {
       const res = await fetch(`/api/items?item_code=${itemCode}`, { method: 'DELETE' });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['items'] });
+      if (!res.ok) {
+        restore();
+        toast.error('Gagal menghapus item');
+      }
     } catch (error) {
       console.error('Error deleting item:', error);
+      restore();
+      toast.error('Gagal menghapus item');
     }
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!confirm(`Nonaktifkan ${visibleSelectedIds.size} item terpilih?`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(visibleSelectedIds).map((id) =>
+          fetch('/api/items', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_code: id, is_active: false }),
+          })
+        )
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${visibleSelectedIds.size} gagal dinonaktifkan` : `${visibleSelectedIds.size} item dinonaktifkan`
+      );
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error('Error bulk-deactivating items:', error);
+      toast.error('Gagal menonaktifkan item terpilih');
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = filteredItems.filter((i) => visibleSelectedIds.has(i.item_code));
+    exportToExcel(rows, REPORT_COLUMNS, 'items_selected', 'Items');
   };
 
   return (
@@ -259,10 +333,18 @@ export default function ItemsTab() {
         </div>
       }
     >
+      {viewMode === 'list' && (
+        <ListSelectionBar
+          count={visibleSelectedIds.size}
+          onClear={() => setSelectedIds(new Set())}
+          actions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Nonaktifkan', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDeactivate },
+          ]}
+        />
+      )}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loading size="lg" />
-        </div>
+        <SkeletonList />
       ) : viewMode === 'report' ? (
         <ReportTable columns={REPORT_COLUMNS} visibleColumns={visibleCols} rows={filteredItems} keyField={(r) => r.item_code} />
       ) : filteredItems.length === 0 ? (
@@ -278,8 +360,11 @@ export default function ItemsTab() {
               </span>
             }
             title={item.item_name}
+            statusTone={item.is_active ? 'green' : 'red'}
             subtitle={`${item.item_code} · ${item.item_group || '-'} · ${item.unit || '-'}`}
             meta={`Jual: ${item.currency === 'USD' ? '$' : 'Rp'}${item.selling_price.toLocaleString('id-ID')}`}
+            selected={selectedIds.has(item.item_code)}
+            onSelectChange={(checked) => toggleSelect(item.item_code, checked)}
             badges={
               <>
                 <StatusBadge label={item.item_type} tone={item.item_type === 'Trading' ? 'purple' : 'blue'} />
@@ -301,13 +386,13 @@ export default function ItemsTab() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? 'Edit Item' : 'Add Item'} size="sm">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="label-field">Item Code</label>
             <div className="relative">
               <input
                 type="text"
-                value={formData.item_code}
+                {...register('item_code')}
                 className="input-field pr-8 font-mono"
                 disabled
               />
@@ -326,18 +411,13 @@ export default function ItemsTab() {
           </div>
           <div>
             <label className="label-field">Item Name</label>
-            <input
-              type="text"
-              value={formData.item_name}
-              onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
-              className="input-field"
-              required
-            />
+            <input type="text" {...register('item_name')} className="input-field" />
+            {formErrors.item_name && <p className="text-xs text-red-600 mt-1">{formErrors.item_name.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-field">Group</label>
-              <select value={formData.item_group} onChange={(e) => handleGroupChange(e.target.value)} className="input-field">
+              <select value={watchedItemGroup ?? ''} onChange={(e) => handleGroupChange(e.target.value)} className="input-field">
                 {ITEM_GROUPS.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}
@@ -345,7 +425,7 @@ export default function ItemsTab() {
             </div>
             <div>
               <label className="label-field">Unit</label>
-              <select value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="input-field">
+              <select {...register('unit')} className="input-field">
                 {ITEM_UNITS.map((u) => (
                   <option key={u} value={u}>{u}</option>
                 ))}
@@ -355,38 +435,38 @@ export default function ItemsTab() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label-field">Currency</label>
-              <select value={formData.currency} onChange={(e) => setFormData({ ...formData, currency: e.target.value })} className="input-field">
+              <select {...register('currency')} className="input-field">
                 <option value="IDR">IDR</option>
                 <option value="USD">USD</option>
               </select>
             </div>
             <div>
               <label className="label-field">Purchase Price</label>
-              <input type="number" min={0} value={formData.purchase_price} onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })} className="input-field" />
+              <input type="number" min={0} {...register('purchase_price')} className="input-field" />
             </div>
             <div>
               <label className="label-field">Selling Price</label>
-              <input type="number" min={0} value={formData.selling_price} onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })} className="input-field" />
+              <input type="number" min={0} {...register('selling_price')} className="input-field" />
             </div>
           </div>
-          {formData.currency === 'USD' && (parseFloat(formData.purchase_price) > 0 || parseFloat(formData.selling_price) > 0) && (
-            <UsdConversionHint purchasePrice={parseFloat(formData.purchase_price) || 0} sellingPrice={parseFloat(formData.selling_price) || 0} />
+          {watchedCurrency === 'USD' && (parseFloat(String(watchedPurchasePrice)) > 0 || parseFloat(String(watchedSellingPrice)) > 0) && (
+            <UsdConversionHint purchasePrice={parseFloat(String(watchedPurchasePrice)) || 0} sellingPrice={parseFloat(String(watchedSellingPrice)) || 0} />
           )}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label-field">Item Type</label>
-              <select value={formData.item_type} onChange={(e) => setFormData({ ...formData, item_type: e.target.value })} className="input-field">
+              <select {...register('item_type')} className="input-field">
                 <option value="Regular">Regular</option>
                 <option value="Trading">Trading</option>
               </select>
             </div>
             <div>
               <label className="label-field">Reorder Level</label>
-              <input type="number" min={0} value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} className="input-field" />
+              <input type="number" min={0} {...register('reorder_level')} className="input-field" />
             </div>
             <div>
               <label className="label-field">Valuation Method</label>
-              <select value={formData.valuation_method} onChange={(e) => setFormData({ ...formData, valuation_method: e.target.value })} className="input-field">
+              <select {...register('valuation_method')} className="input-field">
                 <option value="Average">Average</option>
                 <option value="FIFO">FIFO</option>
               </select>

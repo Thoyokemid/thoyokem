@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useSession } from "next-auth/react";
 import { redirect, useRouter, useSearchParams, usePathname } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -35,6 +38,38 @@ const PERMISSION_COLS: { key: keyof Omit<Role, "role_id" | "role_name">; label: 
   { key: "registration_request", label: "Registration" },
   { key: "setting", label: "Settings" },
 ];
+
+const roleFormSchema = z.object({
+  role_name: z.string().min(1, "Nama role wajib diisi"),
+  is_super_admin: z.boolean(),
+  dashboard: z.boolean(),
+  attendance: z.boolean(),
+  leave: z.boolean(),
+  staff: z.boolean(),
+  inventory: z.boolean(),
+  purchasing: z.boolean(),
+  sales_order: z.boolean(),
+  delivery_order: z.boolean(),
+  can_approve: z.boolean(),
+  registration_request: z.boolean(),
+  setting: z.boolean(),
+});
+type RoleFormValues = z.infer<typeof roleFormSchema>;
+const ROLE_FORM_DEFAULTS: RoleFormValues = {
+  role_name: "",
+  is_super_admin: false,
+  dashboard: false,
+  attendance: false,
+  leave: false,
+  staff: false,
+  inventory: false,
+  purchasing: false,
+  sales_order: false,
+  delivery_order: false,
+  can_approve: false,
+  registration_request: false,
+  setting: false,
+};
 
 function formatLastActive(iso: string | undefined): string {
   if (!iso) return "Never";
@@ -87,21 +122,17 @@ export default function SettingsPage() {
   // Role modal state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [roleForm, setRoleForm] = useState<Omit<Role, "role_id">>({
-    role_name: "",
-    dashboard: false,
-    attendance: false,
-    leave: false,
-    registration_request: false,
-    setting: false,
-    staff: false,
-    inventory: false,
-    purchasing: false,
-    sales_order: false,
-    delivery_order: false,
-    can_approve: false,
-    is_super_admin: false,
+  const {
+    register: registerRole,
+    handleSubmit: handleRoleFormSubmit,
+    reset: resetRoleForm,
+    watch: watchRole,
+    formState: { errors: roleFormErrors },
+  } = useForm<RoleFormValues>({
+    resolver: zodResolver(roleFormSchema),
+    defaultValues: ROLE_FORM_DEFAULTS,
   });
+  const watchedIsSuperAdmin = watchRole("is_super_admin");
   const [isSavingRole, setIsSavingRole] = useState(false);
   const [roleError, setRoleError] = useState("");
 
@@ -237,28 +268,14 @@ export default function SettingsPage() {
 
   const openNewRole = () => {
     setEditingRole(null);
-    setRoleForm({
-      role_name: "",
-      dashboard: false,
-      attendance: false,
-      leave: false,
-      registration_request: false,
-      setting: false,
-      staff: false,
-      inventory: false,
-    purchasing: false,
-    sales_order: false,
-    delivery_order: false,
-    can_approve: false,
-    is_super_admin: false,
-    });
+    resetRoleForm(ROLE_FORM_DEFAULTS);
     setRoleError("");
     setIsRoleModalOpen(true);
   };
 
   const openEditRole = (role: Role) => {
     setEditingRole(role);
-    setRoleForm({
+    resetRoleForm({
       role_name: role.role_name,
       dashboard: role.dashboard,
       attendance: role.attendance,
@@ -277,11 +294,7 @@ export default function SettingsPage() {
     setIsRoleModalOpen(true);
   };
 
-  const handleSaveRole = async () => {
-    if (!roleForm.role_name.trim()) {
-      setRoleError("Nama role wajib diisi");
-      return;
-    }
+  const onSubmitRole = async (data: RoleFormValues) => {
     setIsSavingRole(true);
     setRoleError("");
     try {
@@ -289,12 +302,12 @@ export default function SettingsPage() {
         ? await fetch("/api/roles", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role_id: editingRole.role_id, ...roleForm }),
+            body: JSON.stringify({ role_id: editingRole.role_id, ...data }),
           })
         : await fetch("/api/roles", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(roleForm),
+            body: JSON.stringify(data),
           });
 
       if (res.ok) {
@@ -594,24 +607,18 @@ export default function SettingsPage() {
 
         {/* Role Add/Edit Modal */}
         <Modal isOpen={isRoleModalOpen} onClose={() => setIsRoleModalOpen(false)} title={editingRole ? "Edit Role" : "Add Role"} size="sm">
-          <div className="space-y-3">
+          <form onSubmit={handleRoleFormSubmit(onSubmitRole)} className="space-y-3">
             <div>
               <label className="label-field">Role Name</label>
-              <input
-                type="text"
-                value={roleForm.role_name}
-                onChange={(e) => setRoleForm({ ...roleForm, role_name: e.target.value })}
-                className="input-field"
-                placeholder="cth. HR Manager"
-              />
+              <input type="text" {...registerRole("role_name")} className="input-field" placeholder="cth. HR Manager" />
+              {roleFormErrors.role_name && <p className="text-xs text-red-600 mt-1">{roleFormErrors.role_name.message}</p>}
             </div>
 
             <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-2.5">
               <label className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-400">
                 <input
                   type="checkbox"
-                  checked={roleForm.is_super_admin}
-                  onChange={(e) => setRoleForm({ ...roleForm, is_super_admin: e.target.checked })}
+                  {...registerRole("is_super_admin")}
                   className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 cursor-pointer"
                 />
                 Super Admin
@@ -621,15 +628,14 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className={roleForm.is_super_admin ? 'opacity-40 pointer-events-none' : ''}>
+            <div className={watchedIsSuperAdmin ? 'opacity-40 pointer-events-none' : ''}>
               <label className="label-field">Permissions</label>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 {PERMISSION_COLS.map((col) => (
                   <label key={col.key} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <input
                       type="checkbox"
-                      checked={roleForm[col.key]}
-                      onChange={(e) => setRoleForm({ ...roleForm, [col.key]: e.target.checked })}
+                      {...registerRole(col.key)}
                       className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                     />
                     {col.label}
@@ -641,13 +647,13 @@ export default function SettingsPage() {
             {roleError && <p className="text-xs text-red-600">{roleError}</p>}
 
             <div className="flex gap-2 justify-end pt-3">
-              <Button variant="secondary" onClick={() => setIsRoleModalOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveRole} isLoading={isSavingRole}>
+              <Button type="button" variant="secondary" onClick={() => setIsRoleModalOpen(false)}>Cancel</Button>
+              <Button type="submit" isLoading={isSavingRole}>
                 <Save size={14} className="mr-1.5" />
                 {editingRole ? "Update" : "Add"} Role
               </Button>
             </div>
-          </div>
+          </form>
         </Modal>
       </div>
     </DashboardLayout>

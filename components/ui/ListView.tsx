@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Filter, X, List, Table2, ChevronDown, MoreVertical, Download, Columns3, Check } from 'lucide-react';
+import { Filter, X, List, Table2, ChevronDown, MoreVertical, Download, Columns3, Check, Bookmark, Trash2 } from 'lucide-react';
+import { SavedView } from '@/lib/savedViews';
 
 export interface ListViewFilter {
   label: string;
@@ -152,28 +153,61 @@ export function ListViewLayout({
   );
 }
 
+export type StatusDotTone = 'gray' | 'green' | 'red' | 'blue' | 'orange' | 'purple';
+
+const STATUS_DOT_COLOR: Record<StatusDotTone, string> = {
+  gray: 'bg-gray-400',
+  green: 'bg-green-500',
+  red: 'bg-red-500',
+  blue: 'bg-blue-500',
+  orange: 'bg-orange-500',
+  purple: 'bg-purple-500',
+};
+
+/** Small colored dot, ERPNext-style, meant to sit right before a list row's title. */
+export function StatusDot({ tone = 'gray' }: { tone?: StatusDotTone }) {
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT_COLOR[tone]}`} />;
+}
+
 interface ListRowProps {
   avatar?: React.ReactNode;
   title: React.ReactNode;
+  /** Small colored dot rendered right before the title, e.g. status at a glance. */
+  statusTone?: StatusDotTone;
   subtitle?: React.ReactNode;
   meta?: React.ReactNode;
   badges?: React.ReactNode;
   onClick?: () => void;
   actions?: React.ReactNode;
+  /** Set both to turn on a bulk-select checkbox at the start of the row. */
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
 }
 
 /** A single ERPNext-style list row: avatar, title/subtitle, meta, badges, actions. */
-export function ListRow({ avatar, title, subtitle, meta, badges, onClick, actions }: ListRowProps) {
+export function ListRow({ avatar, title, statusTone, subtitle, meta, badges, onClick, actions, selected, onSelectChange }: ListRowProps) {
   return (
     <div
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors ${
         onClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50' : ''
-      }`}
+      } ${selected ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}
     >
+      {onSelectChange && (
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={(e) => onSelectChange(e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-shrink-0 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+        />
+      )}
       {avatar && <div className="flex-shrink-0">{avatar}</div>}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{title}</p>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
+          {statusTone && <StatusDot tone={statusTone} />}
+          <span className="truncate">{title}</span>
+        </p>
         {subtitle && <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{subtitle}</p>}
       </div>
       {meta && <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{meta}</div>}
@@ -370,6 +404,49 @@ export function OverflowMenuColumns({
   );
 }
 
+export interface BulkAction {
+  label: string;
+  icon?: React.ElementType;
+  onClick: () => void;
+  variant?: 'default' | 'danger';
+  disabled?: boolean;
+}
+
+/** Sticky bar that appears above a list once rows are selected — count + bulk action buttons. */
+export function ListSelectionBar({ count, actions, onClear }: { count: number; actions: BulkAction[]; onClear: () => void }) {
+  if (count === 0) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 border-b border-primary-100 dark:border-primary-800">
+      <div className="flex items-center gap-2 text-xs font-medium text-primary">
+        <span>{count} dipilih</span>
+        <button onClick={onClear} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 underline font-normal">
+          Batal
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        {actions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <button
+              key={a.label}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors disabled:opacity-40 ${
+                a.variant === 'danger'
+                  ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-700'
+              }`}
+            >
+              {Icon && <Icon size={13} />}
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function StatusBadge({ label, tone = 'gray' }: { label: string; tone?: 'gray' | 'green' | 'red' | 'blue' | 'orange' | 'purple' }) {
   const tones: Record<string, string> = {
     gray: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
@@ -383,5 +460,80 @@ export function StatusBadge({ label, tone = 'gray' }: { label: string; tone?: 'g
     <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${tones[tone]}`}>
       {label}
     </span>
+  );
+}
+
+/** "Views ▾" dropdown: save the current filter combination, or reapply/delete a saved one. */
+export function SavedViewsMenu<T>({
+  views,
+  onApply,
+  onSave,
+  onDelete,
+}: {
+  views: SavedView<T>[];
+  onApply: (filters: T) => void;
+  onSave: (name: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const handleSave = () => {
+    const name = window.prompt('Nama untuk filter ini:');
+    if (name && name.trim()) onSave(name.trim());
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      >
+        <Bookmark size={13} /> Views <ChevronDown size={12} className="opacity-60" />
+      </button>
+      {open && (
+        <div className="absolute left-0 mt-1.5 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 py-1">
+          <button
+            onClick={handleSave}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <Bookmark size={13} /> Simpan filter saat ini
+          </button>
+          {views.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1 max-h-56 overflow-y-auto">
+              {views.map((v) => (
+                <div key={v.id} className="flex items-center group">
+                  <button
+                    onClick={() => {
+                      onApply(v.filters);
+                      setOpen(false);
+                    }}
+                    className="flex-1 text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 truncate"
+                  >
+                    {v.name}
+                  </button>
+                  <button
+                    onClick={() => onDelete(v.id)}
+                    className="px-2 py-1.5 text-gray-300 hover:text-red-600 dark:text-gray-600 dark:hover:text-red-400"
+                    title="Hapus"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

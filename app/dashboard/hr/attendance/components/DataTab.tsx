@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
-import Loading from '@/components/ui/Loading';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
@@ -155,7 +155,7 @@ export default function DataTab() {
 
   const columns = ALL_COLUMNS.filter((c) => visibleCols.includes(c.key));
 
-  if (isLoading) return <Loading />;
+  if (isLoading) return <Card><SkeletonList /></Card>;
 
   return (
     <div className="space-y-4">

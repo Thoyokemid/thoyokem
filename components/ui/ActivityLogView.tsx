@@ -51,6 +51,10 @@ const ACTION_ICON: Record<string, React.ElementType> = {
   Paid: Check,
   Imported: Upload,
   Exported: Download,
+  Assigned: AtSign,
+  Unassigned: AtSign,
+  Attached: Upload,
+  Detached: Trash2,
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -67,6 +71,10 @@ const ACTION_COLOR: Record<string, string> = {
   Paid: 'text-green-500 bg-green-50 dark:bg-green-900/20',
   Imported: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
   Exported: 'text-gray-500 bg-gray-100 dark:bg-gray-800',
+  Assigned: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20',
+  Unassigned: 'text-gray-500 bg-gray-100 dark:bg-gray-800',
+  Attached: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
+  Detached: 'text-red-500 bg-red-50 dark:bg-red-900/20',
 };
 
 // Renders comment text with @Mentioned Names bolded + highlighted.
@@ -227,58 +235,62 @@ export default function ActivityLogView({ doctype, documentId }: { doctype: stri
           Belum ada riwayat perubahan
         </div>
       ) : (
-        <div className="space-y-3">
-          {feed.map((item) => {
-            if (item.kind === 'comment') {
-              const c = item.comment;
-              return (
-                <div key={`c-${c.comment_id}`} className="flex gap-2.5">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-purple-500 bg-purple-50 dark:bg-purple-900/20">
-                    <MessageSquare size={12} />
+        <div className="relative">
+          {/* Connector line running through every event's icon column, ERPNext-timeline style. */}
+          <div className="absolute left-3 top-1 bottom-1 w-px bg-gray-200 dark:bg-gray-700" />
+          <div className="space-y-3">
+            {feed.map((item) => {
+              if (item.kind === 'comment') {
+                const c = item.comment;
+                return (
+                  <div key={`c-${c.comment_id}`} className="flex gap-2.5">
+                    <div className="relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-4 ring-white dark:ring-gray-800">
+                      <MessageSquare size={12} />
+                    </div>
+                    <div className="flex-1 min-w-0 pb-1">
+                      <p className="text-xs text-gray-700 dark:text-gray-300">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{c.author || 'Unknown'}</span>{' '}
+                        berkomentar
+                        <span className="text-gray-400"> · {formatDateTime(c.timestamp)}</span>
+                      </p>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
+                        {renderCommentText(c.text, c.mentions)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0 pb-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+                );
+              }
+
+              const entry = item.entry;
+              const Icon = ACTION_ICON[entry.action] || Pencil;
+              const color = ACTION_COLOR[entry.action] || 'text-gray-500 bg-gray-50 dark:bg-gray-900/20';
+              return (
+                <div key={`a-${entry.log_id}`} className="flex gap-2.5">
+                  <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white dark:ring-gray-800 ${color}`}>
+                    <Icon size={12} />
+                  </div>
+                  <div className="flex-1 min-w-0 pb-1">
                     <p className="text-xs text-gray-700 dark:text-gray-300">
-                      <span className="font-medium text-gray-900 dark:text-gray-100">{c.author || 'Unknown'}</span>{' '}
-                      berkomentar
-                      <span className="text-gray-400"> · {formatDateTime(c.timestamp)}</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{entry.changed_by || 'System'}</span>{' '}
+                      {entry.action.toLowerCase()}
+                      <span className="text-gray-400"> · {formatDateTime(entry.timestamp)}</span>
                     </p>
-                    <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
-                      {renderCommentText(c.text, c.mentions)}
-                    </p>
+                    {entry.changes.length > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        {entry.changes.map((c, i) => (
+                          <p key={i} className="text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="font-medium">{c.field}</span>:{' '}
+                            <span className="line-through text-red-400">{c.from || '(kosong)'}</span>{' '}
+                            → <span className="text-green-600 dark:text-green-400">{c.to || '(kosong)'}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
-            }
-
-            const entry = item.entry;
-            const Icon = ACTION_ICON[entry.action] || Pencil;
-            const color = ACTION_COLOR[entry.action] || 'text-gray-500 bg-gray-50 dark:bg-gray-900/20';
-            return (
-              <div key={`a-${entry.log_id}`} className="flex gap-2.5">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${color}`}>
-                  <Icon size={12} />
-                </div>
-                <div className="flex-1 min-w-0 pb-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
-                  <p className="text-xs text-gray-700 dark:text-gray-300">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{entry.changed_by || 'System'}</span>{' '}
-                    {entry.action.toLowerCase()}
-                    <span className="text-gray-400"> · {formatDateTime(entry.timestamp)}</span>
-                  </p>
-                  {entry.changes.length > 0 && (
-                    <div className="mt-1.5 space-y-1">
-                      {entry.changes.map((c, i) => (
-                        <p key={i} className="text-[11px] text-gray-500 dark:text-gray-400">
-                          <span className="font-medium">{c.field}</span>:{' '}
-                          <span className="line-through text-red-400">{c.from || '(kosong)'}</span>{' '}
-                          → <span className="text-green-600 dark:text-green-400">{c.to || '(kosong)'}</span>
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -1,11 +1,14 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Printer, ArrowLeft } from 'lucide-react';
 
 export type PaperSize = 'a4' | 'f4' | 'thermal';
 export const SIZE_LABEL: Record<PaperSize, string> = { a4: 'A4', f4: 'F4', thermal: 'Thermal' };
+
+export type PrintFormat = 'standard' | 'compact';
+export const FORMAT_LABEL: Record<PrintFormat, string> = { standard: 'Standard', compact: 'Ringkas' };
 
 interface PrintItem {
   item_code: string;
@@ -46,10 +49,19 @@ export default function DocumentPrintLayout({
   footerNote,
 }: DocumentPrintLayoutProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const format = (searchParams.get('format') as PrintFormat) || 'standard';
+  const isCompact = format === 'compact';
   const total = items.reduce((sum, i) => sum + i.amount, 0);
 
+  const setParam = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(key, value);
+    router.push(`${printSizeBaseHref}?${params.toString()}`);
+  };
+
   return (
-    <div className={`doc-print-wrapper size-${size}`}>
+    <div className={`doc-print-wrapper size-${size} format-${format}`}>
       <style jsx global>{`
         @media print {
           @page {
@@ -59,6 +71,8 @@ export default function DocumentPrintLayout({
           .no-print { display: none !important; }
           body { background: white !important; }
         }
+        .format-compact .doc-table th, .format-compact .doc-table td { padding: 2px 5px; }
+        .format-compact .doc-print-page { padding-top: 10mm; padding-bottom: 10mm; }
         .doc-print-page {
           background: white;
           color: #111;
@@ -77,10 +91,20 @@ export default function DocumentPrintLayout({
           <ArrowLeft size={16} /> Kembali
         </button>
         <div className="flex items-center gap-2">
+          {(['standard', 'compact'] as PrintFormat[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setParam('format', f)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md border ${f === format ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:border-gray-800'}`}
+            >
+              {FORMAT_LABEL[f]}
+            </button>
+          ))}
+          <span className="w-px h-4 bg-gray-200" />
           {(['a4', 'f4', 'thermal'] as PaperSize[]).map((s) => (
             <button
               key={s}
-              onClick={() => router.push(`${printSizeBaseHref}?size=${s}`)}
+              onClick={() => setParam('size', s)}
               className={`px-2.5 py-1 text-xs font-medium rounded-md border ${s === size ? 'bg-primary text-white border-primary' : 'border-gray-300 text-gray-600 hover:border-primary'}`}
             >
               {SIZE_LABEL[s]}
@@ -105,8 +129,8 @@ export default function DocumentPrintLayout({
           <div>
             <p className="text-gray-500 text-xs uppercase mb-0.5">{partyLabel}</p>
             <p className="font-semibold">{partyName}</p>
-            {partyAddress && <p className="text-xs text-gray-600 max-w-[220px]">{partyAddress}</p>}
-            {partyPhone && <p className="text-xs text-gray-600">{partyPhone}</p>}
+            {!isCompact && partyAddress && <p className="text-xs text-gray-600 max-w-[220px]">{partyAddress}</p>}
+            {!isCompact && partyPhone && <p className="text-xs text-gray-600">{partyPhone}</p>}
           </div>
           <div className="text-right">
             {rightFields.map((f) => (
@@ -149,20 +173,22 @@ export default function DocumentPrintLayout({
           </tfoot>
         </table>
 
-        {footerNote && <p className="text-xs text-gray-500 mb-8">{footerNote}</p>}
+        {!isCompact && footerNote && <p className="text-xs text-gray-500 mb-8">{footerNote}</p>}
 
-        <div className="flex justify-between text-sm mt-12">
-          <div className="text-center w-40">
-            <p>Dibuat oleh,</p>
-            <div className="h-20" />
-            <p className="border-t border-gray-800 pt-1">( ________________ )</p>
+        {!isCompact && (
+          <div className="flex justify-between text-sm mt-12">
+            <div className="text-center w-40">
+              <p>Dibuat oleh,</p>
+              <div className="h-20" />
+              <p className="border-t border-gray-800 pt-1">( ________________ )</p>
+            </div>
+            <div className="text-center w-40">
+              <p>Disetujui oleh,</p>
+              <div className="h-20" />
+              <p className="border-t border-gray-800 pt-1">( ________________ )</p>
+            </div>
           </div>
-          <div className="text-center w-40">
-            <p>Disetujui oleh,</p>
-            <div className="h-20" />
-            <p className="border-t border-gray-800 pt-1">( ________________ )</p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

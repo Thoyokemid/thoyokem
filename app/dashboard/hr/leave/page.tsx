@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useSession } from "next-auth/react";
 import { redirect, useRouter, useSearchParams, usePathname } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Loading from "@/components/ui/Loading";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { ColumnDef } from "@/components/ui/ColumnPicker";
 import {
   ListViewLayout,
@@ -17,10 +21,13 @@ import {
   OverflowMenu,
   OverflowMenuItem,
   OverflowMenuColumns,
+  SavedViewsMenu,
+  ListSelectionBar,
 } from "@/components/ui/ListView";
+import { useSavedViews } from "@/lib/savedViews";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download } from "lucide-react";
+import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download, Ban } from "lucide-react";
 import * as XLSX from "xlsx";
 import { logExport } from "@/lib/logExport";
 import { formatDate, formatDateTime } from "@/lib/date";
@@ -92,20 +99,49 @@ export default function LeavePage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+
+  interface LeaveFilters {
+    searchName: string;
+    filterCategory: string;
+    filterDateFrom: string;
+    filterDateTo: string;
+  }
+  const { views: savedViews, saveView, deleteView } = useSavedViews<LeaveFilters>('hr_leave');
+  const applyView = (f: LeaveFilters) => {
+    setSearchName(f.searchName);
+    setFilterCategory(f.filterCategory);
+    setFilterDateFrom(f.filterDateFrom);
+    setFilterDateTo(f.filterDateTo);
+  };
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE_COLS);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
 
-  const [formData, setFormData] = useState({
-    staff_id: "",
-    date_from: "",
-    date_end: "",
-    category: "sick",
-    link_url: "",
-    keterangan: "",
+  // staff_id is only required when creating (not editing — employee is locked once set),
+  // so it's left optional here and checked manually in onSubmit for the create path.
+  const leaveFormSchema = z.object({
+    staff_id: z.string().optional(),
+    date_from: z.string().min(1, 'Tanggal mulai wajib diisi'),
+    date_end: z.string().min(1, 'Tanggal selesai wajib diisi'),
+    category: z.string().min(1),
+    link_url: z.string().optional(),
+    keterangan: z.string().optional(),
+  });
+  type LeaveFormValues = z.infer<typeof leaveFormSchema>;
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset: resetFormFields,
+    formState: { errors: formErrors },
+  } = useForm<LeaveFormValues>({
+    resolver: zodResolver(leaveFormSchema),
+    defaultValues: { staff_id: "", date_from: "", date_end: "", category: "sick", link_url: "", keterangan: "" },
   });
 
   useEffect(() => {
@@ -192,9 +228,8 @@ export default function LeavePage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    let fileUrl = formData.link_url;
+  const onSubmit = async (data: LeaveFormValues) => {
+    let fileUrl = data.link_url || "";
     if (uploadedFile) {
       fileUrl = await uploadFile();
       if (!fileUrl) return;
@@ -207,11 +242,11 @@ export default function LeavePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: editingLeave.id,
-            from_date: formData.date_from,
-            to_date: formData.date_end,
-            leave_type: formData.category,
+            from_date: data.date_from,
+            to_date: data.date_end,
+            leave_type: data.category,
             attachment: fileUrl,
-            description: formData.keterangan,
+            description: data.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -219,7 +254,7 @@ export default function LeavePage() {
         console.error("Error updating leave:", error);
       }
     } else {
-      const selectedStaff = staff.find((s) => s.employee_id === formData.staff_id);
+      const selectedStaff = staff.find((s) => s.employee_id === data.staff_id);
       if (!selectedStaff) return;
       try {
         const response = await fetch("/api/leave", {
@@ -228,11 +263,11 @@ export default function LeavePage() {
           body: JSON.stringify({
             employee: selectedStaff.user_id,
             employee_name: selectedStaff.employee_name,
-            from_date: formData.date_from,
-            to_date: formData.date_end,
-            leave_type: formData.category,
+            from_date: data.date_from,
+            to_date: data.date_end,
+            leave_type: data.category,
             attachment: fileUrl,
-            description: formData.keterangan,
+            description: data.keterangan,
           }),
         });
         if (response.ok) { resetForm(); fetchData(); }
@@ -244,7 +279,7 @@ export default function LeavePage() {
 
   const handleEdit = (leave: LeaveAttendance) => {
     setEditingLeave(leave);
-    setFormData({ staff_id: "", date_from: leave.from_date, date_end: leave.to_date, category: leave.leave_type, link_url: leave.attachment, keterangan: leave.description || "" });
+    resetFormFields({ staff_id: "", date_from: leave.from_date, date_end: leave.to_date, category: leave.leave_type, link_url: leave.attachment, keterangan: leave.description || "" });
     setIsModalOpen(true);
   };
 
@@ -258,11 +293,58 @@ export default function LeavePage() {
     }
   };
 
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Hapus ${selectedIds.size} pengajuan cuti terpilih?`)) return;
+    setIsBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) => fetch(`/api/leave?id=${id}`, { method: "DELETE" }))
+      );
+      const failed = results.filter((r) => !r.ok).length;
+      toast[failed > 0 ? 'error' : 'success'](
+        failed > 0 ? `${failed} dari ${selectedIds.size} gagal dihapus` : `${selectedIds.size} pengajuan cuti dihapus`
+      );
+      setSelectedIds(new Set());
+      fetchData();
+    } catch (error) {
+      console.error("Error bulk-deleting leave:", error);
+      toast.error("Gagal menghapus data terpilih");
+    } finally {
+      setIsBulkBusy(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const rows = filteredLeaves.filter((l) => selectedIds.has(l.id));
+    const exportData = rows.map((l) => ({
+      Name: l.employee_name,
+      'Date From': formatDate(l.from_date),
+      'Date To': formatDate(l.to_date),
+      Category: CATEGORY_LABELS[l.leave_type] || l.leave_type,
+      Keterangan: l.description || '',
+      Created: formatDateTime(l.created_at),
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Leave');
+    XLSX.writeFile(workbook, `leave_selected_${new Date().toISOString().split('T')[0]}.xlsx`);
+    logExport('Leave', exportData.length);
+  };
+
   const resetForm = () => {
     setIsModalOpen(false);
     setEditingLeave(null);
     setUploadedFile(null);
-    setFormData({ staff_id: "", date_from: "", date_end: "", category: "sick", link_url: "", keterangan: "" });
+    resetFormFields({ staff_id: "", date_from: "", date_end: "", category: "sick", link_url: "", keterangan: "" });
   };
 
   const clearFilters = () => {
@@ -389,6 +471,12 @@ export default function LeavePage() {
               >
                 {sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
+              <SavedViewsMenu
+                views={savedViews}
+                onApply={applyView}
+                onSave={(name) => saveView(name, { searchName, filterCategory, filterDateFrom, filterDateTo })}
+                onDelete={deleteView}
+              />
               <ViewModeDropdown mode={viewMode} onChange={setViewMode} />
               <OverflowMenu>
                 {viewMode === 'report' && (
@@ -426,11 +514,18 @@ export default function LeavePage() {
           </div>
         }
       >
+        {viewMode === 'list' && (
+          <ListSelectionBar
+            count={selectedIds.size}
+            onClear={() => setSelectedIds(new Set())}
+            actions={[
+              { label: 'Export', icon: Download, onClick: handleBulkExport },
+              { label: 'Hapus', icon: Ban, variant: 'danger', disabled: isBulkBusy, onClick: handleBulkDelete },
+            ]}
+          />
+        )}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loading size="lg" />
-            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Loading leave data...</p>
-          </div>
+          <SkeletonList />
         ) : loadError ? (
           <div className="px-3 py-6 text-center">
             <p className="text-sm text-red-500 mb-2">Gagal memuat data — coba lagi.</p>
@@ -508,6 +603,8 @@ export default function LeavePage() {
                   )
                 }
                 badges={<CategoryBadge category={row.leave_type} />}
+                selected={selectedIds.has(row.id)}
+                onSelectChange={(checked) => toggleSelect(row.id, checked)}
                 actions={
                   <>
                     <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
@@ -549,16 +646,11 @@ export default function LeavePage() {
       </ListViewLayout>
 
         <Modal isOpen={isModalOpen} onClose={resetForm} title={editingLeave ? "Edit Leave Request" : "Add Leave Request"}>
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-3">
             {!editingLeave && (
               <div>
                 <label className="label-field">Employee</label>
-                <select
-                  value={formData.staff_id}
-                  onChange={(e) => setFormData({ ...formData, staff_id: e.target.value })}
-                  className="input-field"
-                  required
-                >
+                <select {...register('staff_id')} className="input-field">
                   <option value="">Select employee</option>
                   {staff.map((s) => (
                     <option key={s.employee_id} value={s.employee_id}>{s.employee_name}</option>
@@ -576,12 +668,7 @@ export default function LeavePage() {
 
             <div>
               <label className="label-field">Category</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="input-field"
-                required
-              >
+              <select {...register('category')} className="input-field">
                 <option value="sick">Sick Leave</option>
                 <option value="annual">Annual Leave</option>
                 <option value="personal">Personal Leave</option>
@@ -592,31 +679,20 @@ export default function LeavePage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label-field">From Date</label>
-                <input
-                  type="date"
-                  value={formData.date_from}
-                  onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
-                  className="input-field"
-                  required
-                />
+                <input type="date" {...register('date_from')} className="input-field" />
+                {formErrors.date_from && <p className="text-xs text-red-600 mt-1">{formErrors.date_from.message}</p>}
               </div>
               <div>
                 <label className="label-field">To Date</label>
-                <input
-                  type="date"
-                  value={formData.date_end}
-                  onChange={(e) => setFormData({ ...formData, date_end: e.target.value })}
-                  className="input-field"
-                  required
-                />
+                <input type="date" {...register('date_end')} className="input-field" />
+                {formErrors.date_end && <p className="text-xs text-red-600 mt-1">{formErrors.date_end.message}</p>}
               </div>
             </div>
 
             <div>
               <label className="label-field">Keterangan</label>
               <textarea
-                value={formData.keterangan}
-                onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
+                {...register('keterangan')}
                 className="input-field"
                 rows={2}
                 placeholder="Add a note or reason for this leave (optional)"
@@ -635,9 +711,9 @@ export default function LeavePage() {
                   <span className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG</span>
                 </label>
               </div>
-              {formData.link_url && !uploadedFile && (
+              {editingLeave?.attachment && !uploadedFile && (
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                  Current: <a href={formData.link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a>
+                  Current: <a href={editingLeave.attachment} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a>
                 </p>
               )}
             </div>

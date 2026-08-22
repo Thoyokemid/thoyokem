@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Button from "@/components/ui/Button";
-import Loading from "@/components/ui/Loading";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/components/ui/ListView";
 import { Registration } from "@/types";
 import { getInitials } from "@/utils/format";
@@ -154,9 +154,7 @@ export default function RegistrationPage() {
         ]}
       >
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loading size="lg" />
-          </div>
+          <SkeletonList />
         ) : filteredRegistrations.length === 0 ? (
           <div className="text-center py-10">
             <AlertCircle className="mx-auto text-gray-400 mb-3" size={40} />
@@ -171,6 +169,7 @@ export default function RegistrationPage() {
               onClick={() => router.push(`/dashboard/registration/${encodeURIComponent(registration.id)}`)}
               avatar={<ListRowAvatar initials={getInitials(registration.name)} />}
               title={registration.name}
+              statusTone={activeTab === 'approved' ? 'green' : activeTab === 'rejected' ? 'red' : 'orange'}
               subtitle={registration.email}
               meta={`Requested: ${formatDateTime(registration.created_at)}`}
               badges={

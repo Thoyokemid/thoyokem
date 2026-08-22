@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection, FieldGrid, DetailTable } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Customer } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -96,6 +97,17 @@ export default function CustomerDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !customer}
         badges={customer && <StatusBadge label={customer.is_active ? 'Active' : 'Inactive'} tone={customer.is_active ? 'green' : 'gray'} />}
+        sidebar={
+          customer && (
+            <>
+              <AssignedToSection doctype="Customer" documentId={customer.customer_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Customer" documentId={customer.customer_id} />
+                <AttachmentSection doctype="Customer" documentId={customer.customer_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {customer && (
           <div className="space-y-4">
@@ -130,10 +142,6 @@ export default function CustomerDetailPage() {
                   total_amount: `Rp${o.total_amount.toLocaleString('id-ID')}`,
                 }))}
               />
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Customer" documentId={customer.customer_id} />
-              <AttachmentSection doctype="Customer" documentId={customer.customer_id} />
             </DetailSection>
           </div>
         )}

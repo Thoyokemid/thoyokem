@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { DetailView, DetailSection } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { Role } from '@/types';
 import { AlertCircle } from 'lucide-react';
@@ -88,6 +89,17 @@ export default function RoleDetailPage() {
         isLoading={isLoading}
         notFound={!isLoading && !role}
         badges={role?.is_super_admin && <StatusBadge label="Super Admin" tone="orange" />}
+        sidebar={
+          role && (
+            <>
+              <AssignedToSection doctype="Role" documentId={role.role_id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Role" documentId={role.role_id} />
+                <AttachmentSection doctype="Role" documentId={role.role_id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {role && (
           <div className="space-y-4">
@@ -106,10 +118,6 @@ export default function RoleDetailPage() {
                   Super Admin selalu punya akses penuh ke semua modul, termasuk yang ditambahkan di masa depan — terlepas dari flag di atas.
                 </p>
               )}
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Role" documentId={role.role_id} />
-              <AttachmentSection doctype="Role" documentId={role.role_id} />
             </DetailSection>
           </div>
         )}

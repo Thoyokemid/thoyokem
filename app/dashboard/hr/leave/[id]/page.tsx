@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import { DetailView, DetailSection, FieldGrid } from '@/components/ui/DetailView';
 import { StatusBadge } from '@/components/ui/ListView';
 import ActivityLogView from '@/components/ui/ActivityLogView';
+import AssignedToSection from '@/components/ui/AssignedToSection';
 import AttachmentSection from '@/components/ui/AttachmentSection';
 import { LeaveAttendance, StaffList } from '@/types';
 import { countLeaveDays, countUsedLeaveDays } from '@/utils/attendance';
@@ -110,6 +111,17 @@ export default function LeaveDetailPage() {
             </Button>
           )
         }
+        sidebar={
+          leave && (
+            <>
+              <AssignedToSection doctype="Leave" documentId={leave.id} />
+              <DetailSection title="Riwayat">
+                <ActivityLogView doctype="Leave" documentId={leave.id} />
+                <AttachmentSection doctype="Leave" documentId={leave.id} />
+              </DetailSection>
+            </>
+          )
+        }
       >
         {leave && (
           <div className="space-y-4">
@@ -141,10 +153,6 @@ export default function LeaveDetailPage() {
                   <FileText size={13} /> Lihat dokumen pendukung
                 </a>
               )}
-            </DetailSection>
-            <DetailSection title="Riwayat">
-              <ActivityLogView doctype="Leave" documentId={leave.id} />
-              <AttachmentSection doctype="Leave" documentId={leave.id} />
             </DetailSection>
           </div>
         )}

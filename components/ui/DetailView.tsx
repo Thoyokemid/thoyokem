@@ -34,10 +34,12 @@ interface DetailViewProps {
   isLoading?: boolean;
   notFound?: boolean;
   children?: React.ReactNode;
+  /** ERPNext-style right rail — Riwayat/Lampiran etc. When set, main content and this sit side by side on desktop. */
+  sidebar?: React.ReactNode;
 }
 
 /** ERPNext-style single-document page: breadcrumb, title/badges, action buttons, and a body slot. */
-export function DetailView({ backHref, backLabel, title, subtitle, badges, actions, isLoading, notFound, children }: DetailViewProps) {
+export function DetailView({ backHref, backLabel, title, subtitle, badges, actions, isLoading, notFound, children, sidebar }: DetailViewProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [viewers, setViewers] = useState<Viewer[]>([]);
@@ -142,7 +144,14 @@ export function DetailView({ backHref, backLabel, title, subtitle, badges, actio
               {actions && <div className="flex items-center gap-2">{actions}</div>}
             </div>
           </div>
-          {children}
+          {sidebar ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+              <div className="lg:col-span-2 space-y-4 min-w-0">{children}</div>
+              <div className="lg:col-span-1 space-y-4 min-w-0">{sidebar}</div>
+            </div>
+          ) : (
+            children
+          )}
         </>
       )}
     </div>

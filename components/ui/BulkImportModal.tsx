@@ -144,7 +144,10 @@ export default function BulkImportModal({
   };
 
   const handleUpload = async () => {
-    if (!rows.length) return;
+    // Only the rows that passed client-side validation — the preview UI tells the
+    // user erroring rows will be skipped, so the request must actually honor that.
+    const validRows = rowSchema ? rows.filter((_, i) => !rowErrors[i]) : rows;
+    if (!validRows.length) return;
     setIsUploading(true);
     setResult(null);
 
@@ -152,7 +155,7 @@ export default function BulkImportModal({
       const res = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows }),
+        body: JSON.stringify({ rows: validRows }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import gagal');
@@ -160,7 +163,7 @@ export default function BulkImportModal({
       setResult(data as ImportResult);
       if (data.created > 0) onImported?.();
     } catch (error: any) {
-      setResult({ success: false, created: 0, skipped: rows.length, errors: [{ row: 0, message: error.message || 'Import gagal' }] });
+      setResult({ success: false, created: 0, skipped: validRows.length, errors: [{ row: 0, message: error.message || 'Import gagal' }] });
     } finally {
       setIsUploading(false);
     }

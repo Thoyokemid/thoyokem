@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Cpu,
   ScrollText,
+  BarChart3,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,9 +47,21 @@ function SidebarInner({ permissions, animateIn }: SidebarProps) {
   const isSuperAdmin = !!session?.user.isSuperAdmin;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
 
   useEffect(() => {
     setIsCollapsed(localStorage.getItem('sidebar_collapsed') === '1');
+  }, []);
+
+  useEffect(() => {
+    const check = () => {
+      fetch('/api/health')
+        .then((res) => setIsHealthy(res.ok))
+        .catch(() => setIsHealthy(false));
+    };
+    check();
+    const interval = setInterval(check, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleCollapsed = () => {
@@ -138,6 +151,12 @@ function SidebarInner({ permissions, animateIn }: SidebarProps) {
       icon: UserPlus,
       href: '/dashboard/registration',
       enabled: permissions.registration_request,
+    },
+    {
+      name: 'Report Builder',
+      icon: BarChart3,
+      href: '/dashboard/reports',
+      enabled: permissions.inventory || permissions.purchasing || permissions.sales_order || permissions.staff || permissions.leave,
     },
     {
       name: 'Settings',
@@ -285,6 +304,20 @@ function SidebarInner({ permissions, animateIn }: SidebarProps) {
           );
         })}
       </nav>
+
+      <div className={`p-2 border-t border-gray-200 dark:border-gray-700 flex items-center gap-1.5 ${isCollapsed ? 'justify-center' : 'px-3'}`}>
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+            isHealthy === null ? 'bg-gray-300 dark:bg-gray-600' : isHealthy ? 'bg-green-500' : 'bg-red-500 animate-pulse'
+          }`}
+          title={isHealthy === null ? 'Mengecek koneksi...' : isHealthy ? 'Sistem normal' : 'Gangguan koneksi database'}
+        />
+        {!isCollapsed && (
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            {isHealthy === null ? 'Checking...' : isHealthy ? 'Sistem normal' : 'Gangguan koneksi'}
+          </span>
+        )}
+      </div>
     </>
   );
 
