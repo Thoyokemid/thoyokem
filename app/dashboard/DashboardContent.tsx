@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import ModuleOverview from '@/components/dashboard/ModuleOverview';
+import UpcomingBirthdaysWidget from '@/components/dashboard/UpcomingBirthdaysWidget';
 import {
   LayoutDashboard, Clock, FileText, Users, UserPlus, Settings,
   Boxes, ShoppingCart, ShoppingBag, Truck, ChevronRight,
@@ -52,6 +53,8 @@ export default function DashboardContent({ userName, permissions }: DashboardCon
       </div>
 
       <ModuleOverview permissions={permissions} />
+
+      <UpcomingBirthdaysWidget />
 
       {quickActions.length > 0 && (
         <Card title="Quick Action">
