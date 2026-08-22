@@ -12,7 +12,7 @@ import {
   PERMISSION_ACTIONS, WORKFLOW_ACTIONS, WORKFLOW_ACTION_DOCTYPES, ACTION_LABELS, MATRIX_DOCTYPES,
   PermissionAction, OWNER_TRACKED_DOCTYPES, ASSIGNABLE_RESTRICT_DOCTYPES,
 } from '@/lib/permissionsShared';
-import { ShieldCheck, ArrowLeft, RotateCcw } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, RotateCcw, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type MatrixRow = {
@@ -21,6 +21,13 @@ type MatrixRow = {
   restrictToAssigned: boolean;
   isOverride: boolean;
 } & Record<PermissionAction, boolean>;
+
+interface FieldRow {
+  doctype: string;
+  field: string;
+  label: string;
+  can_view: boolean;
+}
 
 export default function PermissionMatrixPage() {
   const { data: session, status } = useSession();
@@ -42,6 +49,8 @@ export default function PermissionMatrixPage() {
       .catch(() => setRoles([]));
   }, []);
 
+  const [fields, setFields] = useState<FieldRow[]>([]);
+
   const fetchMatrix = useCallback((roleId: string) => {
     if (!roleId) return;
     setIsLoading(true);
@@ -56,11 +65,38 @@ export default function PermissionMatrixPage() {
         toast.error('Gagal memuat permission matrix');
       })
       .finally(() => setIsLoading(false));
+
+    fetch(`/api/field-permissions?role_id=${encodeURIComponent(roleId)}`)
+      .then((res) => (res.ok ? res.json() : { fields: [] }))
+      .then((data) => setFields(data.fields || []))
+      .catch(() => setFields([]));
   }, []);
 
   useEffect(() => {
     if (selectedRoleId) fetchMatrix(selectedRoleId);
   }, [selectedRoleId, fetchMatrix]);
+
+  const handleToggleField = async (row: FieldRow) => {
+    const key = `field:${row.doctype}:${row.field}`;
+    const nextValue = !row.can_view;
+    setSavingKey(key);
+    setFields((prev) => prev.map((f) => (f.doctype === row.doctype && f.field === row.field ? { ...f, can_view: nextValue } : f)));
+
+    try {
+      const res = await fetch('/api/field-permissions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role_id: selectedRoleId, doctype: row.doctype, field: row.field, can_view: nextValue }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Gagal menyimpan');
+      toast.success(`${row.doctype} · ${row.label} diperbarui`);
+    } catch (error: any) {
+      setFields((prev) => prev.map((f) => (f.doctype === row.doctype && f.field === row.field ? row : f)));
+      toast.error(error.message || 'Gagal menyimpan izin field');
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   const saveRow = async (row: MatrixRow, updated: MatrixRow, key: string, label: string) => {
     setSavingKey(key);
@@ -295,6 +331,45 @@ export default function PermissionMatrixPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-2 mb-1">
+            <EyeOff size={16} className="text-gray-500" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Field Permissions</h3>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Sembunyikan field sensitif tertentu untuk role ini — field yang tidak tercentang muncul kosong di daftar/detail, walau role tetap punya akses Read ke doctype-nya.
+          </p>
+
+          {isSuperAdminRole ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+              Super Admin selalu melihat semua field — tidak bisa dikustomisasi.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {fields.map((f) => {
+                const key = `field:${f.doctype}:${f.field}`;
+                return (
+                  <label key={key} className="flex items-center justify-between px-3 py-2 rounded-md border border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <span className="text-xs text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">{f.doctype}</span> · {f.label}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-400">{f.can_view ? 'Terlihat' : 'Disembunyikan'}</span>
+                      <input
+                        type="checkbox"
+                        checked={f.can_view}
+                        disabled={savingKey === key}
+                        onChange={() => handleToggleField(f)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer disabled:opacity-50"
+                      />
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           )}
         </Card>

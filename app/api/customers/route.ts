@@ -5,7 +5,8 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Customer } from '@/types';
 import { validate, customerCreateSchema, customerUpdateSchema } from '@/lib/validation';
-import { hasDoctypePermission, requiresAssignedOnly, filterToAssignedOnly, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
+import { hasDoctypePermission, requiresAssignedOnly, filterToAssignedOnly, resolveReadScope, getSharedDocumentIds, redactRestrictedFields, PermissionAction } from '@/lib/permissions';
+import { resolveApiSession } from '@/lib/apiAuth';
 
 async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
@@ -16,8 +17,10 @@ async function requireAccess(action: PermissionAction) {
   return { session };
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest) {
+  // Accepts either the normal session cookie or an `Authorization: Bearer <API key>`
+  // header — pilot doctype for API key access (see lib/apiAuth.ts).
+  const session = await resolveApiSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // A role without Customer Read can still see individually shared customers
@@ -47,6 +50,8 @@ export async function GET() {
     } else if (await requiresAssignedOnly(session, 'Customer')) {
       customers = await filterToAssignedOnly(session, 'Customer', customers, (c) => c.customer_id);
     }
+
+    customers = await redactRestrictedFields(session, 'Customer', ['credit_limit'], customers);
 
     return NextResponse.json(customers);
   } catch (error) {

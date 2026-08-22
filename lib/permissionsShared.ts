@@ -53,7 +53,16 @@ export const MATRIX_DOCTYPES = [
 // (BOM DELETE, Purchase/Sales Order and Delivery Note's PATCH status-transition handlers).
 export const OWNER_TRACKED_DOCTYPES = ['BOM', 'Purchase Order', 'Sales Order', 'Delivery Note', 'Stock Entry', 'Purchase Invoice', 'Sales Invoice'] as const;
 
+// Field-level permission (mirrors ERPNext's Permission Level) — deliberately scoped to a
+// curated handful of genuinely sensitive fields rather than every field on every doctype.
+// Each entry: the doctype, the API response key (snake_case, matching what the GET
+// endpoint returns to the client), and a human label for the Settings UI.
+export const FIELD_PERMISSION_FIELDS: { doctype: string; field: string; label: string }[] = [
+  { doctype: 'Item', field: 'purchase_price', label: 'Purchase Price' },
+  { doctype: 'Customer', field: 'credit_limit', label: 'Credit Limit' },
+];
+
 // Doctypes where "Restrict to Assigned" (scope Read down to only assigned documents,
 // via the assignments table) makes business sense — e.g. a sales rep who should only
 // see their own accounts. Deliberately not offered on every doctype.
-export const ASSIGNABLE_RESTRICT_DOCTYPES = ['Customer', 'Sales Order'] as const;
+export const ASSIGNABLE_RESTRICT_DOCTYPES = ['Customer', 'Sales Order', 'Supplier', 'Purchase Order'] as const;

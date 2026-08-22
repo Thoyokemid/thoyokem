@@ -8,7 +8,17 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
 import { UserProfile } from "@/types";
-import { Save, Upload, KeyRound, User as UserIcon } from "lucide-react";
+import { Save, Upload, KeyRound, User as UserIcon, Code2, Copy, Trash2, Plus } from "lucide-react";
+import toast from "react-hot-toast";
+
+interface ApiKeyRow {
+  id: string;
+  name: string;
+  key_prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -22,9 +32,80 @@ export default function ProfilePage() {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
 
+  const [apiKeys, setApiKeys] = useState<ApiKeyRow[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [isCreatingKey, setIsCreatingKey] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [busyKeyId, setBusyKeyId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (session) fetchProfile();
+    if (session) {
+      fetchProfile();
+      fetchApiKeys();
+    }
   }, [session]);
+
+  const fetchApiKeys = async () => {
+    try {
+      const res = await fetch("/api/api-keys");
+      if (res.ok) setApiKeys(await res.json());
+    } catch (error) {
+      console.error("Error fetching API keys:", error);
+    }
+  };
+
+  const handleCreateKey = async () => {
+    if (!newKeyName.trim()) {
+      toast.error("Nama key wajib diisi");
+      return;
+    }
+    setIsCreatingKey(true);
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedToken(data.token);
+        setNewKeyName("");
+        fetchApiKeys();
+      } else {
+        toast.error(data.error || "Gagal membuat API key");
+      }
+    } catch (error) {
+      console.error("Error creating API key:", error);
+      toast.error("Gagal membuat API key");
+    } finally {
+      setIsCreatingKey(false);
+    }
+  };
+
+  const handleRevokeKey = async (id: string) => {
+    if (!confirm("Cabut API key ini? Aplikasi yang memakainya akan langsung berhenti bisa akses.")) return;
+    setBusyKeyId(id);
+    try {
+      const res = await fetch(`/api/api-keys?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchApiKeys();
+        toast.success("API key dicabut");
+      } else {
+        toast.error((await res.json()).error || "Gagal mencabut API key");
+      }
+    } catch (error) {
+      console.error("Error revoking API key:", error);
+      toast.error("Gagal mencabut API key");
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
+
+  const copyToken = () => {
+    if (!generatedToken) return;
+    navigator.clipboard.writeText(generatedToken);
+    toast.success("Token disalin");
+  };
 
   const fetchProfile = async () => {
     try {
@@ -305,6 +386,78 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
+            </Card>
+
+            <Card title="API Keys">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 mt-0.5">
+                  <Code2 className="text-indigo-500" size={16} />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Untuk akses programatik ke API — pakai sebagai header <code className="text-[11px] bg-gray-100 dark:bg-gray-700 px-1 rounded">Authorization: Bearer &lt;token&gt;</code>.
+                  Token hanya ditampilkan sekali saat dibuat.
+                </p>
+              </div>
+
+              {generatedToken && (
+                <div className="mb-4 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1.5">
+                    Simpan token ini sekarang — tidak akan ditampilkan lagi.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs bg-white dark:bg-gray-800 px-2 py-1.5 rounded border border-amber-200 dark:border-amber-700 overflow-x-auto whitespace-nowrap">
+                      {generatedToken}
+                    </code>
+                    <button onClick={copyToken} className="p-1.5 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/40 rounded">
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                  <button onClick={() => setGeneratedToken(null)} className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline mt-1.5">
+                    Sudah disimpan, tutup
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  placeholder="Nama key (mis. Zapier integration)"
+                  className="input-field text-sm flex-1"
+                />
+                <Button onClick={handleCreateKey} isLoading={isCreatingKey}>
+                  <Plus size={14} className="mr-1.5" />Generate
+                </Button>
+              </div>
+
+              {apiKeys.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-3">Belum ada API key.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {apiKeys.map((k) => (
+                    <div key={k.id} className="flex items-center justify-between px-3 py-2 rounded-md border border-gray-100 dark:border-gray-700">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
+                          {k.name}
+                          {k.revoked_at && <span className="ml-2 text-[10px] text-red-500 font-normal">Dicabut</span>}
+                        </p>
+                        <p className="text-[11px] text-gray-400 font-mono">{k.key_prefix}••••••••</p>
+                      </div>
+                      {!k.revoked_at && (
+                        <button
+                          onClick={() => handleRevokeKey(k.id)}
+                          disabled={busyKeyId === k.id}
+                          className="flex-shrink-0 p-1.5 text-gray-400 hover:text-red-600 rounded disabled:opacity-40"
+                          title="Cabut key"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </>
         )}

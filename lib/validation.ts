@@ -312,6 +312,17 @@ export const rolePermissionUpdateSchema = z.object({
   print: z.boolean().optional(),
 });
 
+export const apiKeyCreateSchema = z.object({
+  name: z.string().min(1, 'Nama key wajib diisi').max(80, 'Nama key maksimal 80 karakter'),
+});
+
+export const fieldPermissionUpdateSchema = z.object({
+  role_id: z.string().min(1, 'role_id wajib diisi'),
+  doctype: z.string().min(1, 'doctype wajib diisi'),
+  field: z.string().min(1, 'field wajib diisi'),
+  can_view: z.boolean(),
+});
+
 export const roleCreateSchema = z.object({
   role_name: z.string().optional().nullable(),
   ...permissionFlags,

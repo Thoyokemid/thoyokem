@@ -100,6 +100,33 @@ export async function requiresAssignedOnly(session: SessionLike, doctype: string
   return !!override?.restrictToAssigned;
 }
 
+/**
+ * Field-level permission (mirrors ERPNext's Permission Level, scoped to
+ * FIELD_PERMISSION_FIELDS — see lib/permissionsShared.ts). No row = visible,
+ * matching ERPNext's own "not configured = visible" default. Superadmin always sees
+ * everything. Redacts to `null` in-place on every record for the given field.
+ */
+export async function redactRestrictedFields<T extends Record<string, any>>(
+  session: SessionLike,
+  doctype: string,
+  fields: string[],
+  records: T[]
+): Promise<T[]> {
+  if (session.user.isSuperAdmin || fields.length === 0) return records;
+
+  const rows = await prisma.fieldPermission.findMany({
+    where: { roleId: session.user.role_id, doctype, field: { in: fields } },
+  });
+  const hidden = rows.filter((r) => !r.canView).map((r) => r.field);
+  if (hidden.length === 0) return records;
+
+  return records.map((r) => {
+    const copy = { ...r };
+    for (const field of hidden) (copy as Record<string, any>)[field] = null;
+    return copy;
+  });
+}
+
 /** Filters a list of records down to only those the user is assigned to, keyed by documentId. */
 export async function filterToAssignedOnly<T>(
   session: SessionLike,

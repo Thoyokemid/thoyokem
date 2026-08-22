@@ -5,7 +5,8 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Item } from '@/types';
 import { validate, itemCreateSchema, itemUpdateSchema } from '@/lib/validation';
-import { hasDoctypePermission, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
+import { hasDoctypePermission, resolveReadScope, getSharedDocumentIds, redactRestrictedFields, PermissionAction } from '@/lib/permissions';
+import { resolveApiSession } from '@/lib/apiAuth';
 
 async function requireInventoryAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
@@ -16,8 +17,10 @@ async function requireInventoryAccess(action: PermissionAction) {
   return { session };
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest) {
+  // Accepts either the normal session cookie or an `Authorization: Bearer <API key>`
+  // header — pilot doctype for API key access (see lib/apiAuth.ts).
+  const session = await resolveApiSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // A role without Item Read can still see individually shared items
@@ -49,6 +52,8 @@ export async function GET() {
       const sharedIds = await getSharedDocumentIds(session, 'Item');
       items = items.filter((i) => sharedIds.has(i.item_code));
     }
+
+    items = await redactRestrictedFields(session, 'Item', ['purchase_price'], items);
 
     return NextResponse.json(items);
   } catch (error) {

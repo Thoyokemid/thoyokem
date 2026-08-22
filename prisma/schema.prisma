@@ -36,6 +36,7 @@ model Role {
 
   users User[]
   rolePermissions RolePermission[]
+  fieldPermissions FieldPermission[]
 
   @@map("roles")
 }
@@ -70,6 +71,42 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+// Field-level permission (mirrors ERPNext's Permission Level concept, scoped down to a
+// curated set of genuinely sensitive fields rather than a full 0-9 level system — see
+// FIELD_PERMISSION_FIELDS in lib/permissionsShared.ts for exactly which fields exist here).
+// A row present here restricts visibility of that one field for that role on GET responses;
+// absent = visible (matches ERPNext's own "not configured = visible" default).
+model FieldPermission {
+  id       String  @id
+  roleId   String  @map("role_id")
+  doctype  String
+  field    String
+  canView  Boolean @default(true) @map("can_view")
+
+  role Role @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+
+  @@unique([roleId, doctype, field])
+  @@map("field_permissions")
+}
+
+// Per-user API key for programmatic access, checked as a Bearer token alongside the
+// normal session cookie — see lib/apiAuth.ts. Only the SHA-256 hash is stored; the
+// plaintext token is shown to the user once, at creation time, and never again.
+model ApiKey {
+  id         String    @id
+  userId     String    @map("user_id")
+  name       String
+  keyPrefix  String    @map("key_prefix")
+  keyHash    String    @map("key_hash")
+  createdAt  String    @map("created_at")
+  lastUsedAt String?   @map("last_used_at")
+  revokedAt  String?   @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
 model User {
   id                    String  @id
   name                  String
@@ -88,6 +125,7 @@ model User {
   bio                   String?
 
   roleRef Role @relation(fields: [roleId], references: [roleId])
+  apiKeys ApiKey[]
 
   @@map("users")
 }

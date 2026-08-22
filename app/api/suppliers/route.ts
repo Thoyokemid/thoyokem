@@ -5,7 +5,8 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Supplier } from '@/types';
 import { validate, supplierCreateSchema, supplierUpdateSchema } from '@/lib/validation';
-import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
+import { hasDoctypePermission, requiresAssignedOnly, filterToAssignedOnly, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
+import { resolveApiSession } from '@/lib/apiAuth';
 
 async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
@@ -16,13 +17,20 @@ async function requireAccess(action: PermissionAction) {
   return { session };
 }
 
-export async function GET() {
-  const guard = await requireAccess('read');
-  if (guard.error) return guard.error;
+export async function GET(request: NextRequest) {
+  const session = await resolveApiSession(request);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // A role without Supplier Read can still see individually shared suppliers
+  // (Assignment with "grants access" checked) — see lib/permissions.ts.
+  const scope = await resolveReadScope(session, 'Supplier');
+  if (scope === 'none') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   try {
     const records = await prisma.supplier.findMany();
-    const suppliers: Supplier[] = records.map((r) => ({
+    let suppliers: Supplier[] = records.map((r) => ({
       supplier_id: r.supplierId,
       supplier_name: r.supplierName,
       contact: r.contact || '',
@@ -32,6 +40,14 @@ export async function GET() {
       payment_terms: r.paymentTerms || '',
       is_active: r.isActive,
     }));
+
+    if (scope === 'shared') {
+      const sharedIds = await getSharedDocumentIds(session, 'Supplier');
+      suppliers = suppliers.filter((s) => sharedIds.has(s.supplier_id));
+    } else if (await requiresAssignedOnly(session, 'Supplier')) {
+      suppliers = await filterToAssignedOnly(session, 'Supplier', suppliers, (s) => s.supplier_id);
+    }
+
     return NextResponse.json(suppliers);
   } catch (error) {
     console.error('Error fetching suppliers:', error);

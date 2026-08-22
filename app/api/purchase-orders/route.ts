@@ -7,7 +7,7 @@ import { appendStockLedgerEntry } from '@/lib/stock';
 import { logActivity } from '@/lib/activityLog';
 import { broadcastNotificationsChanged } from '@/lib/realtime';
 import { validate, purchaseOrderCreateSchema, purchaseOrderActionSchema } from '@/lib/validation';
-import { hasDoctypePermission, requiresOwnerMatch, PermissionAction } from '@/lib/permissions';
+import { hasDoctypePermission, requiresOwnerMatch, requiresAssignedOnly, filterToAssignedOnly, PermissionAction } from '@/lib/permissions';
 
 async function requireAccess(action: PermissionAction) {
   const session = await getServerSession(authOptions);
@@ -30,7 +30,7 @@ export async function GET() {
     const suppliers = await prisma.supplier.findMany({ select: { supplierId: true, supplierName: true } });
     const supplierMap = new Map(suppliers.map((s) => [s.supplierId, s.supplierName]));
 
-    const result = orders.map((po) => ({
+    let result = orders.map((po) => ({
       po_id: po.poId,
       supplier_id: po.supplierId,
       supplier_name: supplierMap.get(po.supplierId) || po.supplierId,
@@ -55,6 +55,10 @@ export async function GET() {
         warehouse_id: i.warehouseId,
       })),
     }));
+
+    if (await requiresAssignedOnly(guard.session!, 'Purchase Order')) {
+      result = await filterToAssignedOnly(guard.session!, 'Purchase Order', result, (po) => po.po_id);
+    }
 
     return NextResponse.json(result);
   } catch (error) {

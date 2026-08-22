@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activityLog';
 import { Warehouse } from '@/types';
 import { validate, warehouseCreateSchema, warehouseUpdateSchema } from '@/lib/validation';
-import { hasDoctypePermission, PermissionAction } from '@/lib/permissions';
+import { hasDoctypePermission, resolveReadScope, getSharedDocumentIds, PermissionAction } from '@/lib/permissions';
 
 function generateWarehouseId(): string {
   let id = '';
@@ -23,12 +23,17 @@ async function requireInventoryAccess(action: PermissionAction) {
 }
 
 export async function GET() {
-  const guard = await requireInventoryAccess('read');
-  if (guard.error) return guard.error;
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const scope = await resolveReadScope(session, 'Warehouse');
+  if (scope === 'none') {
+    return NextResponse.json({ error: 'Forbidden: no inventory access' }, { status: 403 });
+  }
 
   try {
     const records = await prisma.warehouse.findMany();
-    const warehouses: Warehouse[] = records.map((r) => ({
+    let warehouses: Warehouse[] = records.map((r) => ({
       warehouse_id: r.warehouseId,
       warehouse_name: r.warehouseName,
       location: r.location,
@@ -38,6 +43,12 @@ export async function GET() {
       address: r.address || '',
       postal_code: r.postalCode || '',
     }));
+
+    if (scope === 'shared') {
+      const sharedIds = await getSharedDocumentIds(session, 'Warehouse');
+      warehouses = warehouses.filter((w) => sharedIds.has(w.warehouse_id));
+    }
+
     return NextResponse.json(warehouses);
   } catch (error) {
     console.error('Error fetching warehouses:', error);
