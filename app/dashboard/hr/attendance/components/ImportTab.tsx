@@ -64,7 +64,10 @@ function excelSerialToDate(serial: number): Date {
 }
 
 function toDateObj(value: unknown): Date | null {
-  if (value instanceof Date) return value;
+  // Only ever a raw number here — `cellDates` is deliberately off (see parseFile) so
+  // this never has to reconcile SheetJS's local-timezone Date objects with this
+  // function's UTC epoch math. If cellDates is ever turned back on, this branch needs
+  // to change too, not just the read() call.
   if (typeof value === 'number' && isFinite(value)) return excelSerialToDate(value);
   return null;
 }
@@ -168,12 +171,16 @@ export default function ImportTab({ onImported }: ImportTabProps) {
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
-          // cellDates: true — makes SheetJS parse date/time-formatted numeric cells
-          // into JS Date objects instead of leaving them as raw Excel serial numbers
-          // (e.g. 46231, 0.3333333333333333), which is exactly the bug that silently
-          // corrupted attendance_date/jam_set/jam_absensi before (fixed data + this
-          // guard: excelSerialToDate() below still catches cells SheetJS misses).
-          const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+          // Deliberately NOT using `cellDates: true` here. SheetJS's own Date-object
+          // conversion for date/time cells is anchored to the *local* timezone of
+          // whatever machine runs the parser (verified: a "08:00" time cell parses to a
+          // Date whose getUTCHours() is 0 on a UTC+7 machine — getHours() gives the
+          // right 8, getUTCHours() doesn't) while excelSerialToDate() below is pure UTC
+          // epoch math. Mixing the two silently produced "jam 00:xx" for the first ~7
+          // hours of each day. Keeping cellDates off means every date/time cell comes
+          // through as its raw Excel serial number, always converted by the one
+          // timezone-independent function below — no ambiguity between the two paths.
+          const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
