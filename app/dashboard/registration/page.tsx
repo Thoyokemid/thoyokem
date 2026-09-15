@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { redirect } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { ListViewLayout, ListRow, ListRowAvatar, StatusBadge } from "@/components/ui/ListView";
+import RegistrationDetailView from "./components/RegistrationDetailView";
 import { Registration } from "@/types";
 import { getInitials } from "@/utils/format";
 import { AlertCircle, CheckCircle, XCircle, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/date";
 
-export default function RegistrationPage() {
+function RegistrationPageInner() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
@@ -90,6 +92,11 @@ export default function RegistrationPage() {
     );
   }
 
+  const detailId = searchParams.get('id');
+  if (detailId) {
+    return <RegistrationDetailView id={decodeURIComponent(detailId)} />;
+  }
+
   const filteredRegistrations = registrations.filter((r) => r.status === activeTab);
 
   const tabs = [
@@ -149,7 +156,7 @@ export default function RegistrationPage() {
           filteredRegistrations.map((registration) => (
             <ListRow
               key={registration.id}
-              onClick={() => router.push(`/dashboard/registration/${encodeURIComponent(registration.id)}`)}
+              onClick={() => router.push(`/dashboard/registration?id=${encodeURIComponent(registration.id)}`)}
               avatar={<ListRowAvatar initials={getInitials(registration.name)} />}
               title={registration.name}
               statusTone={activeTab === 'approved' ? 'green' : activeTab === 'rejected' ? 'red' : 'orange'}
@@ -180,6 +187,14 @@ export default function RegistrationPage() {
           ))
         )}
       </ListViewLayout>
-    
+
+  );
+}
+
+export default function RegistrationPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegistrationPageInner />
+    </Suspense>
   );
 }

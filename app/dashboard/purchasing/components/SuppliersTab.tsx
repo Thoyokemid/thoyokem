@@ -238,7 +238,7 @@ export default function SuppliersTab() {
         suppliers.map((s) => (
           <ListRow
             key={s.supplier_id}
-            onClick={() => router.push(`/dashboard/purchasing/supplier/${encodeURIComponent(s.supplier_id)}`)}
+            onClick={() => router.push(`/dashboard/purchasing/supplier?id=${encodeURIComponent(s.supplier_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><Truck size={14} /></span>}
             title={s.supplier_name}
             statusTone={s.is_active ? 'green' : 'red'}

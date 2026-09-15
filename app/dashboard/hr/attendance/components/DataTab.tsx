@@ -213,7 +213,7 @@ export default function DataTab() {
             paginatedData.map((row, i) => (
               <ListRow
                 key={i}
-                onClick={() => router.push(`/dashboard/hr/attendance/record/${encodeURIComponent(row.id || row.cloud_id)}`)}
+                onClick={() => router.push(`/dashboard/hr/attendance/record?id=${encodeURIComponent(row.id || row.cloud_id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(row.employee_name || '?')} />}
                 title={row.employee_name}
                 subtitle={`${row.designation || '-'}${row.branch ? ' · ' + row.branch : ''}`}

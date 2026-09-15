@@ -95,7 +95,7 @@ export default function StockBalanceTab() {
           filtered.map((b) => (
             <ListRow
               key={`${b.item_code}::${b.warehouse_id}`}
-              onClick={() => router.push(`/dashboard/inventory/item/${encodeURIComponent(b.item_code)}`)}
+              onClick={() => router.push(`/dashboard/inventory/item?id=${encodeURIComponent(b.item_code)}`)}
               avatar={
                 <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                   <Boxes size={14} />

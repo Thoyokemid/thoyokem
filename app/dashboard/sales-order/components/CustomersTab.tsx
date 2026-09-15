@@ -246,7 +246,7 @@ export default function CustomersTab() {
         customers.map((c) => (
           <ListRow
             key={c.customer_id}
-            onClick={() => router.push(`/dashboard/sales-order/customer/${encodeURIComponent(c.customer_id)}`)}
+            onClick={() => router.push(`/dashboard/sales-order/customer?id=${encodeURIComponent(c.customer_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><User size={14} /></span>}
             title={c.customer_name}
             statusTone={c.is_active ? 'green' : 'red'}

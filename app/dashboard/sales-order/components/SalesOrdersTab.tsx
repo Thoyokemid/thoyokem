@@ -315,7 +315,7 @@ export default function SalesOrdersTab() {
         orders.map((so) => (
           <ListRow
             key={so.so_id}
-            onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(so.so_id)}`)}
+            onClick={() => router.push(`/dashboard/sales-order/sales-order?id=${encodeURIComponent(so.so_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><ShoppingBag size={14} /></span>}
             title={so.so_id}
             statusTone={STATUS_TONE[so.status] || 'gray'}

@@ -81,7 +81,7 @@ export default function DeliveryHistoryTab() {
         deliveries.map((dn) => (
           <ListRow
             key={dn.dn_id}
-            onClick={() => router.push(`/dashboard/delivery-order/delivery-note/${encodeURIComponent(dn.dn_id)}`)}
+            onClick={() => router.push(`/dashboard/delivery-order/delivery-note?id=${encodeURIComponent(dn.dn_id)}`)}
             avatar={
               <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center">
                 <PackageCheck size={14} />

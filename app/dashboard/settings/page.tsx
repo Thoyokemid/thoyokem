@@ -490,7 +490,7 @@ export default function SettingsPage() {
                   roles.map((role) => (
                     <tr
                       key={role.role_id}
-                      onClick={() => router.push(`/dashboard/settings/role/${encodeURIComponent(role.role_id)}`)}
+                      onClick={() => router.push(`/dashboard/settings/role?id=${encodeURIComponent(role.role_id)}`)}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                     >
                       <td className="py-2.5 pr-4 text-xs font-semibold text-gray-900 dark:text-gray-100">
@@ -555,7 +555,7 @@ export default function SettingsPage() {
                     users.map((user) => (
                       <tr
                         key={user.id}
-                        onClick={() => router.push(`/dashboard/settings/user/${encodeURIComponent(user.id)}`)}
+                        onClick={() => router.push(`/dashboard/settings/user?id=${encodeURIComponent(user.id)}`)}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                       >
                         <td className="py-2.5 pr-4">

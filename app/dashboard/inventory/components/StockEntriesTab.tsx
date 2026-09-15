@@ -218,7 +218,7 @@ export default function StockEntriesTab() {
           return (
             <ListRow
               key={entry.entry_id}
-              onClick={() => router.push(`/dashboard/inventory/stock-entry/${encodeURIComponent(entry.entry_id)}`)}
+              onClick={() => router.push(`/dashboard/inventory/stock-entry?id=${encodeURIComponent(entry.entry_id)}`)}
               avatar={
                 <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                   <Icon size={14} />

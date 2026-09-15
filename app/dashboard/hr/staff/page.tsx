@@ -25,6 +25,7 @@ import {
   SavedViewsMenu,
   ListSelectionBar,
 } from "@/components/ui/ListView";
+import StaffDetailView from "./components/StaffDetailView";
 import { StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download, Ban } from "lucide-react";
@@ -282,8 +283,13 @@ export default function StaffPage() {
     );
   }
 
+  const detailId = searchParams.get('id');
+  if (detailId) {
+    return <StaffDetailView id={decodeURIComponent(detailId)} />;
+  }
+
   return (
-    
+
       <>
       <ListViewLayout
         title="Staff Management"
@@ -360,7 +366,7 @@ export default function StaffPage() {
             {paginatedStaff.map((s) => (
               <ListRow
                 key={s.employee_id}
-                onClick={() => router.push(`/dashboard/hr/staff/${encodeURIComponent(s.employee_id)}`)}
+                onClick={() => router.push(`/dashboard/hr/staff?id=${encodeURIComponent(s.employee_id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(s.employee_name)} />}
                 title={s.employee_name}
                 subtitle={s.user_id || '-'}
@@ -405,7 +411,7 @@ export default function StaffPage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                   {paginatedStaff.map((s) => (
-                    <tr key={s.employee_id} onClick={() => router.push(`/dashboard/hr/staff/${encodeURIComponent(s.employee_id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                    <tr key={s.employee_id} onClick={() => router.push(`/dashboard/hr/staff?id=${encodeURIComponent(s.employee_id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
                       {STAFF_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
                         <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
                           {String((s as any)[col.key] ?? '-')}

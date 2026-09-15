@@ -166,7 +166,7 @@ export default function BomTab() {
         boms.map((b) => (
           <ListRow
             key={b.bom_id}
-            onClick={() => router.push(`/dashboard/inventory/bom/${encodeURIComponent(b.bom_id)}`)}
+            onClick={() => router.push(`/dashboard/inventory/bom?id=${encodeURIComponent(b.bom_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center"><Layers size={14} /></span>}
             title={b.item_name || b.item_code}
             statusTone={b.is_active ? 'green' : 'gray'}

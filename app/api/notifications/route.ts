@@ -14,22 +14,22 @@ interface NotificationItem {
 
 // Maps a doctype to its detail page — kept in sync with app/dashboard/audit-log/page.tsx's DOCTYPE_HREF.
 const DOCTYPE_HREF: Record<string, (id: string) => string> = {
-  'Purchase Order': (id) => `/dashboard/purchasing/purchase-order/${encodeURIComponent(id)}`,
-  'Purchase Invoice': (id) => `/dashboard/purchasing/purchase-invoice/${encodeURIComponent(id)}`,
-  Supplier: (id) => `/dashboard/purchasing/supplier/${encodeURIComponent(id)}`,
-  'Sales Order': (id) => `/dashboard/sales-order/sales-order/${encodeURIComponent(id)}`,
-  'Sales Invoice': (id) => `/dashboard/sales-order/sales-invoice/${encodeURIComponent(id)}`,
-  Customer: (id) => `/dashboard/sales-order/customer/${encodeURIComponent(id)}`,
-  'Delivery Note': (id) => `/dashboard/delivery-order/delivery-note/${encodeURIComponent(id)}`,
-  Item: (id) => `/dashboard/inventory/item/${encodeURIComponent(id)}`,
-  Warehouse: (id) => `/dashboard/inventory/warehouse/${encodeURIComponent(id)}`,
-  'Stock Entry': (id) => `/dashboard/inventory/stock-entry/${encodeURIComponent(id)}`,
-  BOM: (id) => `/dashboard/inventory/bom/${encodeURIComponent(id)}`,
-  Staff: (id) => `/dashboard/hr/staff/${encodeURIComponent(id)}`,
-  Leave: (id) => `/dashboard/hr/leave/${encodeURIComponent(id)}`,
-  Registration: (id) => `/dashboard/registration/${encodeURIComponent(id)}`,
-  Role: (id) => `/dashboard/settings/role/${encodeURIComponent(id)}`,
-  User: (id) => `/dashboard/settings/user/${encodeURIComponent(id)}`,
+  'Purchase Order': (id) => `/dashboard/purchasing/purchase-order?id=${encodeURIComponent(id)}`,
+  'Purchase Invoice': (id) => `/dashboard/purchasing/purchase-invoice?id=${encodeURIComponent(id)}`,
+  Supplier: (id) => `/dashboard/purchasing/supplier?id=${encodeURIComponent(id)}`,
+  'Sales Order': (id) => `/dashboard/sales-order/sales-order?id=${encodeURIComponent(id)}`,
+  'Sales Invoice': (id) => `/dashboard/sales-order/sales-invoice?id=${encodeURIComponent(id)}`,
+  Customer: (id) => `/dashboard/sales-order/customer?id=${encodeURIComponent(id)}`,
+  'Delivery Note': (id) => `/dashboard/delivery-order/delivery-note?id=${encodeURIComponent(id)}`,
+  Item: (id) => `/dashboard/inventory/item?id=${encodeURIComponent(id)}`,
+  Warehouse: (id) => `/dashboard/inventory/warehouse?id=${encodeURIComponent(id)}`,
+  'Stock Entry': (id) => `/dashboard/inventory/stock-entry?id=${encodeURIComponent(id)}`,
+  BOM: (id) => `/dashboard/inventory/bom?id=${encodeURIComponent(id)}`,
+  Staff: (id) => `/dashboard/hr/staff?id=${encodeURIComponent(id)}`,
+  Leave: (id) => `/dashboard/hr/leave?id=${encodeURIComponent(id)}`,
+  Registration: (id) => `/dashboard/registration?id=${encodeURIComponent(id)}`,
+  Role: (id) => `/dashboard/settings/role?id=${encodeURIComponent(id)}`,
+  User: (id) => `/dashboard/settings/user?id=${encodeURIComponent(id)}`,
 };
 
 export async function GET() {
@@ -51,7 +51,7 @@ export async function GET() {
               id: po.poId,
               label: po.poId,
               subtitle: 'Menunggu approval PO',
-              href: `/dashboard/purchasing/purchase-order/${encodeURIComponent(po.poId)}`,
+              href: `/dashboard/purchasing/purchase-order?id=${encodeURIComponent(po.poId)}`,
               action: 'Approve',
             });
           }
@@ -65,7 +65,7 @@ export async function GET() {
               id: so.soId,
               label: so.soId,
               subtitle: 'Menunggu approval SO',
-              href: `/dashboard/sales-order/sales-order/${encodeURIComponent(so.soId)}`,
+              href: `/dashboard/sales-order/sales-order?id=${encodeURIComponent(so.soId)}`,
               action: 'Approve',
             });
           }
@@ -89,7 +89,7 @@ export async function GET() {
                 id: dn.dnId,
                 label: dn.dnId,
                 subtitle: `Perlu ${action} — status: ${dn.status}`,
-                href: `/dashboard/delivery-order/delivery-note/${encodeURIComponent(dn.dnId)}`,
+                href: `/dashboard/delivery-order/delivery-note?id=${encodeURIComponent(dn.dnId)}`,
                 action,
               });
             }
@@ -107,7 +107,7 @@ export async function GET() {
               id: r.id,
               label: r.name || r.email,
               subtitle: 'Menunggu approval registrasi',
-              href: `/dashboard/registration/${encodeURIComponent(r.id)}`,
+              href: `/dashboard/registration?id=${encodeURIComponent(r.id)}`,
               action: 'Approve',
             });
           }

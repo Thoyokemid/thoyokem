@@ -258,7 +258,7 @@ export default function PurchaseOrdersTab() {
         orders.map((po) => (
           <ListRow
             key={po.po_id}
-            onClick={() => router.push(`/dashboard/purchasing/purchase-order/${encodeURIComponent(po.po_id)}`)}
+            onClick={() => router.push(`/dashboard/purchasing/purchase-order?id=${encodeURIComponent(po.po_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><ShoppingCart size={14} /></span>}
             title={po.po_id}
             statusTone={STATUS_TONE[po.status] || 'gray'}

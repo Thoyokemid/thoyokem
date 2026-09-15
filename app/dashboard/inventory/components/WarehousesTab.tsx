@@ -350,7 +350,7 @@ export default function WarehousesTab() {
         warehouses.map((w) => (
           <ListRow
             key={w.warehouse_id}
-            onClick={() => router.push(`/dashboard/inventory/warehouse/${encodeURIComponent(w.warehouse_id)}`)}
+            onClick={() => router.push(`/dashboard/inventory/warehouse?id=${encodeURIComponent(w.warehouse_id)}`)}
             avatar={
               <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                 <WarehouseIcon size={14} />

@@ -24,6 +24,7 @@ import {
   ListSelectionBar,
 } from "@/components/ui/ListView";
 import { useSavedViews } from "@/lib/savedViews";
+import LeaveDetailView from "./components/LeaveDetailView";
 import { LeaveAttendance, StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
 import { Plus, Calendar, Edit, Trash2, Upload, FileText, Search, ChevronUp, ChevronDown, ShieldOff, Download, Ban } from "lucide-react";
@@ -390,6 +391,11 @@ export default function LeavePage() {
     );
   }
 
+  const detailId = searchParams.get('id');
+  if (detailId) {
+    return <LeaveDetailView id={decodeURIComponent(detailId)} />;
+  }
+
   const hasActiveFilter = searchName || filterCategory || filterDateFrom || filterDateTo;
 
   return (
@@ -533,7 +539,7 @@ export default function LeavePage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                   {paginatedLeaves.map((row) => (
-                    <tr key={row.id} onClick={() => router.push(`/dashboard/hr/leave/${encodeURIComponent(row.id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                    <tr key={row.id} onClick={() => router.push(`/dashboard/hr/leave?id=${encodeURIComponent(row.id)}`)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
                       {LEAVE_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((col) => (
                         <td key={col.key} className="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300">
                           {col.key === 'leave_type'
@@ -572,7 +578,7 @@ export default function LeavePage() {
             {paginatedLeaves.map((row) => (
               <ListRow
                 key={row.id}
-                onClick={() => router.push(`/dashboard/hr/leave/${encodeURIComponent(row.id)}`)}
+                onClick={() => router.push(`/dashboard/hr/leave?id=${encodeURIComponent(row.id)}`)}
                 avatar={<ListRowAvatar initials={getInitials(row.employee_name)} />}
                 title={row.employee_name}
                 subtitle={`${formatDate(row.from_date)} → ${formatDate(row.to_date)}${row.description ? ' · ' + row.description : ''}`}

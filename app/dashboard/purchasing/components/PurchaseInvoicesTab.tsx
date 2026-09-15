@@ -120,7 +120,7 @@ export default function PurchaseInvoicesTab() {
         invoices.map((inv) => (
           <ListRow
             key={inv.pi_id}
-            onClick={() => router.push(`/dashboard/purchasing/purchase-invoice/${encodeURIComponent(inv.pi_id)}`)}
+            onClick={() => router.push(`/dashboard/purchasing/purchase-invoice?id=${encodeURIComponent(inv.pi_id)}`)}
             avatar={<span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center"><FileText size={14} /></span>}
             title={inv.pi_id}
             statusTone={STATUS_TONE[inv.status] || 'gray'}

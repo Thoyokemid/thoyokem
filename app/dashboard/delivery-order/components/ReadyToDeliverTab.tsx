@@ -98,7 +98,7 @@ export default function ReadyToDeliverTab() {
         readyOrders.map((so) => (
           <ListRow
             key={so.so_id}
-            onClick={() => router.push(`/dashboard/sales-order/sales-order/${encodeURIComponent(so.so_id)}`)}
+            onClick={() => router.push(`/dashboard/sales-order/sales-order?id=${encodeURIComponent(so.so_id)}`)}
             avatar={<ListRowAvatar initials="SO" />}
             title={so.so_id}
             subtitle={`${so.customer_name} · ${so.items.length} item`}

@@ -14,16 +14,16 @@ import { formatDate } from '@/lib/date';
 // Purchase Receipt and correction entries have no dedicated detail page, so those stay non-clickable.
 function voucherRoute(voucherType: string, voucherId: string): string | null {
   if (voucherType === 'Delivery Note' || voucherType === 'Delivery Note Cancellation') {
-    return `/dashboard/delivery-order/delivery-note/${encodeURIComponent(voucherId)}`;
+    return `/dashboard/delivery-order/delivery-note?id=${encodeURIComponent(voucherId)}`;
   }
   if (voucherType === 'Stock Entry') {
-    return `/dashboard/inventory/stock-entry/${encodeURIComponent(voucherId)}`;
+    return `/dashboard/inventory/stock-entry?id=${encodeURIComponent(voucherId)}`;
   }
   if (voucherType === 'Sales Order Cancellation') {
-    return `/dashboard/sales-order/sales-order/${encodeURIComponent(voucherId)}`;
+    return `/dashboard/sales-order/sales-order?id=${encodeURIComponent(voucherId)}`;
   }
   if (voucherType === 'Purchase Order Cancellation') {
-    return `/dashboard/purchasing/purchase-order/${encodeURIComponent(voucherId)}`;
+    return `/dashboard/purchasing/purchase-order?id=${encodeURIComponent(voucherId)}`;
   }
   return null;
 }

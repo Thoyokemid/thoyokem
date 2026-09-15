@@ -355,7 +355,7 @@ export default function ItemsTab() {
         filteredItems.map((item) => (
           <ListRow
             key={item.item_code}
-            onClick={() => router.push(`/dashboard/inventory/item/${encodeURIComponent(item.item_code)}`)}
+            onClick={() => router.push(`/dashboard/inventory/item?id=${encodeURIComponent(item.item_code)}`)}
             avatar={
               <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary flex items-center justify-center">
                 <Package size={14} />
