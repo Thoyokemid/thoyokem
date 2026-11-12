@@ -27,6 +27,7 @@ export async function GET() {
       employee_name: r.employeeName,
       date_of_birth: r.dateOfBirth || '',
       leave_allocation: r.leaveAllocation ?? 12,
+      is_active: r.isActive,
     }));
 
     return NextResponse.json(staff);
@@ -92,6 +93,7 @@ export async function PUT(request: NextRequest) {
         employeeName: updates.employee_name ?? current.employeeName,
         dateOfBirth: updates.date_of_birth ?? current.dateOfBirth,
         leaveAllocation: updates.leave_allocation ?? current.leaveAllocation,
+        isActive: updates.is_active ?? current.isActive,
       },
     });
 
@@ -122,6 +124,14 @@ export async function DELETE(request: NextRequest) {
     const existing = await prisma.staffList.findUnique({ where: { employeeId: id } });
     if (!existing) {
       return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
+    }
+
+    const leaveCount = await prisma.leaveAttendance.count({ where: { employee: existing.userId } });
+    if (leaveCount > 0) {
+      return NextResponse.json(
+        { error: `Tidak bisa dihapus: ${existing.employeeName} masih punya ${leaveCount} data cuti. Hapus data cuti tersebut dulu.` },
+        { status: 409 }
+      );
     }
 
     await prisma.staffList.delete({ where: { employeeId: id } });

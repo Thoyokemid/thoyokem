@@ -153,6 +153,7 @@ model StaffList {
   employeeName    String  @map("employee_name")
   dateOfBirth     String? @map("date_of_birth")
   leaveAllocation Int?    @map("leave_allocation")
+  isActive        Boolean @default(true) @map("is_active")
 
   leaves LeaveAttendance[]
 

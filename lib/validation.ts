@@ -255,6 +255,7 @@ export const staffUpdateSchema = z.object({
   employee_name: z.string().optional().nullable(),
   date_of_birth: z.string().optional().nullable(),
   leave_allocation: z.coerce.number().optional().nullable(),
+  is_active: z.boolean().optional(),
 });
 
 export const leaveCreateSchema = z.object({

@@ -17,7 +17,7 @@ export async function GET() {
 
   try {
     const records = await prisma.staffList.findMany({
-      where: { dateOfBirth: { not: null } },
+      where: { dateOfBirth: { not: null }, isActive: true },
       select: { employeeId: true, employeeName: true, dateOfBirth: true },
     });
 

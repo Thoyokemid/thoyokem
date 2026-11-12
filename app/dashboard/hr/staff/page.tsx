@@ -28,7 +28,7 @@ import {
 import StaffDetailView from "./components/StaffDetailView";
 import { StaffList } from "@/types";
 import { getInitials } from "@/utils/format";
-import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, Download, Ban } from "lucide-react";
+import { Plus, Edit, Trash2, Search, ShieldOff, Cake, UserCog, UserCheck, UserX, Download, Ban } from "lucide-react";
 import * as XLSX from "xlsx";
 import { logExport } from "@/lib/logExport";
 import { formatDate } from "@/lib/date";
@@ -79,6 +79,7 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState<StaffList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchName, setSearchName] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [birthdayFilter, setBirthdayFilter] = useState<'all' | 'has' | 'missing'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE_COLS);
@@ -126,6 +127,8 @@ export default function StaffPage() {
 
   const filteredStaff = useMemo(() => {
     let result = staff;
+    if (statusFilter === 'active') result = result.filter((s) => s.is_active !== false);
+    if (statusFilter === 'inactive') result = result.filter((s) => s.is_active === false);
     if (searchName.trim()) {
       const q = searchName.toLowerCase();
       result = result.filter((s) => s.employee_name.toLowerCase().includes(q));
@@ -133,11 +136,11 @@ export default function StaffPage() {
     if (birthdayFilter === 'has') result = result.filter((s) => !!s.date_of_birth);
     if (birthdayFilter === 'missing') result = result.filter((s) => !s.date_of_birth);
     return result;
-  }, [staff, searchName, birthdayFilter]);
+  }, [staff, searchName, birthdayFilter, statusFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchName, birthdayFilter, viewMode]);
+  }, [searchName, birthdayFilter, statusFilter, viewMode]);
 
   const totalPages = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE));
   const paginatedStaff = useMemo(() => {
@@ -217,6 +220,28 @@ export default function StaffPage() {
     } catch (error) {
       console.error("Error deleting staff:", error);
       toast.error("Gagal menghapus data karyawan");
+    }
+  };
+
+  const handleToggleActive = async (s: StaffList) => {
+    const next = s.is_active === false;
+    if (!next && !(await confirmDialog({ message: `Nonaktifkan ${s.employee_name}? Data & riwayat cutinya tetap tersimpan.`, danger: false, confirmText: 'Ya, Nonaktifkan' }))) return;
+    try {
+      const response = await fetch("/api/staff", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: s.employee_id, is_active: next }),
+      });
+      if (response.ok) {
+        toast.success(next ? "Karyawan diaktifkan" : "Karyawan dinonaktifkan");
+        fetchData();
+      } else {
+        const err = await response.json().catch(() => null);
+        toast.error(err?.error || "Gagal mengubah status");
+      }
+    } catch (error) {
+      console.error("Error toggling staff status:", error);
+      toast.error("Gagal mengubah status");
     }
   };
 
@@ -308,6 +333,14 @@ export default function StaffPage() {
         }
         filterGroups={[
           {
+            title: 'Status',
+            filters: [
+              { label: 'Aktif', value: 'active', active: statusFilter === 'active', onClick: () => setStatusFilter('active'), count: staff.filter((s) => s.is_active !== false).length },
+              { label: 'Nonaktif', value: 'inactive', active: statusFilter === 'inactive', onClick: () => setStatusFilter('inactive'), count: staff.filter((s) => s.is_active === false).length },
+              { label: 'Semua', value: 'all', active: statusFilter === 'all', onClick: () => setStatusFilter('all'), count: staff.length },
+            ],
+          },
+          {
             title: 'Tanggal Lahir',
             filters: [
               { label: 'Semua', value: 'all', active: birthdayFilter === 'all', onClick: () => setBirthdayFilter('all'), count: staff.length },
@@ -383,13 +416,19 @@ export default function StaffPage() {
                     {s.date_of_birth ? formatDate(s.date_of_birth) : 'No birth date'}
                   </div>
                 }
-                badges={<StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />}
+                badges={<>
+                  <StatusBadge label={`${s.leave_allocation ?? 12} hari/tahun`} tone="purple" />
+                  {s.is_active === false && <StatusBadge label="Nonaktif" tone="gray" />}
+                </>}
                 selected={selectedIds.has(s.employee_id)}
                 onSelectChange={(checked) => toggleSelect(s.employee_id, checked)}
                 actions={
                   <>
                     <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
                       <Edit size={14} />
+                    </button>
+                    <button onClick={() => handleToggleActive(s)} title={s.is_active === false ? 'Aktifkan' : 'Nonaktifkan'} className="text-amber-600 hover:text-amber-800 dark:text-amber-400">
+                      {s.is_active === false ? <UserCheck size={14} /> : <UserX size={14} />}
                     </button>
                     <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
                       <Trash2 size={14} />
@@ -428,6 +467,9 @@ export default function StaffPage() {
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <button onClick={() => handleEdit(s)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
                             <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleToggleActive(s)} title={s.is_active === false ? 'Aktifkan' : 'Nonaktifkan'} className="text-amber-600 hover:text-amber-800 dark:text-amber-400">
+                            {s.is_active === false ? <UserCheck size={14} /> : <UserX size={14} />}
                           </button>
                           <button onClick={() => handleDelete(s.employee_id)} className="text-red-600 hover:text-red-800 dark:text-red-400">
                             <Trash2 size={14} />

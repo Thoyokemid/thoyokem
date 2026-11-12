@@ -124,6 +124,7 @@ export interface StaffList {
   employee_name: string;
   date_of_birth?: string;
   leave_allocation?: number;
+  is_active?: boolean;
 }
 
 // Session Types
