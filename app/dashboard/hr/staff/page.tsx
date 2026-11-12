@@ -207,9 +207,16 @@ export default function StaffPage() {
     if (!(await confirmDialog({ message: "Hapus data karyawan ini? Tindakan ini tidak bisa dibatalkan." }))) return;
     try {
       const response = await fetch(`/api/staff?id=${id}`, { method: "DELETE" });
-      if (response.ok) fetchData();
+      if (response.ok) {
+        toast.success("Data karyawan dihapus");
+        fetchData();
+      } else {
+        const err = await response.json().catch(() => null);
+        toast.error(err?.error || "Gagal menghapus data karyawan");
+      }
     } catch (error) {
       console.error("Error deleting staff:", error);
+      toast.error("Gagal menghapus data karyawan");
     }
   };
 
